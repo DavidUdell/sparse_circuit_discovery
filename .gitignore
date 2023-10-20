@@ -1,0 +1,13 @@
+# Intermediate interpretability data
+*.pt
+*.npy
+
+# `Lightning` training logging
+*.ckpt
+logs/
+
+# HF access tokens
+act_access.yaml
+
+# Testing
+tests/smoke_test_data/smoke_test_token_info.csv
