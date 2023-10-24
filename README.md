@@ -7,14 +7,16 @@ Automatic circuit discovery in large language models, using sparse coding.
 - [Project Status](#project-status)
 
 ## Installation
-To manually install, just run these two commands in the shell:
+To manually install, just run these commands in the shell:
 
 ```git clone https://github.com/DavidUdell/sparse_circuit_discovery```
+
+```cd sparse_circuit_discovery```
 
 ```pip install --editable sparse_circuit_discovery```
 
 _Alternatively,_ I have a Docker image [hosted on
-DockerHub](https://hub.docker.com/repository/docker/davidudell/sparse_circuit_discovery/general).
+DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery).
 The Docker image is especially good for pulling to a remote server.
 
 ## Usage
