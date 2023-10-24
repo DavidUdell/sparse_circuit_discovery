@@ -11,6 +11,7 @@ act_access.yaml
 
 # Testing
 tests/smoke_test_data/smoke_test_token_info.csv
+__pycache__/
 
 # Onstart script and setuptools temp files
 sparse_circuit_discovery.egg-info/

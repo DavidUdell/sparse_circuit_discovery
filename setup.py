@@ -19,6 +19,7 @@ setup(
         "torch",
         "transformers",
         "accelerate",
+        "datasets",
         "lightning",
         "scikit-learn",
         "PyYAML",
