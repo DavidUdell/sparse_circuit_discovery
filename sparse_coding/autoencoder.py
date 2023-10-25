@@ -239,7 +239,8 @@ early_stop = L.pytorch.callbacks.EarlyStopping(
 model: Autoencoder = Autoencoder()
 logger = L.pytorch.loggers.CSVLogger("logs", name="autoencoder")
 # The `accumulate_grad_batches` argument helps with memory on the largest
-# autoencoders.
+# autoencoders. I don't currently do anything about "dead neurons," as Bricken
+# et al. 2023 found and discussed.
 trainer: L.Trainer = L.Trainer(
     accelerator="auto",
     accumulate_grad_batches=ACCUMULATE_GRAD_BATCHES,
