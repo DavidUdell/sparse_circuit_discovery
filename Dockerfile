@@ -1,5 +1,9 @@
 FROM pytorch/pytorch:latest
 
+# To suppress warning.
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NOWARNINGS="yes"
+
 # Install git.
 RUN apt-get update && apt-get install -y git
 
