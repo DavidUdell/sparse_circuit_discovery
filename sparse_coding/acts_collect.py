@@ -63,8 +63,10 @@ t.set_grad_enabled(False)
 accelerator: Accelerator = Accelerator()
 # `device_map="auto` helps initialize big models. Note that the HF transformers
 # `CausalLMOutput` class has both a `hidden_states` and an `attentions`
-# attribute, so all the internal tensors we need should be available through
-# the vanilla HF API.
+# attribute, so most of the internal tensors we need should be available through
+# the vanilla HF API. We'll have to write and register out own hook factory to
+# extract MLP output activations, though; for whatever reason, the HF API
+# doesn't expose those to us.
 model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     device_map="auto",
