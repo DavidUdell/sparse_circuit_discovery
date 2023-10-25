@@ -1,7 +1,7 @@
 FROM pytorch/pytorch:latest
 
 # Install git.
-RUN apt update && apt install -y git
+RUN apt-get update && apt-get install -y git
 
 # Install repository.
 WORKDIR /root/sparse_circuit_discovery
