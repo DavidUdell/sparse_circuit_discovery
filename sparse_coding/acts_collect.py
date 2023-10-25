@@ -61,7 +61,10 @@ np.random.seed(SEED)
 # Efficient inference and model parallelization.
 t.set_grad_enabled(False)
 accelerator: Accelerator = Accelerator()
-# `device_map="auto` helps initialize big models.
+# `device_map="auto` helps initialize big models. Note that the HF transformers
+# `CausalLMOutput` class has both a `hidden_states` and an `attentions`
+# attribute, so all the internal tensors we need should be available through
+# the vanilla HF API.
 model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     device_map="auto",
