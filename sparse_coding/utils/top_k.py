@@ -237,14 +237,15 @@ def filter_encoder_activations_by_input_token(
     indices_of_encoder_activations_at_input_token = t.nonzero(
         flat_input_token_ids == input_token_id
     )
-    flat_indices_of_encoder_activations_at_input_token = (
+    # Flatten in-place.
+    indices_of_encoder_activations_at_input_token = (
         indices_of_encoder_activations_at_input_token.squeeze(dim=1)
     )
 
     # Fancy index along dim=0.
     dims_from_encoder_activations_at_input_token_in_batch = (
         batched_dims_from_encoder_activations[
-            flat_indices_of_encoder_activations_at_input_token
+            indices_of_encoder_activations_at_input_token
         ]
     )
 
