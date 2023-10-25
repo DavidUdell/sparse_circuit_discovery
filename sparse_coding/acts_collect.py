@@ -231,7 +231,7 @@ for (
         model_accuracy += 1.0
 
 model_accuracy /= len(answers_with_rubric)
-print(f"{MODEL_DIR} accuracy:{model_accuracy*100}%.")
+print(f"{MODEL_DIR} accuracy:{round(model_accuracy*100, 2)}%.")
 
 
 # %%
