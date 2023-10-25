@@ -40,9 +40,7 @@ ENCODER_PATH = config.get("ENCODER_PATH")
 BIASES_PATH = config.get("BIASES_PATH")
 SEED = config.get("SEED")
 ACTS_LAYER = config.get("ACTS_LAYER")
-tsfm_config = AutoConfig.from_pretrained(
-    TOKENIZER_DIR, use_auth_token=HF_ACCESS_TOKEN
-)
+tsfm_config = AutoConfig.from_pretrained(TOKENIZER_DIR, token=HF_ACCESS_TOKEN)
 EMBEDDING_DIM = tsfm_config.hidden_size
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(EMBEDDING_DIM * PROJECTION_FACTOR)
@@ -56,7 +54,7 @@ np.random.seed(SEED)
 # The original tokenizer.
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     TOKENIZER_DIR,
-    use_auth_token=HF_ACCESS_TOKEN,
+    token=HF_ACCESS_TOKEN,
 )
 
 # %%

@@ -94,12 +94,12 @@ accelerator: Accelerator = Accelerator()
 model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     device_map="auto",
-    use_auth_token=HF_ACCESS_TOKEN,
+    token=HF_ACCESS_TOKEN,
 )
 
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
-    use_auth_token=HF_ACCESS_TOKEN,
+    token=HF_ACCESS_TOKEN,
 )
 
 # accelerator.prepare() takes over parallelization from here on out.
