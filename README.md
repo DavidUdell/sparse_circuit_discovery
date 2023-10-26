@@ -60,4 +60,4 @@ provide a corresponding HuggingFace access token in
 `sparse_coding/act_access.yaml`.
 
 ## Project Status
-Project is currently extremely WIP. Current version is 0.0.1.
+Project is currently extremely WIP. Current version is 0.0.2.

@@ -2,6 +2,9 @@
 *.pt
 *.npy
 
+# .csv data
+*.csv
+
 # `Lightning` training logging
 *.ckpt
 logs/

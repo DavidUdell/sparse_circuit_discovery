@@ -19,6 +19,7 @@ TOP_K_INFO_PATH: "smoke_test_data/smoke_test_token_info.csv"
 LAMBDA_L1: 1.0e-4
 LEARNING_RATE: 1.0e-4
 NUM_WORKERS: 0
+ACCUMULATE_GRAD_BATCHES: 1
 
 # Reproducibility
 SEED: 0
