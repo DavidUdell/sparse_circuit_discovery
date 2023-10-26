@@ -44,14 +44,14 @@ LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 LOG_EVERY_N_STEPS = config.get("LOG_EVERY_N_STEPS", 5)
 EPOCHS = config.get("EPOCHS", 150)
 SYNC_DIST_LOGGING = config.get("SYNC_DIST_LOGGING", True)
+TRAINING_BATCH_SIZE = config.get("TRAINING_BATCH_SIZE", 16)
+ACCUMULATE_GRAD_BATCHES = config.get("ACCUMULATE_GRAD_BATCHES", 1)
 
 assert isinstance(LARGE_MODEL_MODE, bool), "LARGE_MODEL_MODE must be a bool."
 
 if not LARGE_MODEL_MODE:
     NUM_WORKERS: int = 0
     ACCUMULATE_GRAD_BATCHES: int = 1
-else:
-    ACCUMULATE_GRAD_BATCHES: int = 4
 
 # %%
 # Use available tensor cores.
@@ -128,14 +128,14 @@ validation_sampler = t.utils.data.SubsetRandomSampler(val_indices)
 # For smaller autoencoders, larger batch sizes are possible.
 training_loader: DataLoader = DataLoader(
     dataset,
-    batch_size=16,
+    batch_size=TRAINING_BATCH_SIZE,
     sampler=training_sampler,
     num_workers=NUM_WORKERS,
 )
 
 validation_loader: DataLoader = DataLoader(
     dataset,
-    batch_size=16,
+    batch_size=TRAINING_BATCH_SIZE,
     sampler=validation_sampler,
     num_workers=NUM_WORKERS,
 )

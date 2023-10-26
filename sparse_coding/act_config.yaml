@@ -1,9 +1,6 @@
 # Model
 MODEL_DIR: "meta-llama/Llama-2-70b-hf"
-ACTS_LAYER: 13
-
-# Batching
-DIMS_IN_BATCH: 4000
+ACTS_LAYER: 32
 
 # Large Model Mode
 LARGE_MODEL_MODE: True
@@ -21,7 +18,9 @@ TOP_K_INFO_PATH: "data/token_info.csv"
 # Autoencoder Training
 LAMBDA_L1: 3.0
 LEARNING_RATE: 1.0e-3
-NUM_WORKERS: 16
+TRAINING_BATCH_SIZE: 8
+NUM_WORKERS: 8
+ACCUMULATE_GRAD_BATCHES: 4
 
 # Reproducibility
 SEED: 0
@@ -40,4 +39,5 @@ SYNC_DIST_LOGGING: True
 # Stable Dev Constants (`feature_tokens.py`)
 # _Leave out entries_ for None: None values will be interpreted as "None"
 # strings.
+DIMS_IN_BATCH: 5000
 TOP_K: 6
