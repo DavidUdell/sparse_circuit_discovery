@@ -1,7 +1,7 @@
 # Model
-# `EleutherAI/pythia-70m`
-# `meta-llama/Llama-2-7b-hf`
-# `meta-llama/Llama-2-70b-hf`
+# "EleutherAI/pythia-70m"
+# "meta-llama/Llama-2-7b-hf"
+# "meta-llama/Llama-2-70b-hf"
 MODEL_DIR: "meta-llama/Llama-2-70b-hf"
 ACTS_LAYER: 32
 
