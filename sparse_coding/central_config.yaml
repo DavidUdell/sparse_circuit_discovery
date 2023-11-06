@@ -1,8 +1,12 @@
 # Model
+# `EleutherAI/pythia-70m`
+# `meta-llama/Llama-2-7b-hf`
+# `meta-llama/Llama-2-70b-hf`
 MODEL_DIR: "meta-llama/Llama-2-70b-hf"
 ACTS_LAYER: 32
 
 # Large Model Mode
+# True for `Llama-2 7B` and larger.
 LARGE_MODEL_MODE: True
 
 # Encoder Size
@@ -25,18 +29,18 @@ ACCUMULATE_GRAD_BATCHES: 4
 # Reproducibility
 SEED: 0
 
-# Stable Dev Constants (`acts_collect.py`)
+# Stable Dev Constants for `collect_acts.py`
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 817
 
-# Stable Dev Constants (`autoencoder.py`)
+# Stable Dev Constants for `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 5
 EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
-# Stable Dev Constants (`feature_tokens.py`)
+# Stable Dev Constants for `interp_top_tokens.py`
 # _Leave out entries_ for None: None values will be interpreted as "None"
 # strings.
 DIMS_IN_BATCH: 5000

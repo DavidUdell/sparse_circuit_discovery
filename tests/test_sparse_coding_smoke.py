@@ -43,7 +43,7 @@ def test_smoke_sparse_coding(
     for script in [
         "collect_acts",
         "train_autoencoder",
-        "interp_top_tokens",
+        "top_tokens_interp",
     ]:
         try:
             print(f"Starting smoke test for {script}...")
