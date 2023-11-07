@@ -56,11 +56,9 @@ def test_smoke_sparse_coding(
     for script in [
         "collect_acts",
         "train_autoencoder",
-        "interp_scripts.top_tokens",
+        "interp_tools.top_tokens",
     ]:
         try:
-            print(f"Starting smoke test for {script}...")
             run_module(f"sparse_coding.{script}")
-            print(f"Smoke test for {script} passed!")
         except Exception as e:  # pylint: disable=broad-except
             pytest.fail(f"Smoke test for {script} failed: {e}")

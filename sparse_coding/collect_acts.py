@@ -40,7 +40,7 @@ MODEL_DIR = config.get("MODEL_DIR")
 LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_SAVE_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
-ACTS_LAYER = config.get("ACTS_LAYERS")
+ACTS_LAYERS = config.get("ACTS_LAYERS")
 SEED = config.get("SEED")
 MAX_NEW_TOKENS = config.get("MAX_NEW_TOKENS", 1)
 NUM_RETURN_SEQUENCES = config.get("NUM_RETURN_SEQUENCES", 1)
@@ -216,7 +216,7 @@ for question_num in sampled_indices:
     # Save the model's answer besides their ground truths.
     answers_with_rubric[question_num] = [int(model_answer), ground_truth]
     # Save the model's activations.
-    activations.append(outputs.hidden_states[ACTS_LAYER])
+    activations.append(outputs.hidden_states[ACTS_LAYERS])
 
 # %%
 # Grade the model's answers.

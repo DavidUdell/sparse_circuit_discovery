@@ -7,7 +7,7 @@ from runpy import run_module
 for script in [
     "collect_acts",
     "train_autoencoder",
-    "interp_scripts.top_tokens",
+    "interp_tools.top_tokens",
 ]:
     try:
         run_module(f"sparse_coding.{script}")
