@@ -24,7 +24,7 @@ from transformers import (
     PreTrainedTokenizer,
 )
 
-from sparse_coding.utils.configure import load_yaml_constants
+from sparse_coding.utils.configure import load_yaml_constants, save_paths
 
 
 assert (
@@ -38,8 +38,8 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 MODEL_DIR = config.get("MODEL_DIR")
 LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
-PROMPT_IDS_PATH = config.get("PROMPT_IDS_PATH")
-ACTS_SAVE_PATH = config.get("ACTS_DATA_PATH")
+PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
+ACTS_SAVE_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
 ACTS_LAYER = config.get("ACTS_LAYER")
 SEED = config.get("SEED")
 MAX_NEW_TOKENS = config.get("MAX_NEW_TOKENS", 1)

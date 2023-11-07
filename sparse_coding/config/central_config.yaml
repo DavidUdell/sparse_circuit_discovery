@@ -12,12 +12,12 @@ LARGE_MODEL_MODE: False
 # Encoder Size
 PROJECTION_FACTOR: 10
 
-# Save Paths
-PROMPT_IDS_PATH: "/root/sparse_circuit_discovery/sparse_coding/data/activations_prompt_ids.npy"
-ACTS_DATA_PATH: "/root/sparse_circuit_discovery/sparse_coding/data/activations_dataset.pt"
-ENCODER_PATH: "/root/sparse_circuit_discovery/sparse_coding/data/learned_encoder.pt"
-BIASES_PATH: "/root/sparse_circuit_discovery/sparse_coding/data/learned_biases.pt"
-TOP_K_INFO_PATH: "/root/sparse_circuit_discovery/sparse_coding/data/token_info.csv"
+# Save Files
+PROMPT_IDS_FILE: "activations_prompt_ids.npy"
+ACTS_DATA_FILE: "activations_dataset.pt"
+ENCODER_FILE: "learned_encoder.pt"
+BIASES_FILE: "learned_biases.pt"
+TOP_K_INFO_FILE: "token_info.csv"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2

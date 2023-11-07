@@ -18,7 +18,8 @@ import transformers
 from accelerate import Accelerator
 from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizer
 
-from sparse_coding.utils import configure, top_k
+from sparse_coding.utils import top_k
+from sparse_coding.utils.configure import load_yaml_constants, save_paths
 
 
 assert (
@@ -27,15 +28,15 @@ assert (
 
 # %%
 # Set up constants.
-access, config = configure.load_yaml_constants(__file__)
+access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 TOKENIZER_DIR = config.get("MODEL_DIR")
-PROMPT_IDS_PATH = config.get("PROMPT_IDS_PATH")
-ACTS_DATA_PATH = config.get("ACTS_DATA_PATH")
-ENCODER_PATH = config.get("ENCODER_PATH")
-BIASES_PATH = config.get("BIASES_PATH")
-TOP_K_INFO_PATH = config.get("TOP_K_INFO_PATH")
+PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
+ACTS_DATA_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
+ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
+BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
+TOP_K_INFO_PATH = save_paths(__file__, config.get("TOP_K_INFO_FILE"))
 SEED = config.get("SEED")
 tsfm_config = AutoConfig.from_pretrained(TOKENIZER_DIR, token=HF_ACCESS_TOKEN)
 EMBEDDING_DIM = tsfm_config.hidden_size

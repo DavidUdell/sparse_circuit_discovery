@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoConfig
 
-from sparse_coding.utils.configure import load_yaml_constants
+from sparse_coding.utils.configure import load_yaml_constants, save_paths
 
 
 assert t.__version__ >= "2.0.1", "`Lightning` requires newer `torch` versions."
@@ -27,10 +27,10 @@ access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 SEED = config.get("SEED")
-ACTS_DATA_PATH = config.get("ACTS_DATA_PATH")
-PROMPT_IDS_PATH = config.get("PROMPT_IDS_PATH")
-BIASES_PATH = config.get("BIASES_PATH")
-ENCODER_PATH = config.get("ENCODER_PATH")
+ACTS_DATA_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
+PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
+BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
+ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
 MODEL_DIR = config.get("MODEL_DIR")
 # Float casts fix YAML bug with scientific notation.
 LAMBDA_L1 = float(config.get("LAMBDA_L1"))

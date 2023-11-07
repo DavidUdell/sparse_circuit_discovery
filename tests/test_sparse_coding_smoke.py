@@ -12,10 +12,10 @@ import yaml
 
 
 @pytest.fixture
-def mock_load_yaml_constants(monkeypatch):
-    """Load from the smoke test configuration YAML files."""
+def mock_configure(monkeypatch):
+    """Load to and from the smoke test yaml files."""
 
-    def mock_load(base_path):  # pylint: disable=unused-argument
+    def mock_load_yaml_constants(base_file):  # pylint: disable=unused-argument
         """Load config files with get() methods."""
 
         try:
@@ -31,13 +31,26 @@ def mock_load_yaml_constants(monkeypatch):
 
         return access, config
 
+    def mock_save_paths(  # pylint: disable=unused-argument
+        base_file, save_append
+    ) -> str:
+        """Route to smoke test save paths from the tests directory."""
+        assert isinstance(
+            save_append, str
+        ), f"`save_append` must be a string: {save_append}."
+        return "smoke_test_data/" + save_append
+
     monkeypatch.setattr(
-        "sparse_coding.utils.configure.load_yaml_constants", mock_load
+        "sparse_coding.utils.configure.load_yaml_constants",
+        mock_load_yaml_constants,
+    )
+    monkeypatch.setattr(
+        "sparse_coding.utils.configure.save_paths", mock_save_paths
     )
 
 
 def test_smoke_sparse_coding(
-    mock_load_yaml_constants,
+    mock_configure,
 ):  # pylint: disable=redefined-outer-name, unused-argument
     """Run the submodule scripts in sequence."""
     for script in [
