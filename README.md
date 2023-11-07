@@ -21,16 +21,16 @@ The Docker image is especially good for pulling to a remote server.
 
 ## Usage
 To train and interpret a sparse autoencoder, go to
-`sparse_coding/config/central_config.yaml`. In that YAML, set your
+`sparse_coding/config/central_config.yaml`. There, set your
 
-1. HuggingFace Transformers model
-repository (`MODEL_DIR`),
-2. layer to collect model activations at
+1. HuggingFace model
+repo (`MODEL_DIR`),
+2. layer index to collect activation data from
 (`ACTS_LAYER`), and
-3. autoencoder training hyperparameters (`LAMBDA_L1`,
+3. autoencoder training hyperparameters values (`LAMBDA_L1`,
 `LEARNING_RATE`, `PROJECTION_FACTOR`).
 
-To help get you started, here are decent starting values for a few HuggingFace models:
+Acceptable starting values for a range of models are:
 
 |`MODEL_DIR`|`ACTS_LAYER`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
 |---|:---:|:---:|:---:|:---:|
@@ -38,8 +38,7 @@ To help get you started, here are decent starting values for a few HuggingFace m
 |meta-llama/Llama-2-7b-hf | 13 | 1.0 | 1.0e-3 | 10 |
 |meta-llama/Llama-2-70b-hf | 32 | 3.0 | 1.0e-3 | 10 |
 
-Once you've set YAML values, run the activation data collection, autoencoder
-training, and autoencoder interpretation pipeline running with:
+Once you've saved the YAML, run the main interpretability pipeline with:
 ```
 cd sparse_coding
 
@@ -48,14 +47,15 @@ python3 pipe.py
 
 ### Notes:
 A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
-convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` hyperparameters
-to achieve this value.
+convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
+hyperparameters to get this L^0.
 
-Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`.
+Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`. This
+solves device issues with `accelerate` on too-small models.
 
 If you're trying to access a gated HuggingFace model repo, you'll have to
-provide a corresponding HuggingFace access token in
-`sparse_coding/act_access.yaml`.
+provide the needed HuggingFace access token in `sparse_coding/act_access.yaml`.
+The script will create this YAML if needed.
 
 ## Project Status
-Project is currently WIP. Current version is 0.1.2.
+Project is currently a WIP. Current version: 0.1.2.
