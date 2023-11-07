@@ -27,7 +27,7 @@ assert (
 
 # %%
 # Set up constants.
-access, config = configure.load_yaml_constants()
+access, config = configure.load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 TOKENIZER_DIR = config.get("MODEL_DIR")

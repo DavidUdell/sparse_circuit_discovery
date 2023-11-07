@@ -23,7 +23,7 @@ assert t.__version__ >= "2.0.1", "`Lightning` requires newer `torch` versions."
 
 # %%
 # Set up constants. Drive towards an L_0 of 20-100 at convergence.
-access, config = load_yaml_constants()
+access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 SEED = config.get("SEED")

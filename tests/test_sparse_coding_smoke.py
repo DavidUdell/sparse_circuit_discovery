@@ -15,7 +15,7 @@ import yaml
 def mock_load_yaml_constants(monkeypatch):
     """Load from the smoke test configuration YAML files."""
 
-    def mock_load():
+    def mock_load(base_path):  # pylint: disable=unused-argument
         """Load config files with get() methods."""
 
         try:
@@ -43,7 +43,7 @@ def test_smoke_sparse_coding(
     for script in [
         "collect_acts",
         "train_autoencoder",
-        "interp.top_tokens",
+        "interp_scripts.top_tokens",
     ]:
         try:
             print(f"Starting smoke test for {script}...")

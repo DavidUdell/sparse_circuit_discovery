@@ -21,7 +21,7 @@ The Docker image is especially good for pulling to a remote server.
 
 ## Usage
 To train and interpret a sparse autoencoder, go to
-`sparse_coding/act_config.yaml`. In that YAML, set your
+`sparse_coding/config/central_config.yaml`. In that YAML, set your
 
 1. HuggingFace Transformers model
 repository (`MODEL_DIR`),
@@ -43,13 +43,13 @@ training, and autoencoder interpretation scripts in sequence:
 ```
 cd sparse_coding
 
-python3 acts_collect.py
+python3 collect_acts.py
 
-python3 autoencoder.py
+python3 train_autoencoder.py
 
-python3 feature_tokens.py
+python3 interp_scripts/top_tokens.py
 ```
-A highly interpretable sparse autoencoder will have an L^0 value of 20-100 at
+A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
 convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` hyperparameters
 to achieve this value.
 
@@ -60,4 +60,4 @@ provide a corresponding HuggingFace access token in
 `sparse_coding/act_access.yaml`.
 
 ## Project Status
-Project is currently extremely WIP. Current version is 0.0.2.
+Project is currently extremely WIP. Current version is 0.1.2.
