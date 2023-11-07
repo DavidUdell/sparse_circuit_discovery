@@ -5,7 +5,7 @@ Note that this integration test will necessarily be somewhat slow.
 """
 
 
-import runpy
+from runpy import run_module
 
 import pytest
 import yaml
@@ -47,7 +47,7 @@ def test_smoke_sparse_coding(
     ]:
         try:
             print(f"Starting smoke test for {script}...")
-            runpy.run_module(f"sparse_coding.{script}")
+            run_module(f"sparse_coding.{script}")
             print(f"Smoke test for {script} passed!")
         except Exception as e:  # pylint: disable=broad-except
             pytest.fail(f"Smoke test for {script} failed: {e}")

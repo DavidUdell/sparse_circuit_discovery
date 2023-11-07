@@ -38,17 +38,15 @@ To help get you started, here are decent starting values for a few HuggingFace m
 |meta-llama/Llama-2-7b-hf | 13 | 1.0 | 1.0e-3 | 10 |
 |meta-llama/Llama-2-70b-hf | 32 | 3.0 | 1.0e-3 | 10 |
 
-Once you've set your YAML values, run the activations data collection, autoencoder
-training, and autoencoder interpretation scripts in sequence:
+Once you've set YAML values, run the activation data collection, autoencoder
+training, and autoencoder interpretation pipeline running with:
 ```
 cd sparse_coding
 
-python3 collect_acts.py
-
-python3 train_autoencoder.py
-
-python3 interp_scripts/top_tokens.py
+python3 pipe.py
 ```
+
+### Notes:
 A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
 convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` hyperparameters
 to achieve this value.
@@ -60,4 +58,4 @@ provide a corresponding HuggingFace access token in
 `sparse_coding/act_access.yaml`.
 
 ## Project Status
-Project is currently extremely WIP. Current version is 0.1.2.
+Project is currently WIP. Current version is 0.1.2.
