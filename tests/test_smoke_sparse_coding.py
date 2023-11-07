@@ -16,14 +16,23 @@ def mock_configure(monkeypatch):
     """Load to and from the smoke test yaml files."""
 
     def mock_load_yaml_constants(base_file):  # pylint: disable=unused-argument
-        """Load config files with get() methods."""
+        """Load config files."""
 
         try:
-            with open("smoke_test_access.yaml", "r", encoding="utf-8") as f:
+            with open(
+            "smoke_test_config/smoke_test_access.yaml",
+            "r",
+            encoding="utf-8"
+            ) as f:
                 access = yaml.safe_load(f)
         except yaml.YAMLError as e:
             print(e)
-        with open("smoke_test_config.yaml", "r", encoding="utf-8") as f:
+
+        with open(
+            "smoke_test_config/smoke_test_config.yaml",
+            "r",
+            encoding="utf-8",
+            ) as f:
             try:
                 config = yaml.safe_load(f)
             except yaml.YAMLError as e:
