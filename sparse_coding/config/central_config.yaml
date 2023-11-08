@@ -10,7 +10,8 @@ MODEL_DIR: "EleutherAI/pythia-70m"
 ACTS_AT_LAYERS_SLICE: "1:3"
 
 # Large Model Mode
-# True for `Llama-2 7B` and larger.
+# Set True for `Llama-2 7B` and larger, False for smaller. This solves a
+# devicing bug in `accelerate` that occurs with smaller models.
 LARGE_MODEL_MODE: False
 
 # Encoder Size
@@ -32,6 +33,7 @@ ACCUMULATE_GRAD_BATCHES: 4
 
 # Reproducibility
 SEED: 0
+
 
 # Stable Dev Constants for `collect_acts.py`
 MAX_NEW_TOKENS: 1
