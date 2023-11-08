@@ -24,7 +24,11 @@ from transformers import (
     PreTrainedTokenizer,
 )
 
-from sparse_coding.utils.caching import parse_slice, validate_slice
+from sparse_coding.utils.caching import (
+    parse_slice,
+    validate_slice,
+    cache_layer_tensor,
+)
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
 
 
@@ -40,7 +44,7 @@ HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 MODEL_DIR = config.get("MODEL_DIR")
 LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
-ACTS_SAVE_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
+ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ACTS_AT_LAYERS_SLICE = parse_slice(config.get("ACTS_AT_LAYERS_SLICE"))
 SEED = config.get("SEED")
 MAX_NEW_TOKENS = config.get("MAX_NEW_TOKENS", 1)
@@ -239,7 +243,16 @@ print(f"{MODEL_DIR} accuracy:{round(model_accuracy*100, 2)}%.")
 
 
 # %%
-# Save the model's prompt_ids and activations.
+# Save prompt ids.
+prompt_ids_list: list = []
+for question_ids in prompts_ids:
+    prompt_ids_list.append(question_ids.tolist())
+prompt_ids_array: ndarray = np.array(prompt_ids_list, dtype=object)
+np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
+
+
+# %%
+# Functionality to pad out activations for saving.
 def pad_activations(tensor, length) -> t.Tensor:
     """Pad activation tensors to a certain stream-dim length."""
     padding_size: int = length - tensor.size(1)
@@ -253,26 +266,31 @@ def pad_activations(tensor, length) -> t.Tensor:
     return t.cat([tensor, padding], dim=1)
 
 
-# Find the widest model activation in the stream-dimension (dim=1).
-max_size: int = max(tensor.size(1) for tensor in activations)
-# Pad the activations to the widest activaiton stream-dim.
-padded_activations: list[t.Tensor] = [
-    pad_activations(tensor, max_size) for tensor in activations
-]
-
-# Concat the model activations.
-concat_activations: t.Tensor = t.cat(
-    padded_activations,
-    dim=0,
+# %%
+# Save activations.
+sequence_layer_indices = range(
+    ACTS_AT_LAYERS_SLICE.start,
+    ACTS_AT_LAYERS_SLICE.stop,
+    1 if ACTS_AT_LAYERS_SLICE.step is None else ACTS_AT_LAYERS_SLICE.step,
 )
 
-# Prep to save the prompt_ids.
-prompt_ids_list: list = []
-for question_ids in prompts_ids:
-    prompt_ids_list.append(question_ids.tolist())
 
-prompt_ids_array: ndarray = np.array(prompt_ids_list, dtype=object)
-
-# Save the activations and prompt_ids.
-np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
-t.save(concat_activations, ACTS_SAVE_PATH)
+for layer_idx in sequence_layer_indices:
+    max_seq_len: int = max(tensor.size(1) for tensor in activations[layer_idx])
+    # Pad the activations to the widest activation stream-dim.
+    padded_activations: list[t.Tensor] = [
+        pad_activations(tensor, max_seq_len)
+        for tensor in activations[layer_idx]
+    ]
+    concat_activations: t.Tensor = t.cat(
+        padded_activations,
+        dim=0,
+    )
+    # Save layer activations in appropriate locations.
+    cache_layer_tensor(
+        concat_activations,
+        layer_idx,
+        ACTS_DATA_FILE,
+        __file__,
+        MODEL_DIR,
+    )

@@ -1,9 +1,13 @@
 """Help cache data and layer tensors from many model layers."""
 
 
+import os
 from textwrap import dedent
 
+import torch as t
 from transformers import PreTrainedModel
+
+from sparse_coding.utils.configure import save_paths
 
 
 def parse_slice(slice_string: str) -> slice:
@@ -62,3 +66,43 @@ def validate_slice(model: PreTrainedModel, layers_slice: slice) -> None:
         )
 
     return
+
+
+def sanitize_model_name(model_name: str) -> str:
+    """Sanitize model names for saving and loading."""
+
+    return model_name.replace("/", "_")
+
+
+def cache_layer_tensor(
+    layer_tensor: t.Tensor,
+    layer_idx: int,
+    save_append: str,
+    base_file: str,
+    model_name: str,
+) -> None:
+    """
+    Cache per layer tensors in appropriate subdirectories.
+
+    Base file is `__file` in the calling module. Save append should be _just_
+    the file name and extension, not any additional path. Model name will be
+    sanitized, so HF hub names are kosher.
+    """
+
+    assert isinstance(
+        layer_idx, int
+    ), f"Layer index {layer_idx} is not an int."
+    # Python bools are an int subclass.
+    assert not isinstance(
+        layer_idx, bool
+    ), f"Layer index {layer_idx} is a bool, not an int."
+
+    save_dir_path: str = save_paths(base_file, "")
+    safe_model_name = sanitize_model_name(model_name)
+
+    # Subdirectory structure in the save directory is
+    # data/models/layers/tensor.pt.
+    save_subdir_path: str = save_dir_path + f"/{safe_model_name}/{layer_idx}"
+
+    os.makedirs(save_subdir_path, exist_ok=True)
+    t.save(layer_tensor, save_subdir_path + f"/{save_append}")
