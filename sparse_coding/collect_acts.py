@@ -24,7 +24,7 @@ from transformers import (
     PreTrainedTokenizer,
 )
 
-from sparse_coding.utils.caching import parse_slice
+from sparse_coding.utils.caching import parse_slice, validate_slice
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
 
 
@@ -81,6 +81,9 @@ tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
 )
 model: PreTrainedModel = accelerator.prepare(model)
 model.eval()
+
+# Validate slice against model's layer count.
+validate_slice(model, ACTS_AT_LAYERS_SLICE)
 
 # %%
 # Load the TruthfulQA dataset.

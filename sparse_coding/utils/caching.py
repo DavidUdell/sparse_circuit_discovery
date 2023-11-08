@@ -3,6 +3,8 @@
 
 from textwrap import dedent
 
+from transformers import PreTrainedModel
+
 
 def parse_slice(slice_string: str) -> slice:
     """Parse a well-formed slice string into a proper slice."""
@@ -28,4 +30,35 @@ def parse_slice(slice_string: str) -> slice:
     if len(slice_parts) == 3 and slice_parts[2]:
         step = int(slice_parts[2])
 
-    return slice(start, stop, step)
+    layers_slice = slice(start, stop, step)
+    assert start < stop, dedent(
+        f"""
+        Slice start ({layers_slice.start}) must be less than stop
+        ({layers_slice.stop})
+        """
+    )
+
+    return layers_slice
+
+
+def validate_slice(model: PreTrainedModel, layers_slice: slice) -> None:
+    """See whether the layers slice fits in the model's layers."""
+
+    if layers_slice.stop is None:
+        return
+
+    # num_hidden_layers is not inclusive.
+    last_layer: int = model.config.num_hidden_layers - 1
+
+    # slice.stop is not inclusive.
+    if last_layer < layers_slice.stop - 1:
+        raise ValueError(
+            dedent(
+                f"""
+                The layers slice {layers_slice} is out of bounds for the
+                model's layer count.
+                """
+            )
+        )
+
+    return
