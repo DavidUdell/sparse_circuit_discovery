@@ -1,6 +1,6 @@
 # Smoke Test Model
 MODEL_DIR: "EleutherAI/pythia-70m"
-ACTS_LAYERS: 1
+ACTS_AT_LAYERS_SLICE: "1:2"
 
 # Large Model Mode
 LARGE_MODEL_MODE: False

@@ -7,7 +7,7 @@ MODEL_DIR: "EleutherAI/pythia-70m"
 # Slice of Layers to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS: "1:3"
+ACTS_AT_LAYERS_SLICE: "1:3"
 
 # Large Model Mode
 # True for `Llama-2 7B` and larger.
