@@ -20,6 +20,12 @@ from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizer
 
 from sparse_coding.utils import top_k
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
+from sparse_coding.utils.caching import (
+    parse_slice,
+    slice_to_seq,
+    load_input_token_ids,
+    sanitize_model_name,
+)
 
 
 assert (
@@ -31,14 +37,15 @@ assert (
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
-TOKENIZER_DIR = config.get("MODEL_DIR")
+MODEL_DIR = config.get("MODEL_DIR")
+ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
-ACTS_DATA_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
-ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
-BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
-TOP_K_INFO_PATH = save_paths(__file__, config.get("TOP_K_INFO_FILE"))
+ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
+ENCODER_FILE = config.get("ENCODER_FILE")
+BIASES_FILE = config.get("BIASES_FILE")
+TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 SEED = config.get("SEED")
-tsfm_config = AutoConfig.from_pretrained(TOKENIZER_DIR, token=HF_ACCESS_TOKEN)
+tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
 EMBEDDING_DIM = tsfm_config.hidden_size
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(EMBEDDING_DIM * PROJECTION_FACTOR)
@@ -65,24 +72,27 @@ np.random.seed(SEED)
 # %%
 # We need the original tokenizer here.
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
-    TOKENIZER_DIR,
+    MODEL_DIR,
     token=HF_ACCESS_TOKEN,
 )
+accelerator: Accelerator = Accelerator()
 
 # %%
-# Load the learned encoder weights.
-imported_weights: t.Tensor = t.load(ENCODER_PATH)
-imported_biases: t.Tensor = t.load(BIASES_PATH)
+# Input token ids are constant across layers.
+unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 
+# %%
+# Define the encoder class, taking imported_weights and biases as
+# initialization args.
 class Encoder:
-    """Reconstruct the encoder as a callable linear layer."""
+    """Reconstruct an encoder as a callable linear layer."""
 
-    def __init__(self):
+    def __init__(self, layer_weights: t.Tensor, layer_biases: t.Tensor):
         """Initialize the encoder."""
         self.encoder_layer = t.nn.Linear(EMBEDDING_DIM, PROJECTION_DIM)
-        self.encoder_layer.weight.data = imported_weights
-        self.encoder_layer.bias.data = imported_biases
+        self.encoder_layer.weight.data = layer_weights
+        self.encoder_layer.bias.data = layer_biases
 
         self.encoder = t.nn.Sequential(self.encoder_layer, t.nn.ReLU())
 
@@ -95,42 +105,6 @@ class Encoder:
         return self.encoder(inputs)
 
 
-# Initialize the encoder.
-model: Encoder = Encoder()
-accelerator: Accelerator = Accelerator()
-model = accelerator.prepare(model)
-
-# %%
-# Load and pre-process the original prompt tokens.
-prompts_ids: np.ndarray = np.load(PROMPT_IDS_PATH, allow_pickle=True)
-prompts_ids_list = prompts_ids.tolist()
-unpacked_ids: list[list[int]] = [
-    e for q_list in prompts_ids_list for e in q_list
-]
-
-
-# %%
-# Load and parallelize activations.
-acts_dataset: t.Tensor = accelerator.prepare(t.load(ACTS_DATA_PATH))
-
-# %%
-# Unpad the activations. Note that activations are stored as a list of question
-# tensors from here on out. Functions may internally unpack that into
-# individual activations, but that's the general protocol between functions.
-unpadded_acts: list[t.Tensor] = top_k.unpad_activations(
-    acts_dataset, unpacked_ids
-)
-
-# %%
-# Project the activations.
-# If you want to _directly_ interpret the model's activations, assign
-# `feature_acts` directly to `unpadded_acts` and ensure constants are set to
-# the model's embedding dimensionality.
-feature_acts: list[t.Tensor] = top_k.project_activations(
-    unpadded_acts, model, accelerator
-)
-
-
 # %%
 # Tabluation functionality.
 def round_floats(num: Union[float, int]) -> Union[float, int]:
@@ -141,7 +115,9 @@ def round_floats(num: Union[float, int]) -> Union[float, int]:
     return round(num, SIG_FIGS)
 
 
-def populate_table(_table, top_k_tokes) -> None:
+def populate_table(
+    _table, top_k_tokes, model_dir, top_k_info_file, layer_index
+) -> None:
     """Put the results in the table _and_ save to csv."""
     csv_rows: list[list] = [
         ["Dimension", "Top Tokens", "Top-Token Activations"]
@@ -177,41 +153,91 @@ def populate_table(_table, top_k_tokes) -> None:
         _table.add_row(processed_row)
         csv_rows.append(processed_row)
 
-    # Save to csv.
-    with open(TOP_K_INFO_PATH, "w", encoding="utf-8") as file:
+    top_k_info_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(model_dir)}/{layer_index}/{top_k_info_file}",
+    )
+    with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerows(csv_rows)
 
 
 # %%
-# Initialize the table.
-table = prettytable.PrettyTable()
-table.field_names = [
-    "Dimension",
-    "Top Tokens",
-    "Top-Token Activations",
-]
-# %%
-# Calculate per-input-token summed activation, for each feature dimension.
-effects: defaultdict[
-    int, defaultdict[str, float]
-] = top_k.per_input_token_effects(
-    unpacked_ids,
-    feature_acts,
-    model,
-    tokenizer,
-    accelerator,
-    DIMS_IN_BATCH,
-    LARGE_MODEL_MODE,
-)
+# Loop over all the sliced model layers.
+seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
 
-# %%
-# Select just the top-k effects.
-truncated_effects: defaultdict[
-    int, list[tuple[str, float]]
-] = top_k.select_top_k_tokens(effects, TOP_K)
+for layer_idx in seq_layer_indices:
+    ENCODER_PATH = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENCODER_FILE}",
+    )
+    BIASES_PATH = save_paths(
+        __file__, f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{BIASES_FILE}"
+    )
+    imported_weights: t.Tensor = t.load(ENCODER_PATH)
+    imported_biases: t.Tensor = t.load(BIASES_PATH)
 
-# %%
-# Populate the table and save it to csv.
-populate_table(table, truncated_effects)
-print(table)
+    # Initialize a concrete encoder for this layer.
+    model: Encoder = Encoder(imported_weights, imported_biases)
+    model = accelerator.prepare(model)
+
+    # %%
+    # Load and parallelize activations.
+    LAYER_ACTS_PATH = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ACTS_DATA_FILE}",
+    )
+    layer_acts_data: t.Tensor = accelerator.prepare(t.load(LAYER_ACTS_PATH))
+
+    # %%
+    # Unpad the activations. Note that activations are stored as a list of
+    # question tensors from here on out. Functions may internally unpack that
+    # into individual activations, but that's the general protocol between
+    # functions.
+    unpadded_acts: list[t.Tensor] = top_k.unpad_activations(
+        layer_acts_data, unpacked_prompts_ids
+    )
+
+    # %%
+    # Project the activations.
+    # If you want to _directly_ interpret the model's activations, assign
+    # `feature_acts` directly to `unpadded_acts` and ensure constants are set
+    # to the model's embedding dimensionality.
+    feature_acts: list[t.Tensor] = top_k.project_activations(
+        unpadded_acts, model, accelerator
+    )
+
+    # %%
+    # Initialize the table.
+    table = prettytable.PrettyTable()
+    table.field_names = [
+        "Dimension",
+        "Top Tokens",
+        "Top-Token Activations",
+    ]
+    # %%
+    # Calculate per-input-token summed activation, for each feature dimension.
+    effects: defaultdict[
+        int, defaultdict[str, float]
+    ] = top_k.per_input_token_effects(
+        unpacked_prompts_ids,
+        feature_acts,
+        model,
+        tokenizer,
+        accelerator,
+        DIMS_IN_BATCH,
+        LARGE_MODEL_MODE,
+    )
+
+    # %%
+    # Select just the top-k effects.
+    truncated_effects: defaultdict[
+        int, list[tuple[str, float]]
+    ] = top_k.select_top_k_tokens(effects, TOP_K)
+
+    # %%
+    # Populate the table and save it to csv.
+    populate_table(
+        table, truncated_effects, MODEL_DIR, TOP_K_INFO_FILE, layer_idx
+    )
+    print(table)

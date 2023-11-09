@@ -4,6 +4,7 @@
 import os
 from textwrap import dedent
 
+import numpy as np
 import torch as t
 from transformers import PreTrainedModel
 
@@ -117,3 +118,18 @@ def slice_to_seq(input_slice: slice) -> range:
     )
 
     return output_range
+
+
+def load_input_token_ids(prompt_ids_path: str) -> list[list[int]]:
+    """
+    Load input ids.
+
+    These are constant across layers, making this a simpler job.
+    """
+    prompts_ids: np.ndarray = np.load(prompt_ids_path, allow_pickle=True)
+    prompts_ids_list = prompts_ids.tolist()
+    unpacked_ids: list[list[int]] = [
+        elem for question_list in prompts_ids_list for elem in question_list
+    ]
+
+    return unpacked_ids

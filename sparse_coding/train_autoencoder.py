@@ -20,6 +20,7 @@ from sparse_coding.utils.caching import (
     slice_to_seq,
     sanitize_model_name,
     cache_layer_tensor,
+    load_input_token_ids,
 )
 
 
@@ -109,11 +110,7 @@ class ActivationsDataset(Dataset):
 
 # %%
 # Input token ids are constant across model layers.
-prompts_ids: np.ndarray = np.load(PROMPT_IDS_PATH, allow_pickle=True)
-prompts_ids_list = prompts_ids.tolist()
-unpacked_prompts_ids = [
-    elem for sublist in prompts_ids_list for elem in sublist
-]
+unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 # %%
 # Loop over the layer_idx values in the model slice.
