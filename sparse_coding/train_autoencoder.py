@@ -33,10 +33,10 @@ access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 SEED = config.get("SEED")
-ACTS_DATA_FILE = save_paths(__file__, config.get("ACTS_DATA_FILE"))
-PROMPT_IDS_FILE = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
-BIASES_FILE = save_paths(__file__, config.get("BIASES_FILE"))
-ENCODER_FILE = save_paths(__file__, config.get("ENCODER_FILE"))
+ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
+PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
+BIASES_FILE = config.get("BIASES_FILE")
+ENCODER_FILE = config.get("ENCODER_FILE")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 # Float casts fix YAML bug with scientific notation.
@@ -109,7 +109,7 @@ class ActivationsDataset(Dataset):
 
 # %%
 # Input token ids are constant across model layers.
-prompts_ids: np.ndarray = np.load(PROMPT_IDS_FILE, allow_pickle=True)
+prompts_ids: np.ndarray = np.load(PROMPT_IDS_PATH, allow_pickle=True)
 prompts_ids_list = prompts_ids.tolist()
 unpacked_prompts_ids = [
     elem for sublist in prompts_ids_list for elem in sublist

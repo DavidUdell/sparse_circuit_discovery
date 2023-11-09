@@ -271,12 +271,20 @@ def pad_activations(tensor, length) -> t.Tensor:
 # Save activations.
 seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
 
-for layer_idx in seq_layer_indices:
-    max_seq_len: int = max(tensor.size(1) for tensor in activations[layer_idx])
+# %%
+# Deal with the single layer case, since there are no tuples there.
+if isinstance(activations, list) and isinstance(activations[0], t.Tensor):
+    activations: list[tuple[t.Tensor]] = [(tensor,) for tensor in activations]
+
+max_seq_len: int = max(
+    tensor.size(1) for layers_tuple in activations for tensor in layers_tuple
+)
+
+for abs_idx, layer_idx in enumerate(seq_layer_indices):
     # Pad the activations to the widest activation stream-dim.
     padded_activations: list[t.Tensor] = [
-        pad_activations(tensor, max_seq_len)
-        for tensor in activations[layer_idx]
+        pad_activations(layers_tuple[abs_idx], max_seq_len)
+        for layers_tuple in activations
     ]
     concat_activations: t.Tensor = t.cat(
         padded_activations,

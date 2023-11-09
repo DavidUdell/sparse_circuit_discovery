@@ -41,7 +41,6 @@ def parse_slice(slice_string: str) -> slice:
         ({layers_slice.stop})
         """
     )
-
     return layers_slice
 
 
@@ -111,8 +110,10 @@ def cache_layer_tensor(
 def slice_to_seq(input_slice: slice) -> range:
     """Build a range corresponding to an input slice."""
 
-    return range(
+    output_range = range(
         input_slice.start,
         input_slice.stop,
         1 if input_slice.step is None else input_slice.step,
     )
+
+    return output_range

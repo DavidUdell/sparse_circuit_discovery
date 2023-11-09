@@ -18,11 +18,13 @@ TOP_K_INFO_FILE: "smoke_test_token_info.csv"
 # Autoencoder Training
 LAMBDA_L1: 1e-4
 LEARNING_RATE: 1.0e-4
+TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 0
 ACCUMULATE_GRAD_BATCHES: 1
 
 # Reproducibility
 SEED: 0
+
 
 # Smoke Test Constants (`acts_collect.py`)
 MAX_NEW_TOKENS: 1
@@ -38,5 +40,5 @@ SYNC_DIST_LOGGING: True
 # Smoke Test Constants (`feature_tokens.py`)
 # _Leave out entries_ for None: None values will be interpreted as "None"
 # strings.
-TOP_K: 6
 DIMS_IN_BATCH: 200
+TOP_K: 6

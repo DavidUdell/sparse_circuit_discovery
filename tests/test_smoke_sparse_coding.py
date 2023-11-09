@@ -20,9 +20,9 @@ def mock_configure(monkeypatch):
 
         try:
             with open(
-            "smoke_test_config/smoke_test_access.yaml",
-            "r",
-            encoding="utf-8"
+                "smoke_test_config/smoke_test_access.yaml",
+                "r",
+                encoding="utf-8",
             ) as f:
                 access = yaml.safe_load(f)
         except yaml.YAMLError as e:
@@ -32,7 +32,7 @@ def mock_configure(monkeypatch):
             "smoke_test_config/smoke_test_config.yaml",
             "r",
             encoding="utf-8",
-            ) as f:
+        ) as f:
             try:
                 config = yaml.safe_load(f)
             except yaml.YAMLError as e:
