@@ -84,7 +84,7 @@ def cache_layer_tensor(
     """
     Cache per layer tensors in appropriate subdirectories.
 
-    Base file is `__file` in the calling module. Save append should be _just_
+    Base file is `__file__` in the calling module. Save append should be _just_
     the file name and extension, not any additional path. Model name will be
     sanitized, so HF hub names are kosher.
     """
@@ -106,3 +106,13 @@ def cache_layer_tensor(
 
     os.makedirs(save_subdir_path, exist_ok=True)
     t.save(layer_tensor, save_subdir_path + f"/{save_append}")
+
+
+def slice_to_seq(input_slice: slice) -> range:
+    """Build a range corresponding to an input slice."""
+
+    return range(
+        input_slice.start,
+        input_slice.stop,
+        1 if input_slice.step is None else input_slice.step,
+    )

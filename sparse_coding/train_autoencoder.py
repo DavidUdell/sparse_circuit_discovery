@@ -15,6 +15,12 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AutoConfig
 
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
+from sparse_coding.utils.caching import (
+    parse_slice,
+    slice_to_seq,
+    sanitize_model_name,
+    cache_layer_tensor,
+)
 
 
 assert t.__version__ >= "2.0.1", "`Lightning` requires newer `torch` versions."
@@ -27,11 +33,12 @@ access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 SEED = config.get("SEED")
-ACTS_DATA_PATH = save_paths(__file__, config.get("ACTS_DATA_FILE"))
-PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
-BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
-ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
+ACTS_DATA_FILE = save_paths(__file__, config.get("ACTS_DATA_FILE"))
+PROMPT_IDS_FILE = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
+BIASES_FILE = save_paths(__file__, config.get("BIASES_FILE"))
+ENCODER_FILE = save_paths(__file__, config.get("ENCODER_FILE"))
 MODEL_DIR = config.get("MODEL_DIR")
+ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 # Float casts fix YAML bug with scientific notation.
 LAMBDA_L1 = float(config.get("LAMBDA_L1"))
 LEARNING_RATE = float(config.get("LEARNING_RATE"))
@@ -101,162 +108,190 @@ class ActivationsDataset(Dataset):
 
 
 # %%
-# Load, preprocess, and split the activations dataset.
-padded_acts_block = t.load(ACTS_DATA_PATH)
-
-prompts_ids: np.ndarray = np.load(PROMPT_IDS_PATH, allow_pickle=True)
+# Input token ids are constant across model layers.
+prompts_ids: np.ndarray = np.load(PROMPT_IDS_FILE, allow_pickle=True)
 prompts_ids_list = prompts_ids.tolist()
 unpacked_prompts_ids = [
     elem for sublist in prompts_ids_list for elem in sublist
 ]
-pad_mask: t.Tensor = padding_mask(padded_acts_block, unpacked_prompts_ids)
-
-dataset: ActivationsDataset = ActivationsDataset(
-    padded_acts_block,
-    pad_mask,
-)
-
-training_indices, val_indices = train_test_split(
-    np.arange(len(dataset)),
-    test_size=0.2,
-    random_state=SEED,
-)
-
-training_sampler = t.utils.data.SubsetRandomSampler(training_indices)
-validation_sampler = t.utils.data.SubsetRandomSampler(val_indices)
-
-# For smaller autoencoders, larger batch sizes are possible.
-training_loader: DataLoader = DataLoader(
-    dataset,
-    batch_size=TRAINING_BATCH_SIZE,
-    sampler=training_sampler,
-    num_workers=NUM_WORKERS,
-)
-
-validation_loader: DataLoader = DataLoader(
-    dataset,
-    batch_size=TRAINING_BATCH_SIZE,
-    sampler=validation_sampler,
-    num_workers=NUM_WORKERS,
-)
-
 
 # %%
-# Define a tied autoencoder, with `lightning`.
-class Autoencoder(L.LightningModule):
-    """An autoencoder architecture."""
+# Loop over the layer_idx values in the model slice.
+seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
 
-    def __init__(self, lr=LEARNING_RATE):  # pylint: disable=unused-argument
-        super().__init__()
-        self.save_hyperparameters()
-        self.encoder = t.nn.Sequential(
-            t.nn.Linear(EMBEDDING_DIM, PROJECTION_DIM, bias=True),
-            t.nn.ReLU(),
-        )
+for layer_idx in seq_layer_indices:
+    # Load, preprocess, and split an activations dataset.
+    DATASET_PATH = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ACTS_DATA_FILE}",
+    )
+    padded_acts_block = t.load(DATASET_PATH)
+    pad_mask: t.Tensor = padding_mask(padded_acts_block, unpacked_prompts_ids)
 
-        # Orthogonal initialization.
-        t.nn.init.orthogonal_(self.encoder[0].weight.data)
+    dataset: ActivationsDataset = ActivationsDataset(
+        padded_acts_block,
+        pad_mask,
+    )
 
-    def forward(self, state):  # pylint: disable=arguments-differ
-        """The forward pass of an autoencoder for activations."""
-        encoded_state = self.encoder(state)
+    training_indices, val_indices = train_test_split(
+        np.arange(len(dataset)),
+        test_size=0.2,
+        random_state=SEED,
+    )
 
-        # Decode the sampled state.
-        decoder_weights = self.encoder[0].weight.data.T
-        output_state = t.nn.functional.linear(  # pylint: disable=not-callable
-            encoded_state, decoder_weights
-        )
+    training_sampler = t.utils.data.SubsetRandomSampler(training_indices)
+    validation_sampler = t.utils.data.SubsetRandomSampler(val_indices)
 
-        return encoded_state, output_state
+    # For smaller autoencoders, larger batch sizes are possible.
+    training_loader: DataLoader = DataLoader(
+        dataset,
+        batch_size=TRAINING_BATCH_SIZE,
+        sampler=training_sampler,
+        num_workers=NUM_WORKERS,
+    )
 
-    def training_step(self, batch):  # pylint: disable=arguments-differ
-        """Train the autoencoder."""
-        data, mask = batch
-        data_mask = mask.unsqueeze(-1).expand_as(data)
-        masked_data = data * data_mask
+    validation_loader: DataLoader = DataLoader(
+        dataset,
+        batch_size=TRAINING_BATCH_SIZE,
+        sampler=validation_sampler,
+        num_workers=NUM_WORKERS,
+    )
 
-        encoded_state, output_state = self.forward(masked_data)
+    # Define a tied autoencoder, with `lightning`.
+    class Autoencoder(L.LightningModule):
+        """An autoencoder architecture."""
 
-        # The mask excludes the padding tokens from consideration.
-        mse_loss = t.nn.functional.mse_loss(output_state, masked_data)
-        l1_loss = t.nn.functional.l1_loss(
-            encoded_state,
-            t.zeros_like(encoded_state),
-        )
+        def __init__(
+            self, lr=LEARNING_RATE
+        ):  # pylint: disable=unused-argument
+            super().__init__()
+            self.save_hyperparameters()
+            self.encoder = t.nn.Sequential(
+                t.nn.Linear(EMBEDDING_DIM, PROJECTION_DIM, bias=True),
+                t.nn.ReLU(),
+            )
 
-        training_loss = mse_loss + (LAMBDA_L1 * l1_loss)
-        l0_sparsity = (encoded_state != 0).float().sum(dim=-1).mean().item()
-        print(f"L^0: {round(l0_sparsity, 2)}\n")
-        self.log("training loss", training_loss, sync_dist=SYNC_DIST_LOGGING)
-        print(f"t_loss: {round(training_loss.item(), 2)}\n")
-        self.log(
-            "L1 component", LAMBDA_L1 * l1_loss, sync_dist=SYNC_DIST_LOGGING
-        )
-        self.log("MSE component", mse_loss, sync_dist=SYNC_DIST_LOGGING)
-        self.log("L0 sparsity", l0_sparsity, sync_dist=SYNC_DIST_LOGGING)
-        return training_loss
+            # Orthogonal initialization.
+            t.nn.init.orthogonal_(self.encoder[0].weight.data)
 
-    # Unused import resolves `lightning` bug.
-    def validation_step(
-        self, batch, batch_idx
-    ):  # pylint: disable=unused-argument,arguments-differ
-        """Validate the autoencoder."""
-        data, mask = batch
-        data_mask = mask.unsqueeze(-1).expand_as(data)
-        masked_data = data * data_mask
+        def forward(self, state):  # pylint: disable=arguments-differ
+            """The forward pass of an autoencoder for activations."""
+            encoded_state = self.encoder(state)
 
-        encoded_state, output_state = self.forward(masked_data)
+            # Decode the sampled state.
+            decoder_weights = self.encoder[0].weight.data.T
+            output_state = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    encoded_state, decoder_weights
+                )
+            )
 
-        mse_loss = t.nn.functional.mse_loss(output_state, masked_data)
-        l1_loss = t.nn.functional.l1_loss(
-            encoded_state,
-            t.zeros_like(encoded_state),
-        )
-        validation_loss = mse_loss + (LAMBDA_L1 * l1_loss)
+            return encoded_state, output_state
 
-        self.log(
-            "validation loss", validation_loss, sync_dist=SYNC_DIST_LOGGING
-        )
-        return validation_loss
+        def training_step(self, batch):  # pylint: disable=arguments-differ
+            """Train the autoencoder."""
+            data, mask = batch
+            data_mask = mask.unsqueeze(-1).expand_as(data)
+            masked_data = data * data_mask
 
-    def configure_optimizers(self):
-        """Configure the `Adam` optimizer."""
-        return t.optim.Adam(self.parameters(), lr=self.hparams.lr)
+            encoded_state, output_state = self.forward(masked_data)
 
+            # The mask excludes the padding tokens from consideration.
+            mse_loss = t.nn.functional.mse_loss(output_state, masked_data)
+            l1_loss = t.nn.functional.l1_loss(
+                encoded_state,
+                t.zeros_like(encoded_state),
+            )
 
-# %%
-# Validation-loss-based early stopping.
-early_stop = L.pytorch.callbacks.EarlyStopping(
-    monitor="validation loss",
-    min_delta=1e-5,
-    patience=3,
-    verbose=False,
-    mode="min",
-)
+            training_loss = mse_loss + (LAMBDA_L1 * l1_loss)
+            l0_sparsity = (
+                (encoded_state != 0).float().sum(dim=-1).mean().item()
+            )
+            print(f"L^0: {round(l0_sparsity, 2)}\n")
+            self.log(
+                "training loss", training_loss, sync_dist=SYNC_DIST_LOGGING
+            )
+            print(f"t_loss: {round(training_loss.item(), 2)}\n")
+            self.log(
+                "L1 component",
+                LAMBDA_L1 * l1_loss,
+                sync_dist=SYNC_DIST_LOGGING,
+            )
+            self.log("MSE component", mse_loss, sync_dist=SYNC_DIST_LOGGING)
+            self.log("L0 sparsity", l0_sparsity, sync_dist=SYNC_DIST_LOGGING)
+            return training_loss
 
-# %%
-# Train the autoencoder. Note that `lightning` does its own parallelization.
-model: Autoencoder = Autoencoder()
-logger = L.pytorch.loggers.CSVLogger("logs", name="autoencoder")
-# The `accumulate_grad_batches` argument helps with memory on the largest
-# autoencoders. I don't currently do anything about "dead neurons," as Bricken
-# et al. 2023 found and discussed.
-trainer: L.Trainer = L.Trainer(
-    accelerator="auto",
-    accumulate_grad_batches=ACCUMULATE_GRAD_BATCHES,
-    callbacks=early_stop,
-    log_every_n_steps=LOG_EVERY_N_STEPS,
-    logger=logger,
-    max_epochs=EPOCHS,
-)
+        # Unused import resolves `lightning` bug.
+        def validation_step(
+            self, batch, batch_idx
+        ):  # pylint: disable=unused-argument,arguments-differ
+            """Validate the autoencoder."""
+            data, mask = batch
+            data_mask = mask.unsqueeze(-1).expand_as(data)
+            masked_data = data * data_mask
 
-trainer.fit(
-    model,
-    train_dataloaders=training_loader,
-    val_dataloaders=validation_loader,
-)
+            encoded_state, output_state = self.forward(masked_data)
 
-# %%
-# Save the trained encoder weights and biases.
-t.save(model.encoder[0].weight.data, ENCODER_PATH)
-t.save(model.encoder[0].bias.data, BIASES_PATH)
+            mse_loss = t.nn.functional.mse_loss(output_state, masked_data)
+            l1_loss = t.nn.functional.l1_loss(
+                encoded_state,
+                t.zeros_like(encoded_state),
+            )
+            validation_loss = mse_loss + (LAMBDA_L1 * l1_loss)
+
+            self.log(
+                "validation loss", validation_loss, sync_dist=SYNC_DIST_LOGGING
+            )
+            return validation_loss
+
+        def configure_optimizers(self):
+            """Configure the `Adam` optimizer."""
+            return t.optim.Adam(self.parameters(), lr=self.hparams.lr)
+
+    # Validation-loss-based early stopping.
+    early_stop = L.pytorch.callbacks.EarlyStopping(
+        monitor="validation loss",
+        min_delta=1e-5,
+        patience=3,
+        verbose=False,
+        mode="min",
+    )
+
+    # Train the autoencoder. Note that `lightning` does its own
+    # parallelization.
+    model: Autoencoder = Autoencoder()
+    logger = L.pytorch.loggers.CSVLogger("logs", name="autoencoder")
+    # The `accumulate_grad_batches` argument helps with memory on the largest
+    # autoencoders. I don't currently do anything about "dead neurons," as
+    # Bricken et al. 2023 found and discussed.
+    trainer: L.Trainer = L.Trainer(
+        accelerator="auto",
+        accumulate_grad_batches=ACCUMULATE_GRAD_BATCHES,
+        callbacks=early_stop,
+        log_every_n_steps=LOG_EVERY_N_STEPS,
+        logger=logger,
+        max_epochs=EPOCHS,
+    )
+
+    trainer.fit(
+        model,
+        train_dataloaders=training_loader,
+        val_dataloaders=validation_loader,
+    )
+
+    # Save the trained encoder weights and biases.
+    cache_layer_tensor(
+        model.encoder[0].weight.data,
+        layer_idx,
+        ENCODER_FILE,
+        __file__,
+        MODEL_DIR,
+    )
+
+    cache_layer_tensor(
+        model.encoder[0].bias.data,
+        layer_idx,
+        BIASES_FILE,
+        __file__,
+        MODEL_DIR,
+    )

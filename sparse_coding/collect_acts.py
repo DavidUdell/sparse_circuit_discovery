@@ -28,6 +28,7 @@ from sparse_coding.utils.caching import (
     parse_slice,
     validate_slice,
     cache_layer_tensor,
+    slice_to_seq,
 )
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
 
@@ -45,7 +46,7 @@ MODEL_DIR = config.get("MODEL_DIR")
 LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
-ACTS_AT_LAYERS_SLICE = parse_slice(config.get("ACTS_AT_LAYERS_SLICE"))
+ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 SEED = config.get("SEED")
 MAX_NEW_TOKENS = config.get("MAX_NEW_TOKENS", 1)
 NUM_RETURN_SEQUENCES = config.get("NUM_RETURN_SEQUENCES", 1)
@@ -87,7 +88,7 @@ model: PreTrainedModel = accelerator.prepare(model)
 model.eval()
 
 # Validate slice against model's layer count.
-validate_slice(model, ACTS_AT_LAYERS_SLICE)
+validate_slice(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Load the TruthfulQA dataset.
@@ -224,7 +225,7 @@ for question_num in sampled_indices:
     # Save the model's answer besides their ground truths.
     answers_with_rubric[question_num] = [int(model_answer), ground_truth]
     # Save the model's activations.
-    activations.append(outputs.hidden_states[ACTS_AT_LAYERS_SLICE])
+    activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
 
 # %%
 # Grade the model's answers.
@@ -268,14 +269,9 @@ def pad_activations(tensor, length) -> t.Tensor:
 
 # %%
 # Save activations.
-sequence_layer_indices = range(
-    ACTS_AT_LAYERS_SLICE.start,
-    ACTS_AT_LAYERS_SLICE.stop,
-    1 if ACTS_AT_LAYERS_SLICE.step is None else ACTS_AT_LAYERS_SLICE.step,
-)
+seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
 
-
-for layer_idx in sequence_layer_indices:
+for layer_idx in seq_layer_indices:
     max_seq_len: int = max(tensor.size(1) for tensor in activations[layer_idx])
     # Pad the activations to the widest activation stream-dim.
     padded_activations: list[t.Tensor] = [
