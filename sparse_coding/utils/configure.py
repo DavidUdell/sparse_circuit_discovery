@@ -11,14 +11,16 @@ def load_yaml_constants(base_file):
     """Load config files."""
 
     current_dir = Path(base_file).parent
+    hf_access_file: str = "config/hf_access.yaml"
+    central_config_file: str = "config/central_config.yaml"
 
     if current_dir.name == "sparse_coding":
-        hf_access_path = current_dir / "config/hf_access.yaml"
-        central_config_path = current_dir / "config/central_config.yaml"
+        hf_access_path = current_dir / hf_access_file
+        central_config_path = current_dir / central_config_file
 
-    elif current_dir.name == "interp_tools":
-        hf_access_path = current_dir.parent / "config/hf_access.yaml"
-        central_config_path = current_dir.parent / "config/central_config.yaml"
+    elif current_dir.name in ("interp_tools", "rasp"):
+        hf_access_path = current_dir.parent / hf_access_file
+        central_config_path = current_dir.parent / central_config_file
 
     else:
         raise ValueError(
