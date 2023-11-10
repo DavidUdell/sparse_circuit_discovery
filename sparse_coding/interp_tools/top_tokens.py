@@ -182,7 +182,6 @@ for layer_idx in seq_layer_indices:
     model: Encoder = Encoder(imported_weights, imported_biases)
     model = accelerator.prepare(model)
 
-    # %%
     # Load and parallelize activations.
     LAYER_ACTS_PATH = save_paths(
         __file__,
@@ -190,7 +189,6 @@ for layer_idx in seq_layer_indices:
     )
     layer_acts_data: t.Tensor = accelerator.prepare(t.load(LAYER_ACTS_PATH))
 
-    # %%
     # Unpad the activations. Note that activations are stored as a list of
     # question tensors from here on out. Functions may internally unpack that
     # into individual activations, but that's the general protocol between
@@ -199,7 +197,6 @@ for layer_idx in seq_layer_indices:
         layer_acts_data, unpacked_prompts_ids
     )
 
-    # %%
     # Project the activations.
     # If you want to _directly_ interpret the model's activations, assign
     # `feature_acts` directly to `unpadded_acts` and ensure constants are set
@@ -208,7 +205,6 @@ for layer_idx in seq_layer_indices:
         unpadded_acts, model, accelerator
     )
 
-    # %%
     # Initialize the table.
     table = prettytable.PrettyTable()
     table.field_names = [
@@ -216,7 +212,6 @@ for layer_idx in seq_layer_indices:
         "Top Tokens",
         "Top-Token Activations",
     ]
-    # %%
     # Calculate per-input-token summed activation, for each feature dimension.
     effects: defaultdict[
         int, defaultdict[str, float]
@@ -230,15 +225,16 @@ for layer_idx in seq_layer_indices:
         LARGE_MODEL_MODE,
     )
 
-    # %%
     # Select just the top-k effects.
     truncated_effects: defaultdict[
         int, list[tuple[str, float]]
     ] = top_k.select_top_k_tokens(effects, TOP_K)
 
-    # %%
     # Populate the table and save it to csv.
     populate_table(
         table, truncated_effects, MODEL_DIR, TOP_K_INFO_FILE, layer_idx
     )
     print(table)
+
+    # Empty out memory for next run.
+    accelerator.free_memory()
