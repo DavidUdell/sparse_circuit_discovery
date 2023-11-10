@@ -27,6 +27,10 @@ PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
 
 # %%
+# Reproducibility.
+t.manual_seed(SEED)
+
+# %%
 # Initialize and prepare the model.
 
 
