@@ -46,9 +46,9 @@ BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 SEED = config.get("SEED")
 tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
-EMBEDDING_DIM = tsfm_config.hidden_size
+HIDDEN_DIM = tsfm_config.hidden_size
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
-PROJECTION_DIM = int(EMBEDDING_DIM * PROJECTION_FACTOR)
+PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
 LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 TOP_K = config.get("TOP_K", 6)
 SIG_FIGS = config.get("SIG_FIGS", None)  # None means "round to int."
@@ -91,7 +91,7 @@ class Encoder(t.nn.Module):
     def __init__(self, layer_weights: t.Tensor, layer_biases: t.Tensor):
         """Initialize the encoder."""
         super().__init__()
-        self.encoder_layer = t.nn.Linear(EMBEDDING_DIM, PROJECTION_DIM)
+        self.encoder_layer = t.nn.Linear(HIDDEN_DIM, PROJECTION_DIM)
         self.encoder_layer.weight.data = layer_weights
         self.encoder_layer.bias.data = layer_biases
 
