@@ -16,7 +16,7 @@ def load_yaml_constants(base_file):
         hf_access_path = current_dir / "config/hf_access.yaml"
         central_config_path = current_dir / "config/central_config.yaml"
 
-    elif current_dir.name == "interp_scripts":
+    elif current_dir.name == "interp_tools":
         hf_access_path = current_dir.parent / "config/hf_access.yaml"
         central_config_path = current_dir.parent / "config/central_config.yaml"
 
@@ -63,7 +63,7 @@ def save_paths(base_file, save_append: str) -> str:
         save_path = current_dir / "data" / save_append
         return str(save_path)
 
-    if current_dir.name == "interp_scripts":
+    if current_dir.name == "interp_tools":
         save_path = current_dir.parent / "data" / save_append
         return str(save_path)
 
