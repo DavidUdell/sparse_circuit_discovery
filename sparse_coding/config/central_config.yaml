@@ -49,5 +49,5 @@ SYNC_DIST_LOGGING: True
 # Stable Dev Constants for `interp_top_tokens.py`
 # _Leave out entries_ for None: None values are unfortunately interpreted as
 # the string "None"
-DIMS_IN_BATCH: 5000
+DIMS_IN_BATCH: 500
 TOP_K: 6

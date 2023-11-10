@@ -52,7 +52,7 @@ PROJECTION_DIM = int(EMBEDDING_DIM * PROJECTION_FACTOR)
 LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 TOP_K = config.get("TOP_K", 6)
 SIG_FIGS = config.get("SIG_FIGS", None)  # None means "round to int."
-DIMS_IN_BATCH = config.get("DIMS_IN_BATCH", 200)  # WIP tunable for `70B`.
+DIMS_IN_BATCH = config.get("DIMS_IN_BATCH", 200)  # Tunable
 
 if config.get("N_DIMS_PRINTED_OVERRIDE") is not None:
     N_DIMS_PRINTED = config.get("N_DIMS_PRINTED_OVERRIDE")
@@ -85,18 +85,19 @@ unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 # %%
 # Define the encoder class, taking imported_weights and biases as
 # initialization args.
-class Encoder:
+class Encoder(t.nn.Module):
     """Reconstruct an encoder as a callable linear layer."""
 
     def __init__(self, layer_weights: t.Tensor, layer_biases: t.Tensor):
         """Initialize the encoder."""
+        super().__init__()
         self.encoder_layer = t.nn.Linear(EMBEDDING_DIM, PROJECTION_DIM)
         self.encoder_layer.weight.data = layer_weights
         self.encoder_layer.bias.data = layer_biases
 
         self.encoder = t.nn.Sequential(self.encoder_layer, t.nn.ReLU())
 
-    def __call__(self, inputs):
+    def forward(self, inputs):
         """Project to the sparse latent space."""
 
         if not LARGE_MODEL_MODE:
