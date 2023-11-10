@@ -46,16 +46,19 @@ python3 pipe.py
 ```
 
 ### Notes:
-A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
-convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
-hyperparameters to get this L^0.
+- A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
+  convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
+h  yperparameters to get this L^0.
 
-Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`. This
-solves device issues with `accelerate` on too-small models.
+- Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`.
+  This solves device issues with `accelerate` on too-small models.
 
-If you're trying to access a gated HuggingFace model repo, you'll have to
-provide the needed HuggingFace access token in `sparse_coding/act_access.yaml`.
-The script will create this YAML if needed.
+- Try to run this on CUDA 12.2 or better. I have ever had issues on CUDA 12.0;
+  I haven't looked into this in great detail, but I notice this fix works.
+
+- If you're trying to access a gated HuggingFace model repo, you'll have to
+  provide the needed HuggingFace access token in
+  `sparse_coding/act_access.yaml`. The script will create this YAML if needed.
 
 ## Project Status
 Project is currently a WIP. Current version: 0.1.2.
