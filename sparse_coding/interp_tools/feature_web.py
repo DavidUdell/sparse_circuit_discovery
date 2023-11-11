@@ -5,7 +5,6 @@
 from contextlib import contextmanager
 
 import accelerate
-import yaml
 import torch as t
 from transformers import AutoConfig
 
