@@ -65,7 +65,7 @@ def save_paths(base_file, save_append: str) -> str:
         save_path = current_dir / "data" / save_append
         return str(save_path)
 
-    if current_dir.name == "interp_tools":
+    if current_dir.name in ("interp_tools", "rasp"):
         save_path = current_dir.parent / "data" / save_append
         return str(save_path)
 
