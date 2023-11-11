@@ -24,6 +24,8 @@ ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 
+# %%
+# Errors ensure yaml files are configured for the subsequent ACDC run.
 if MODEL_DIR != "rasp":
     raise ValueError(
         dedent(
@@ -33,6 +35,17 @@ if MODEL_DIR != "rasp":
             """
         )
     )
+
+if ACTS_LAYERS_SLICE != slice(0, 2):
+    raise ValueError(
+        dedent(
+            f"""
+            `rasp_cache.py` requires that ACTS_LAYERS_SLICE be set to `slice(0,
+            2)`, not {ACTS_LAYERS_SLICE}.
+            """
+        )
+    )
+
 # %%
 # Compile the rasp model.
 model = compiler.compiling.compile_rasp_to_model(
