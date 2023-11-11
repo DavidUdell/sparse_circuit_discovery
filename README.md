@@ -25,18 +25,18 @@ To train and interpret a sparse autoencoder, go to
 
 1. HuggingFace model
 repo (`MODEL_DIR`),
-2. layer index to collect activation data from
-(`ACTS_LAYER`), and
+2. layer indexes to collect activation data from
+(`ACT_LAYERS_SLICE`), and
 3. autoencoder training hyperparameters values (`LAMBDA_L1`,
 `LEARNING_RATE`, `PROJECTION_FACTOR`).
 
 Acceptable starting values for a range of models are:
 
-|`MODEL_DIR`|`ACTS_LAYER`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
+|`MODEL_DIR`|`ACT_LAYERS_SLICE`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
 |---|:---:|:---:|:---:|:---:|
-|EleutherAI/pythia-70m | 2 | 1.0e-2 | 1.0e-2 | 10 |
-|meta-llama/Llama-2-7b-hf | 13 | 1.0 | 1.0e-3 | 10 |
-|meta-llama/Llama-2-70b-hf | 32 | 3.0 | 1.0e-3 | 10 |
+|EleutherAI/pythia-70m | "2:3" | 1.0e-2 | 1.0e-2 | 10 |
+|meta-llama/Llama-2-7b-hf | "13:14" | 1.0 | 1.0e-3 | 10 |
+|meta-llama/Llama-2-70b-hf | "32:33" | 3.0 | 1.0e-3 | 10 |
 
 Once you've saved the YAML, run the main interpretability pipeline with:
 ```
