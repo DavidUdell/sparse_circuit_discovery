@@ -19,23 +19,51 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
+ENCODER_FILE = config.get("ENCODER_FILE")
+BIASES_FILE = config.get("BIASES_FILE")
 SEED = config.get("SEED")
-tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
-HIDDEN_DIM = tsfm_config.hidden_size
-PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
-PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
 
 # %%
 # Reproducibility.
 t.manual_seed(SEED)
 
-# %%
-# Initialize and prepare the model.
-
 
 # %%
-# Ablations hook factory.
+# Ablations context manager and factory.
+@contextmanager
+def ablations_lifecycle(
+    model: t.nn.Module, layer_idx: int, neuron_idx: int
+) -> None:
+    """Define, register, then unregister a specified ablations hook."""
+
+    def ablations_hook(  # pylint: disable=unused-argument, redefined-builtin
+        module: t.nn.Module, input: tuple, output: t.Tensor
+    ) -> None:
+        """Zero out a particular neuron's activations."""
+        output[:, neuron_idx] = 0.0
+
+    # Register the hook with `torch`.
+    hook_handle = model[layer_idx].register_forward_hook(ablations_hook)
+
+    try:
+        # Yield control flow to caller function.
+        yield
+    finally:
+        # Unregister the ablations hook.
+        hook_handle.remove()
 
 
 # %%
-# Loop over every autoencoder dim and ablate, recording effects.
+# This implementation validates against just the rasp model. After validation,
+# I will generalize to real-world autoencoded models.
+
+assert MODEL_DIR == "rasp", "MODEL_DIR must be 'rasp`, for now."
+assert ACTS_LAYERS_SLICE == slice(
+    0, 2
+), "ACTS_LAYERS_SLICE must be 0:2, for now."
+
+# Initialize and prepare the rasp model.
+# TODO
+
+# Loop over every dim and ablate, recording effects.
+# TODO
