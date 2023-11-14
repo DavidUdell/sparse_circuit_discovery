@@ -78,101 +78,23 @@ assert ACTS_LAYERS_SLICE == slice(
     0, 2
 ), "ACTS_LAYERS_SLICE must be 0:2, for now."
 
-# Compile the rasp model.
-haiku_model = compiler.compiling.compile_rasp_to_model(
-    make_frac_prevs(rasp.tokens == "x"),
-    vocab={"w", "x", "y", "z"},
-    max_seq_len=5,
-    compiler_bos="BOS",
-)
 
-# Transplant the model into a proper `torch` module.
-num_heads = haiku_model.model_config.num_heads
-num_layers = haiku_model.model_config.num_layers
-attention_dim = haiku_model.model_config.key_size
-hidden_dim = haiku_model.model_config.mlp_hidden_size
-vocab_dim = haiku_model.params["token_embed"]["embeddings"].shape[0]
-resid_width = haiku_model.params["token_embed"]["embeddings"].shape[1]
-# Length of vocab minus BOS and PAD.
-vocab_dim_out = haiku_model.params["token_embed"]["embeddings"].shape[0] - 2
-
-# Reshape weights and biases everywhere to fit num_heads.
-state_dict = {}
-state_dict["pos_embed.weight"] = haiku_model.params["pos_embed"]["embeddings"]
-state_dict["embed.weight"] = haiku_model.params["token_embed"]["embeddings"]
-state_dict["unembed.weight"] = np.eye(resid_width, vocab_dim_out)
-
-for layer_idx in range(num_layers):
-    state_dict[f"blocks.{layer_idx}.attn.out_proj_weight"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/key"]["w"],
-        "d_model (n_heads d_head) -> n_heads d_model d_head",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.out_proj_bias"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/key"]["b"],
-        "(n_heads d_head) -> n_heads d_head",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.in_proj_weight"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/query"]["w"],
-        "d_model (n_heads d_head) -> n_heads d_model d_head",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.in_proj_bias"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/query"]["b"],
-        "(n_heads d_head) -> n_heads d_head",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.W_V"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/value"]["w"],
-        "d_model (n_heads d_head) -> n_heads d_model d_head",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.b_V"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/value"]["b"],
-        "(n_heads d_head) -> n_heads d_head",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.W_O"] = einops.rearrange(
-        haiku_model.params[f"transformer/layer_{layer_idx}/attn/linear"]["w"],
-        "(n_heads d_head) d_model -> n_heads d_head d_model",
-        d_head=attention_dim,
-        n_heads=num_heads,
-    )
-    state_dict[f"blocks.{layer_idx}.attn.b_O"] = haiku_model.params[
-        f"transformer/layer_{layer_idx}/attn/linear"
-    ]["b"]
-
-    state_dict[f"blocks.{layer_idx}.mlp.0.weight"] = haiku_model.params[
-        f"transformer/layer_{layer_idx}/mlp/linear_1"
-    ]["w"]
-    state_dict[f"blocks.{layer_idx}.mlp.0.bias"] = haiku_model.params[
-        f"transformer/layer_{layer_idx}/mlp/linear_1"
-    ]["b"]
-    state_dict[f"blocks.{layer_idx}.mlp.2.weight"] = haiku_model.params[
-        f"transformer/layer_{layer_idx}/mlp/linear_2"
-    ]["w"]
-    state_dict[f"blocks.{layer_idx}.mlp.2.bias"] = haiku_model.params[
-        f"transformer/layer_{layer_idx}/mlp/linear_2"
-    ]["b"]
-
-for key, value in state_dict.items():
-    # Jax array, to numpy array, to torch tensor.
-    state_dict[key] = t.tensor(np.array(value))
-
-
+# t.tensor(np.array(value))
 class RaspModel(t.nn.Module):
     """A `torch` module that wraps the `rasp` weights and biases."""
 
     def __init__(self):
         """Initialize the model."""
         super().__init__()
+
+        # Compile the Haiku version of the model.
+        haiku_model = compiler.compiling.compile_rasp_to_model(
+            make_frac_prevs(rasp.tokens == "x"),
+            vocab={"w", "x", "y", "z"},
+            max_seq_len=5,
+            compiler_bos="BOS",
+        )
+
         self.pos_embed = t.nn.Embedding.from_pretrained(
             state_dict["pos_embed.weight"]
         )
@@ -250,7 +172,6 @@ class RaspModel(t.nn.Module):
 
 
 model = RaspModel()
-model.load_state_dict(state_dict)
 model.eval()
 accelerator = accelerate.Accelerator()
 model = accelerator.prepare(model)
