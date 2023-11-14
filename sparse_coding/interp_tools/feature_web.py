@@ -98,30 +98,30 @@ vocab_dim_out = haiku_model.params["token_embed"]["embeddings"].shape[0] - 2
 
 # Reshape weights and biases everywhere to fit num_heads.
 state_dict = {}
-state_dict["pos_embed.W_pos"] = haiku_model.params["pos_embed"]["embeddings"]
-state_dict["embed.W_E"] = haiku_model.params["token_embed"]["embeddings"]
-state_dict["unembed.W_U"] = np.eye(resid_width, vocab_dim_out)
+state_dict["pos_embed.weight"] = haiku_model.params["pos_embed"]["embeddings"]
+state_dict["embed.weight"] = haiku_model.params["token_embed"]["embeddings"]
+state_dict["unembed.weight"] = np.eye(resid_width, vocab_dim_out)
 
 for layer_idx in range(num_layers):
-    state_dict[f"blocks.{layer_idx}.attn.W_K"] = einops.rearrange(
+    state_dict[f"blocks.{layer_idx}.attn.out_proj_weight"] = einops.rearrange(
         haiku_model.params[f"transformer/layer_{layer_idx}/attn/key"]["w"],
         "d_model (n_heads d_head) -> n_heads d_model d_head",
         d_head=attention_dim,
         n_heads=num_heads,
     )
-    state_dict[f"blocks.{layer_idx}.attn.b_K"] = einops.rearrange(
+    state_dict[f"blocks.{layer_idx}.attn.out_proj_bias"] = einops.rearrange(
         haiku_model.params[f"transformer/layer_{layer_idx}/attn/key"]["b"],
         "(n_heads d_head) -> n_heads d_head",
         d_head=attention_dim,
         n_heads=num_heads,
     )
-    state_dict[f"blocks.{layer_idx}.attn.W_Q"] = einops.rearrange(
+    state_dict[f"blocks.{layer_idx}.attn.in_proj_weight"] = einops.rearrange(
         haiku_model.params[f"transformer/layer_{layer_idx}/attn/query"]["w"],
         "d_model (n_heads d_head) -> n_heads d_model d_head",
         d_head=attention_dim,
         n_heads=num_heads,
     )
-    state_dict[f"blocks.{layer_idx}.attn.b_Q"] = einops.rearrange(
+    state_dict[f"blocks.{layer_idx}.attn.in_proj_bias"] = einops.rearrange(
         haiku_model.params[f"transformer/layer_{layer_idx}/attn/query"]["b"],
         "(n_heads d_head) -> n_heads d_head",
         d_head=attention_dim,
@@ -149,16 +149,16 @@ for layer_idx in range(num_layers):
         f"transformer/layer_{layer_idx}/attn/linear"
     ]["b"]
 
-    state_dict[f"blocks.{layer_idx}.mlp.W_in"] = haiku_model.params[
+    state_dict[f"blocks.{layer_idx}.mlp.0.weight"] = haiku_model.params[
         f"transformer/layer_{layer_idx}/mlp/linear_1"
     ]["w"]
-    state_dict[f"blocks.{layer_idx}.mlp.b_in"] = haiku_model.params[
+    state_dict[f"blocks.{layer_idx}.mlp.0.bias"] = haiku_model.params[
         f"transformer/layer_{layer_idx}/mlp/linear_1"
     ]["b"]
-    state_dict[f"blocks.{layer_idx}.mlp.W_out"] = haiku_model.params[
+    state_dict[f"blocks.{layer_idx}.mlp.2.weight"] = haiku_model.params[
         f"transformer/layer_{layer_idx}/mlp/linear_2"
     ]["w"]
-    state_dict[f"blocks.{layer_idx}.mlp.b_out"] = haiku_model.params[
+    state_dict[f"blocks.{layer_idx}.mlp.2.bias"] = haiku_model.params[
         f"transformer/layer_{layer_idx}/mlp/linear_2"
     ]["b"]
 
@@ -174,14 +174,16 @@ class RaspModel(t.nn.Module):
         """Initialize the model."""
         super().__init__()
         self.pos_embed = t.nn.Embedding.from_pretrained(
-            state_dict["pos_embed.W_pos"]
+            state_dict["pos_embed.weight"]
         )
-        self.embed = t.nn.Embedding.from_pretrained([state_dict["embed.W_E"]])
+        self.embed = t.nn.Embedding.from_pretrained(state_dict["embed.weight"])
         self.unembed = t.nn.Linear(
             in_features=vocab_dim_out, out_features=resid_width
         )
         self.blocks = t.nn.ModuleList()
-        for layer_idx in range(num_layers):  # pylint: disable=unused-variable
+        for (
+            layer_idx  # pylint: disable=unused-variable, redefined-outer-name
+        ) in range(num_layers):
             self.blocks.append(
                 t.nn.ModuleDict(
                     {
@@ -192,19 +194,19 @@ class RaspModel(t.nn.Module):
                         ),
                         "mlp": t.nn.Sequential(
                             t.nn.Linear(
-                                in_features=attention_dim,
+                                in_features=hidden_dim,
                                 out_features=hidden_dim,
                             ),
                             t.nn.ReLU(),
                             t.nn.Linear(
                                 in_features=hidden_dim,
-                                out_features=attention_dim,
+                                out_features=hidden_dim,
                             ),
                         ),
                     }
                 )
             )
-        self.out = t.nn.Linear(in_features=attention_dim, out_features=1)
+        self.out = t.nn.Linear(in_features=hidden_dim, out_features=1)
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
@@ -228,11 +230,9 @@ class RaspModel(t.nn.Module):
         # x: (seq_len, batch_size, resid_width)
         x = x.permute(1, 0, 2)
         # x: (batch_size, seq_len, resid_width)
-        for (
+        for (  # pylint: disable=unused-variable, redefined-outer-name
             layer_index
-        ) in range(  # pylint: disable=unused-variable, redefined-outer-name
-            num_layers
-        ):
+        ) in range(num_layers):
             # x: (batch_size, seq_len, resid_width)
             x = self.blocks[layer_index]["attn"](
                 query=x, key=x, value=x, need_weights=False
