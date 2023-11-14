@@ -26,6 +26,7 @@ setup(
         "pytest",
         "circuitsvis",
         "prettytable",
-        "openai",
+        "einops",
+        "tracr @ git+https://github.com/google-deepmind/tracr.git",
     ],
 )
