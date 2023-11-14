@@ -15,20 +15,13 @@ haiku_model = compiler.compiling.compile_rasp_to_model(
     compiler_bos="BOS",
 )
 
-model_len: int = len(haiku_model.params)
-print(model_len)
+torch_tensors = {}
 for layer in haiku_model.params:
-    print(layer)
+    for matrix in haiku_model.params[layer]:
+        tensor_name = f"{layer}_{matrix}"
+        torch_tensors[tensor_name] = t.tensor(
+            np.array(haiku_model.params[layer][matrix])
+        )
 
-# matrix = haiku_model.params.popitem()
-# print(matrix)
-# print(type(matrix))
-# print(len(matrix))
-# print(matrix[0])
-# print(type(matrix[0]))
-# print(matrix[1])
-# print(type(matrix[1]))
-# print(len(matrix[1]))
-# print(matrix[1]["w"])
-# print(type(matrix[1]["w"]))
-# print(type(t.tensor(np.array(matrix[1]["w"]))))
+for key in torch_tensors.keys():
+    print(key)
