@@ -37,17 +37,17 @@ class Attn(t.nn.Module):
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
-        Q = t.nn.functional.linear(x, self.query_weights, self.query_bias)
-        K = t.nn.functional.linear(x, self.key_weights, self.key_bias)
-        V = t.nn.functional.linear(x, self.value_weights, self.value_bias)
+        Q = t.einsum("ij,jk->ik", x, self.query_weights) + self.query_bias
+        K = t.einsum("ij,jk->ik", x, self.key_weights) + self.key_bias
+        V = t.einsum("ij,jk->ik", x, self.value_weights) + self.value_bias
 
         scores = t.matmul(Q, K.transpose(-2, -1) / sqrt(Q.size(-1)))
         attn = t.nn.functional.softmax(scores, dim=-1)
 
         # VO circuit
         context = t.matmul(attn, V)
-        output = t.nn.functional.linear(
-            context, self.out_weights, self.out_bias
+        output = (
+            t.einsum("ij,jk->ik", context, self.out_weights) + self.out_bias
         )
         return output
 
@@ -66,7 +66,7 @@ class RaspModel(t.nn.Module):
             max_seq_len=5,
             compiler_bos="BOS",
         )
-
+        self.haiku_model = haiku_model
         torch_tensors: dict = {}
 
         for layer in haiku_model.params:
@@ -165,13 +165,12 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_1/mlp/linear_2_b"]
         )
 
-    def forward(self, x: t.Tensor) -> t.Tensor:
+    def forward(self, x: str) -> t.Tensor:
         """Forward pass."""
-
         x = self.embed(x) + self.pos_embed(x)
 
         x = self.attn_1(x)
-        x = self.mlp_1 = x
+        x = self.mlp_1(x)
 
         x = self.attn_2(x)
         x = self.mlp_2(x)

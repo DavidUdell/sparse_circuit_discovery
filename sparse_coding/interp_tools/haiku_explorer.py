@@ -26,6 +26,27 @@ for layer in haiku_model.params:
 for key in torch_tensors:
     print(key)
 
+# haiku_model
+#   apply
+#   forward
+#   get_compiled_model
+#   model_config
+#   output_encoder
+#   params
+#   residual_labels
+#   input_encoder
+#       bos_encoding
+#       bos_token
+#       decode
+#       encode
+#       encoding_map
+#       enforce_bos
+#       pad_encoding
+#       pad_token
+#       vocab_size
+
 print(haiku_model.model_config.num_heads)
 print(haiku_model.model_config.key_size)
 print(haiku_model.model_config.mlp_hidden_size)
+
+print(haiku_model.input_encoder.encode(["BOS", "x"]))

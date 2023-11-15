@@ -75,8 +75,6 @@ assert ACTS_LAYERS_SLICE == slice(
 
 model = RaspModel()
 model.eval()
-accelerator = accelerate.Accelerator()
-model = accelerator.prepare(model)
 
 # Loop over every dim and ablate, recording effects.
 activations = {}
@@ -84,11 +82,21 @@ activations = {}
 for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
     for neuron_idx in range(7):
         with ablations_lifecycle(model, neuron_idx):
-            for token in ["w", "x", "y", "z"]:
-                # Run inference on the ablated model.
-                output = model(token)
-                # Record the downstream activations.
-                activations[(layer_index, neuron_idx, token)] = output.hiddens
+            for literal in [
+                ["BOS", "w"],
+                "x",
+                "y",
+                "z",
+            ]:
+                tokens = model.haiku_model.input_encoder.encode(literal)
+                for token in tokens:
+                    # Run inference on the ablated model.
+                    token = t.tensor(token, dtype=t.int).unsqueeze(0)
+                    output = model(token)
+                    # Record the downstream activations.
+                    activations[
+                        (layer_index, neuron_idx, token)
+                    ] = output.hiddens
 
 # %%
 # Graph the causal effects.
