@@ -1,11 +1,26 @@
 """Convert a JAX rasp model into a torch module model."""
 
 
+import einsum
 import numpy as np
 import torch as t
 from tracr import compiler
 from tracr.rasp import rasp
 from tracr.compiler.lib import make_frac_prevs
+
+
+class Attn(t.nn.Module):
+    """A custom single-headed attention layer, loading from tensors."""
+
+    def __init__(self, key: t.Tensor, query: t.Tensor, value: t.Tensor):
+        """Initialize the layer."""
+        super().__init__()
+        self.key = key
+        self.query = query
+        self.value = value
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        """Forward pass."""
 
 
 class RaspModel(t.nn.Module):
@@ -60,19 +75,20 @@ class RaspModel(t.nn.Module):
 
         hidden_dim: int = haiku_model.model_config.mlp_hidden_size
         attention_dim: int = haiku_model.model_config.key_size
+
         self.pos_embed = t.nn.Embedding.from_pretrained(
             torch_tensors["pos_embed_embeddings"]
         )
         self.embed = t.nn.Embedding.from_pretrained(
             torch_tensors["token_embed_embeddings"]
         )
-        self.attn_1 = t.nn.MultiheadAttention()
+        self.attn_1 = Attn()
         self.mlp_1 = t.nn.Sequential(
             t.nn.Linear(hidden_dim, hidden_dim),
             t.nn.ReLU(),
             t.nn.Linear(hidden_dim, hidden_dim),
         )
-        self.attn_2 = t.nn.MultiheadAttention()
+        self.attn_2 = Attn()
         self.mlp_2 = t.nn.Sequential(
             t.nn.Linear(hidden_dim, hidden_dim),
             t.nn.ReLU(),
