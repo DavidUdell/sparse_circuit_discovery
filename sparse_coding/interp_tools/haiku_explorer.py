@@ -23,5 +23,9 @@ for layer in haiku_model.params:
             np.array(haiku_model.params[layer][matrix])
         )
 
-for key in torch_tensors.keys():
+for key in torch_tensors:
     print(key)
+
+print(haiku_model.model_config.num_heads)
+print(haiku_model.model_config.key_size)
+print(haiku_model.model_config.mlp_hidden_size)
