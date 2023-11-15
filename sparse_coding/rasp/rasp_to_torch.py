@@ -1,7 +1,8 @@
 """Convert a JAX rasp model into a torch module model."""
 
 
-import einsum
+from math import sqrt
+
 import numpy as np
 import torch as t
 from tracr import compiler
@@ -12,15 +13,43 @@ from tracr.compiler.lib import make_frac_prevs
 class Attn(t.nn.Module):
     """A custom single-headed attention layer, loading from tensors."""
 
-    def __init__(self, key: t.Tensor, query: t.Tensor, value: t.Tensor):
+    def __init__(
+        self,
+        key_weights: t.Tensor,
+        key_bias: t.Tensor,
+        query_weights: t.Tensor,
+        query_bias: t.Tensor,
+        value_weights: t.Tensor,
+        value_bias: t.Tensor,
+        out_weights: t.Tensor,
+        out_bias: t.Tensor,
+    ):
         """Initialize the layer."""
         super().__init__()
-        self.key = key
-        self.query = query
-        self.value = value
+        self.key_weights = key_weights
+        self.key_bias = key_bias
+        self.query_weights = query_weights
+        self.query_bias = query_bias
+        self.value_weights = value_weights
+        self.value_bias = value_bias
+        self.out_weights = out_weights
+        self.out_bias = out_bias
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
+        Q = t.nn.functional.linear(x, self.query_weights, self.query_bias)
+        K = t.nn.functional.linear(x, self.key_weights, self.key_bias)
+        V = t.nn.functional.linear(x, self.value_weights, self.value_bias)
+
+        scores = t.matmul(Q, K.transpose(-2, -1) / sqrt(Q.size(-1)))
+        attn = t.nn.functional.softmax(scores, dim=-1)
+
+        # VO circuit
+        context = t.matmul(attn, V)
+        output = t.nn.functional.linear(
+            context, self.out_weights, self.out_bias
+        )
+        return output
 
 
 class RaspModel(t.nn.Module):
@@ -74,7 +103,6 @@ class RaspModel(t.nn.Module):
         # transformer/layer_1/mlp/linear_2_w
 
         hidden_dim: int = haiku_model.model_config.mlp_hidden_size
-        attention_dim: int = haiku_model.model_config.key_size
 
         self.pos_embed = t.nn.Embedding.from_pretrained(
             torch_tensors["pos_embed_embeddings"]
@@ -82,18 +110,70 @@ class RaspModel(t.nn.Module):
         self.embed = t.nn.Embedding.from_pretrained(
             torch_tensors["token_embed_embeddings"]
         )
-        self.attn_1 = Attn()
+        self.attn_1 = Attn(
+            torch_tensors["transformer/layer_0/attn/key_w"],
+            torch_tensors["transformer/layer_0/attn/key_b"],
+            torch_tensors["transformer/layer_0/attn/query_w"],
+            torch_tensors["transformer/layer_0/attn/query_b"],
+            torch_tensors["transformer/layer_0/attn/value_w"],
+            torch_tensors["transformer/layer_0/attn/value_b"],
+            torch_tensors["transformer/layer_0/attn/linear_w"],
+            torch_tensors["transformer/layer_0/attn/linear_b"],
+        )
         self.mlp_1 = t.nn.Sequential(
             t.nn.Linear(hidden_dim, hidden_dim),
             t.nn.ReLU(),
             t.nn.Linear(hidden_dim, hidden_dim),
         )
-        self.attn_2 = Attn()
+        self.mlp_1[0].weight = t.nn.Parameter(
+            torch_tensors["transformer/layer_0/mlp/linear_1_w"]
+        )
+        self.mlp_1[0].bias = t.nn.Parameter(
+            torch_tensors["transformer/layer_0/mlp/linear_1_b"]
+        )
+        self.mlp_1[2].weight = t.nn.Parameter(
+            torch_tensors["transformer/layer_0/mlp/linear_2_w"]
+        )
+        self.mlp_1[2].bias = t.nn.Parameter(
+            torch_tensors["transformer/layer_0/mlp/linear_2_b"]
+        )
+        self.attn_2 = Attn(
+            torch_tensors["transformer/layer_1/attn/key_w"],
+            torch_tensors["transformer/layer_1/attn/key_b"],
+            torch_tensors["transformer/layer_1/attn/query_w"],
+            torch_tensors["transformer/layer_1/attn/query_b"],
+            torch_tensors["transformer/layer_1/attn/value_w"],
+            torch_tensors["transformer/layer_1/attn/value_b"],
+            torch_tensors["transformer/layer_1/attn/linear_w"],
+            torch_tensors["transformer/layer_1/attn/linear_b"],
+        )
         self.mlp_2 = t.nn.Sequential(
             t.nn.Linear(hidden_dim, hidden_dim),
             t.nn.ReLU(),
             t.nn.Linear(hidden_dim, hidden_dim),
         )
+        self.mlp_2[0].weight = t.nn.Parameter(
+            torch_tensors["transformer/layer_1/mlp/linear_1_w"]
+        )
+        self.mlp_2[0].bias = t.nn.Parameter(
+            torch_tensors["transformer/layer_1/mlp/linear_1_b"]
+        )
+        self.mlp_2[2].weight = t.nn.Parameter(
+            torch_tensors["transformer/layer_1/mlp/linear_2_w"]
+        )
+        self.mlp_2[2].bias = t.nn.Parameter(
+            torch_tensors["transformer/layer_1/mlp/linear_2_b"]
+        )
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
+
+        x = self.embed(x) + self.pos_embed(x)
+
+        x = self.attn_1(x)
+        x = self.mlp_1 = x
+
+        x = self.attn_2(x)
+        x = self.mlp_2(x)
+
+        return x
