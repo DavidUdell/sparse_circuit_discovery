@@ -8,7 +8,7 @@ import accelerate
 import torch as t
 
 from sparse_coding.utils.configure import load_yaml_constants
-from sparse_coding.utils.caching import parse_slice
+from sparse_coding.utils.caching import parse_slice, slice_to_seq
 from sparse_coding.rasp.rasp_to_torch import RaspModel
 
 
@@ -25,13 +25,12 @@ SEED = config.get("SEED")
 # Reproducibility.
 t.manual_seed(SEED)
 
+
 # %%
 # Ablations context manager and factory.
-
-
 @contextmanager
 def ablations_lifecycle(  # pylint: disable=redefined-outer-name
-    torch_model: t.nn.Module, layer_index: int, neuron_idx: int
+    torch_model: t.nn.Module, neuron_idx: int
 ) -> None:
     """Define, register, then unregister hooks."""
 
@@ -48,10 +47,10 @@ def ablations_lifecycle(  # pylint: disable=redefined-outer-name
         activations[(layer_index, neuron_idx, token)] = output.detach()
 
     # Register the hooks with `torch`.
-    ablations_hook_handle = torch_model[layer_index].register_forward_hook(
+    ablations_hook_handle = torch_model.attn_1.register_forward_hook(
         ablations_hook
     )
-    caching_hook_handle = torch_model[layer_index + 1].register_forward_hook(
+    caching_hook_handle = torch_model.attn_2.register_forward_hook(
         caching_hook
     )
 
@@ -82,9 +81,9 @@ model = accelerator.prepare(model)
 # Loop over every dim and ablate, recording effects.
 activations = {}
 
-for layer_index in ACTS_LAYERS_SLICE:
-    for neuron_idx in range(attention_dim):
-        with ablations_lifecycle(model, layer_index, neuron_idx):
+for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
+    for neuron_idx in range(7):
+        with ablations_lifecycle(model, neuron_idx):
             for token in ["w", "x", "y", "z"]:
                 # Run inference on the ablated model.
                 output = model(token)
