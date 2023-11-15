@@ -79,7 +79,6 @@ assert ACTS_LAYERS_SLICE == slice(
 ), "ACTS_LAYERS_SLICE must be 0:2, for now."
 
 
-# t.tensor(np.array(value))
 class RaspModel(t.nn.Module):
     """A `torch` module that wraps the `rasp` weights and biases."""
 
@@ -95,80 +94,53 @@ class RaspModel(t.nn.Module):
             compiler_bos="BOS",
         )
 
-        self.pos_embed = t.nn.Embedding.from_pretrained(
-            state_dict["pos_embed.weight"]
-        )
-        self.embed = t.nn.Embedding.from_pretrained(state_dict["embed.weight"])
-        self.unembed = t.nn.Linear(
-            in_features=vocab_dim_out, out_features=resid_width
-        )
-        self.blocks = t.nn.ModuleList()
-        for (
-            layer_idx  # pylint: disable=unused-variable, redefined-outer-name
-        ) in range(num_layers):
-            self.blocks.append(
-                t.nn.ModuleDict(
-                    {
-                        "attn": t.nn.MultiheadAttention(
-                            embed_dim=attention_dim,
-                            num_heads=num_heads,
-                            dropout=0.0,
-                        ),
-                        "mlp": t.nn.Sequential(
-                            t.nn.Linear(
-                                in_features=hidden_dim,
-                                out_features=hidden_dim,
-                            ),
-                            t.nn.ReLU(),
-                            t.nn.Linear(
-                                in_features=hidden_dim,
-                                out_features=hidden_dim,
-                            ),
-                        ),
-                    }
+        torch_tensors: dict = {}
+
+        for layer in haiku_model.params:
+            for matrix in haiku_model.params[layer]:
+                tensor_name: str = f"{layer}_{matrix}"
+                torch_tensors[tensor_name] = t.tensor(
+                    np.array(haiku_model.params[layer][matrix])
                 )
-            )
-        self.out = t.nn.Linear(in_features=hidden_dim, out_features=1)
+        # pos_embed_embeddings
+        # token_embed_embeddings
+        # transformer/layer_0/attn/key_b
+        # transformer/layer_0/attn/key_w
+        # transformer/layer_0/attn/linear_b
+        # transformer/layer_0/attn/linear_w
+        # transformer/layer_0/attn/query_b
+        # transformer/layer_0/attn/query_w
+        # transformer/layer_0/attn/value_b
+        # transformer/layer_0/attn/value_w
+        # transformer/layer_0/mlp/linear_1_b
+        # transformer/layer_0/mlp/linear_1_w
+        # transformer/layer_0/mlp/linear_2_b
+        # transformer/layer_0/mlp/linear_2_w
+        # transformer/layer_1/attn/key_b
+        # transformer/layer_1/attn/key_w
+        # transformer/layer_1/attn/linear_b
+        # transformer/layer_1/attn/linear_w
+        # transformer/layer_1/attn/query_b
+        # transformer/layer_1/attn/query_w
+        # transformer/layer_1/attn/value_b
+        # transformer/layer_1/attn/value_w
+        # transformer/layer_1/mlp/linear_1_b
+        # transformer/layer_1/mlp/linear_1_w
+        # transformer/layer_1/mlp/linear_2_b
+        # transformer/layer_1/mlp/linear_2_w
+        self.pos_embed = t.nn.Embedding.from_pretrained(
+            torch_tensors["pos_embed_embeddings"]
+        )
+        self.embed = t.nn.Embedding.from_pretrained(
+            torch_tensors["token_embed_embeddings"]
+        )
+        self.attn_1 = t.nn.MultiheadAttention()
+        self.mlp_1 = t.nn.Sequential(t.nn.Linear(), t.nn.ReLU(), t.nn.Linear())
+        self.attn_2 = t.nn.MultiheadAttention()
+        self.mlp_2 = t.nn.Sequential(t.nn.Linear(), t.nn.ReLU(), t.nn.Linear())
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
-        # x: (batch_size, seq_len)
-        # x: (batch_size, seq_len, resid_width)
-        x = self.unembed(x)
-        # x: (batch_size, seq_len, resid_width)
-        x = x + self.pos_embed(t.arange(x.shape[1], device=x.device))
-        # x: (seq_len, batch_size, resid_width)
-        x = x.permute(1, 0, 2)
-        # x: (seq_len, batch_size, resid_width)
-        x = self.embed(x)
-        # x: (seq_len, batch_size, resid_width)
-        x = x.permute(1, 0, 2)
-        # x: (batch_size, seq_len, resid_width)
-        x = x + self.pos_embed(t.arange(x.shape[1], device=x.device))
-        # x: (batch_size, seq_len, resid_width)
-        x = x.permute(1, 0, 2)
-        # x: (seq_len, batch_size, resid_width)
-        x = x + t.randn_like(x) * 0.02
-        # x: (seq_len, batch_size, resid_width)
-        x = x.permute(1, 0, 2)
-        # x: (batch_size, seq_len, resid_width)
-        for (  # pylint: disable=unused-variable, redefined-outer-name
-            layer_index
-        ) in range(num_layers):
-            # x: (batch_size, seq_len, resid_width)
-            x = self.blocks[layer_index]["attn"](
-                query=x, key=x, value=x, need_weights=False
-            )[0]
-            # x: (batch_size, seq_len, resid_width)
-            x = x + t.randn_like(x) * 0.02
-            # x: (batch_size, seq_len, resid_width)
-            x = self.blocks[layer_index]["mlp"](x)
-            # x: (batch_size, seq_len, resid_width)
-            x = x + t.randn_like(x) * 0.02
-        # x: (batch_size, seq_len, resid_width)
-        x = x.permute(1, 0, 2)
-        # x: (seq_len, batch_size, resid_width)
-        x = self.out(x)
 
 
 model = RaspModel()
