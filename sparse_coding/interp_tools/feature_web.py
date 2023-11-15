@@ -84,19 +84,15 @@ for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
         with ablations_lifecycle(model, neuron_idx):
             for literal in [
                 ["BOS", "w"],
-                "x",
-                "y",
-                "z",
+                ["BOS", "x"],
+                ["BOS", "y"],
+                ["BOS", "z"],
             ]:
                 tokens = model.haiku_model.input_encoder.encode(literal)
                 for token in tokens:
                     # Run inference on the ablated model.
                     token = t.tensor(token, dtype=t.int).unsqueeze(0)
-                    output = model(token)
-                    # Record the downstream activations.
-                    activations[
-                        (layer_index, neuron_idx, token)
-                    ] = output.hiddens
+                    model(token)
 
 # %%
 # Graph the causal effects.
