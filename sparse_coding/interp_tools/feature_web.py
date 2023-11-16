@@ -27,24 +27,28 @@ t.manual_seed(SEED)
 
 
 # %%
-# Ablations context manager and factory.
-@contextmanager
-def ablations_lifecycle(  # pylint: disable=redefined-outer-name
-    torch_model: t.nn.Module, neuron_idx: int
+# Raw hooks.
+def ablations_hook(  # pylint: disable=unused-argument, redefined-builtin, redefined-outer-name
+    module: t.nn.Module, input: tuple, output: t.Tensor
 ) -> None:
-    """Define, register, then unregister hooks."""
+    """Zero out a particular neuron's activations."""
+    output[:, neuron_index] = 0.0
 
-    def ablations_hook(  # pylint: disable=unused-argument, redefined-builtin, redefined-outer-name
-        module: t.nn.Module, input: tuple, output: t.Tensor
-    ) -> None:
-        """Zero out a particular neuron's activations."""
-        output[:, neuron_idx] = 0.0
 
-    def caching_hook(  # pylint: disable=unused-argument, redefined-builtin, redefined-outer-name
-        module: t.nn.Module, input: tuple, output: t.Tensor
-    ) -> None:
-        """Cache downstream layer activations."""
-        activations[(layer_index, neuron_idx, token)] = output.detach()
+def caching_hook(  # pylint: disable=unused-argument, redefined-builtin, redefined-outer-name
+    module: t.nn.Module, input: tuple, output: t.Tensor
+) -> None:
+    """Cache downstream layer activations."""
+    activations[(layer_index, neuron_index, token.item)] = output.detach()
+
+
+# %%
+# Ablations context managers and factories.
+@contextmanager
+def ablations_lifecycle(
+    torch_model: t.nn.Module,
+) -> None:
+    """Define, register, and unregister ablation run hooks."""
 
     # Register the hooks with `torch`. Note that `attn_1` and `attn_2` are
     # hardcoded for the rasp model for now.
@@ -55,13 +59,26 @@ def ablations_lifecycle(  # pylint: disable=redefined-outer-name
         caching_hook
     )
 
+    # Yield control to caller function.
     try:
-        # Yield control flow to caller function.
+        yield
+    # Unregister the hooks.
+    finally:
+        ablations_hook_handle.remove()
+        caching_hook_handle.remove()
+
+
+@contextmanager
+def base_caching_lifecycle(torch_model: t.nn.Module) -> None:
+    """Define, register, and unregister just the caching hook."""
+
+    caching_hook_handle = torch_model.attn_2.register_forward_hook(
+        caching_hook
+    )
+
+    try:
         yield
     finally:
-        # Unregister the ablations hook.
-        ablations_hook_handle.remove()
-        # Unregister the caching hook.
         caching_hook_handle.remove()
 
 
@@ -77,23 +94,24 @@ assert ACTS_LAYERS_SLICE == slice(
 model = RaspModel()
 model.eval()
 
-# Loop over every dim and ablate, recording effects.
+# Loop over every dim and ablate, recording differential effects.
 activations = {}
 
 for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
-    for neuron_idx in range(7):
-        with ablations_lifecycle(model, neuron_idx):
-            for literal in [
-                ["BOS", "w"],
-                ["BOS", "x"],
-                ["BOS", "y"],
-                ["BOS", "z"],
-            ]:
-                tokens = model.haiku_model.input_encoder.encode(literal)
-                for token in tokens:
-                    # Run inference on the ablated model.
-                    token = t.tensor(token, dtype=t.int).unsqueeze(0)
-                    model(token)
+    for neuron_index in range(7):
+        for context in (ablations_lifecycle, base_caching_lifecycle):
+            with context(model):
+                for prompt in [
+                    ["BOS", "w"],
+                    ["BOS", "x"],
+                    ["BOS", "y"],
+                    ["BOS", "z"],
+                ]:
+                    tokens = model.haiku_model.input_encoder.encode(prompt)
+                    for token in tokens:
+                        # Run inference on the model.
+                        token = t.tensor(token, dtype=t.int).unsqueeze(0)
+                        model(token)
 
 # %%
 # Graph the causal effects.
