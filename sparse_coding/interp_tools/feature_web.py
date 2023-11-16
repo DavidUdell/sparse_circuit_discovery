@@ -98,4 +98,4 @@ for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
 # %%
 # Graph the causal effects.
 print(activations.keys())
-graph_causal_effects(activations).draw("feature_web.png", prog="dot")
+graph_causal_effects(activations).draw("../data/feature_web.png", prog="dot")
