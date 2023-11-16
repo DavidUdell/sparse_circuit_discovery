@@ -5,6 +5,9 @@
 # .csv data
 *.csv
 
+# Graph .png files
+*.png
+
 # `Lightning` training logging
 *.ckpt
 logs/

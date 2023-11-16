@@ -9,6 +9,7 @@ import torch as t
 from sparse_coding.utils.configure import load_yaml_constants
 from sparse_coding.utils.caching import parse_slice, slice_to_seq
 from sparse_coding.rasp.rasp_to_torch import RaspModel
+from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
 
 
 # %%
@@ -97,3 +98,4 @@ for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
 # %%
 # Graph the causal effects.
 print(activations.keys())
+graph_causal_effects(activations).draw("feature_web.png", prog="dot")
