@@ -4,7 +4,6 @@
 
 from contextlib import contextmanager
 
-import accelerate
 import torch as t
 
 from sparse_coding.utils.configure import load_yaml_constants
@@ -46,7 +45,8 @@ def ablations_lifecycle(  # pylint: disable=redefined-outer-name
         """Cache downstream layer activations."""
         activations[(layer_index, neuron_idx, token)] = output.detach()
 
-    # Register the hooks with `torch`.
+    # Register the hooks with `torch`. Note that `attn_1` and `attn_2` are
+    # hardcoded for the rasp model for now.
     ablations_hook_handle = torch_model.attn_1.register_forward_hook(
         ablations_hook
     )
