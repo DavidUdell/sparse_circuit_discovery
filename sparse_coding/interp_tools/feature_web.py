@@ -39,7 +39,13 @@ def caching_hook(  # pylint: disable=unused-argument, redefined-builtin, redefin
     module: t.nn.Module, input: tuple, output: t.Tensor
 ) -> None:
     """Cache downstream layer activations."""
-    activations[(layer_index, neuron_index, token.item)] = output.detach()
+    activations[
+        (
+            f"layer_{layer_index}",
+            f"dim_{neuron_index}",
+            f"token_id_{token.item()}",
+        )
+    ] = output.detach()
 
 
 # %%
