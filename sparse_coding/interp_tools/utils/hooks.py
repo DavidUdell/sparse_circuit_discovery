@@ -39,7 +39,7 @@ def caching_hook_fac(
                 f"token_id_{token}",
             )
         ] = (
-            output.detach().sum().item()
+            output.detach()
         )
 
     return caching_hook
