@@ -1,13 +1,12 @@
-"""Run the main sparse coding pipeline in one command."""
+"""Run the rasp validation pipeline in one command."""
 
 
 from runpy import run_module
 
 
 for script in [
-    "collect_acts",
-    "train_autoencoder",
-    "interp_tools.top_tokens",
+    "rasp.rasp_cache",
+    "interp_tools.feature_web",
 ]:
     try:
         run_module(f"sparse_coding.{script}")
