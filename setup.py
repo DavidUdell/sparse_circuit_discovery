@@ -27,6 +27,7 @@ setup(
         "circuitsvis",
         "prettytable",
         "einops",
+        "pygraphviz",
         "tracr @ git+https://github.com/google-deepmind/tracr.git",
     ],
 )
