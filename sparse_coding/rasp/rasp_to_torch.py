@@ -168,14 +168,20 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_1/mlp/linear_2_b"],
         )
 
-    def forward(self, x: str) -> t.Tensor:
+    def forward(self, x) -> t.Tensor:
         """Forward pass."""
         x = self.embed(x) + self.pos_embed(x)
 
-        x = self.attn_1(x)
-        x = self.mlp_1(x)
+        # Block 1
+        attn_out_1 = self.attn_1(x)
+        x = x + attn_out_1
+        mlp_out_1 = self.mlp_1(x)
+        x = x + mlp_out_1
 
-        x = self.attn_2(x)
-        x = self.mlp_2(x)
+        # Block 2
+        attn_out_2 = self.attn_2(x)
+        x = x + attn_out_2
+        mlp_out_2 = self.mlp_2(x)
+        x = x + mlp_out_2
 
         return x
