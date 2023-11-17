@@ -2,14 +2,16 @@
 """Ablate autoencoder dimensions during inference and graph causal effects."""
 
 
-from contextlib import contextmanager
-
 import torch as t
 
 from sparse_coding.utils.configure import load_yaml_constants
 from sparse_coding.utils.caching import parse_slice, slice_to_seq
 from sparse_coding.rasp.rasp_to_torch import RaspModel
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
+from sparse_coding.interp_tools.utils.hooks import (
+    ablations_lifecycle,
+    base_caching_lifecycle,
+)
 
 
 # %%
@@ -25,69 +27,6 @@ SEED = config.get("SEED")
 # Reproducibility.
 t.manual_seed(SEED)
 
-
-# %%
-# Raw hooks.
-def ablations_hook(  # pylint: disable=unused-argument, redefined-builtin, redefined-outer-name
-    module: t.nn.Module, input: tuple, output: t.Tensor
-) -> None:
-    """Zero out a particular neuron's activations."""
-    output[:, neuron_index] = 0.0
-
-
-def caching_hook(  # pylint: disable=unused-argument, redefined-builtin, redefined-outer-name
-    module: t.nn.Module, input: tuple, output: t.Tensor
-) -> None:
-    """Cache downstream layer activations."""
-    activations[
-        (
-            f"layer_{layer_index}",
-            f"dim_{neuron_index}",
-            f"token_id_{token.item()}",
-        )
-    ] = output.detach()
-
-
-# %%
-# Ablations context managers and factories.
-@contextmanager
-def ablations_lifecycle(
-    torch_model: t.nn.Module,
-) -> None:
-    """Define, register, and unregister ablation run hooks."""
-
-    # Register the hooks with `torch`. Note that `attn_1` and `attn_2` are
-    # hardcoded for the rasp model for now.
-    ablations_hook_handle = torch_model.attn_1.register_forward_hook(
-        ablations_hook
-    )
-    caching_hook_handle = torch_model.attn_2.register_forward_hook(
-        caching_hook
-    )
-
-    # Yield control to caller function.
-    try:
-        yield
-    # Unregister the hooks.
-    finally:
-        ablations_hook_handle.remove()
-        caching_hook_handle.remove()
-
-
-@contextmanager
-def base_caching_lifecycle(torch_model: t.nn.Module) -> None:
-    """Define, register, and unregister just the caching hook."""
-
-    caching_hook_handle = torch_model.attn_2.register_forward_hook(
-        caching_hook
-    )
-
-    try:
-        yield
-    finally:
-        caching_hook_handle.remove()
-
-
 # %%
 # This implementation validates against just the rasp model. After validation,
 # I will generalize to real-world autoencoded models.
@@ -100,26 +39,41 @@ assert ACTS_LAYERS_SLICE == slice(
 model = RaspModel()
 model.eval()
 
-# Loop over every dim and ablate, recording differential effects.
-activations = {}
+# Record the differential downstream effects of ablating each dim.
+base_activations: dict = {}
+ablated_activations: dict = {}
 
 for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
     for neuron_index in range(7):
-        for context in (ablations_lifecycle, base_caching_lifecycle):
-            with context(model):
-                for prompt in [
-                    ["BOS", "w"],
-                    ["BOS", "x"],
-                    ["BOS", "y"],
-                    ["BOS", "z"],
-                ]:
-                    tokens = model.haiku_model.input_encoder.encode(prompt)
-                    for token in tokens:
-                        # Run inference on the model.
-                        token = t.tensor(token, dtype=t.int).unsqueeze(0)
-                        model(token)
+        for prompt in [
+            ["BOS", "w"],
+            ["BOS", "x"],
+            ["BOS", "y"],
+            ["BOS", "z"],
+        ]:
+            tokens = model.haiku_model.input_encoder.encode(prompt)
+            for token in tokens:
+                for context, dictionary in (
+                    (base_caching_lifecycle, base_activations),
+                    (ablations_lifecycle, ablated_activations),
+                ):
+                    with context(
+                        model,
+                        neuron_index,
+                        layer_index,
+                        token,
+                        dictionary,
+                    ):
+                        # Run inference.
+                        model_input = t.tensor(token, dtype=t.int).unsqueeze(0)
+                        model(model_input)
 
 # %%
 # Graph the causal effects.
-print(activations.keys())
-graph_causal_effects(activations).draw("../data/feature_web.png", prog="dot")
+print(base_activations.keys())
+print(ablated_activations.keys())
+print(base_activations.values())
+print(ablated_activations.values())
+graph_causal_effects(base_activations).draw(
+    "../data/feature_web.png", prog="dot"
+)

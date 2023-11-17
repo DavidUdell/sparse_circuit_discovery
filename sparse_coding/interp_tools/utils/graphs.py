@@ -9,8 +9,11 @@ def graph_causal_effects(activations: dict) -> AGraph:
 
     graph = AGraph(directed=True)
 
-    # Add nodes.
+    # Plot nodes.
     for layer_index, neuron_idx, token in activations.keys():
         graph.add_node(f"{layer_index}_{neuron_idx}_{token}")
+
+    # Plot edges.
+    # TODO
 
     return graph
