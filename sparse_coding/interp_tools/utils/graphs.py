@@ -16,7 +16,10 @@ def graph_causal_effects(activations: dict) -> AGraph:
     # Plot edges.
     graph.add_edges_from(
         [
-            (f"{layer_index}_{neuron_idx}", f"{int(layer_index.split('_')[-1]) + 1}_{neuron_idx}")
+            (
+                f"{layer_index}_{neuron_idx}",
+                f"{layer_index.split('_')[0]}_{int(layer_index.split('_')[-1]) + 1}_{neuron_idx}"
+            )
             for layer_index, neuron_idx in activations.keys()
             if int(layer_index.split("_")[-1]) + 1 < 2
         ],
