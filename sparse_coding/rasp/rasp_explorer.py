@@ -2,17 +2,17 @@
 
 
 from sparse_coding.rasp.rasp_to_torch import RaspModel
-from sparse_coding.rasp.rasp_tokenizer import rasp_encode, rasp_decode
+from sparse_coding.rasp.rasp_tokenizer import rasp_encode
 
 
 model = RaspModel()
 model.eval()
 
-input_tokens = ["BOS", "w", "x", "y", "z"]
+input_tokens = ["BOS", "x", "x", "y", "y", "y", "z", "z", "z"]
 
 input_ids = rasp_encode(model, input_tokens)
 output = model(input_ids).detach()
-print(output)
-output_tokens = rasp_decode(model, output)
+print(output.shape)
 
-print(output_tokens)
+for i in range(9):
+    print([output[i, :].sum(-1).item()])

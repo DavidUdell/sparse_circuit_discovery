@@ -89,8 +89,8 @@ class RaspModel(t.nn.Module):
         # Compile the Haiku version of the model.
         haiku_model = compiler.compiling.compile_rasp_to_model(
             make_frac_prevs(rasp.tokens == "x"),
-            vocab={"w", "x", "y", "z"},
-            max_seq_len=5,
+            vocab={"w", "x", "y", "z", "q", "r", "s", "t"},
+            max_seq_len=10,
             compiler_bos="BOS",
         )
         self.haiku_model = haiku_model
@@ -145,14 +145,14 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_0/attn/linear_w"],
             torch_tensors["transformer/layer_0/attn/linear_b"],
         )
-        self.layer_norm_1 = t.nn.LayerNorm(14)
+        self.layer_norm_1 = t.nn.LayerNorm(23)
         self.mlp_1 = MLP(
             torch_tensors["transformer/layer_0/mlp/linear_1_w"],
             torch_tensors["transformer/layer_0/mlp/linear_1_b"],
             torch_tensors["transformer/layer_0/mlp/linear_2_w"],
             torch_tensors["transformer/layer_0/mlp/linear_2_b"],
         )
-        self.layer_norm_2 = t.nn.LayerNorm(14)
+        self.layer_norm_2 = t.nn.LayerNorm(23)
         self.attn_2 = Attn(
             torch_tensors["transformer/layer_1/attn/key_w"],
             torch_tensors["transformer/layer_1/attn/key_b"],
@@ -163,14 +163,14 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_1/attn/linear_w"],
             torch_tensors["transformer/layer_1/attn/linear_b"],
         )
-        self.layer_norm_3 = t.nn.LayerNorm(14)
+        self.layer_norm_3 = t.nn.LayerNorm(23)
         self.mlp_2 = MLP(
             torch_tensors["transformer/layer_1/mlp/linear_1_w"],
             torch_tensors["transformer/layer_1/mlp/linear_1_b"],
             torch_tensors["transformer/layer_1/mlp/linear_2_w"],
             torch_tensors["transformer/layer_1/mlp/linear_2_b"],
         )
-        self.layer_norm_4 = t.nn.LayerNorm(14)
+        self.layer_norm_4 = t.nn.LayerNorm(23)
 
     def forward(self, x) -> t.Tensor:
         """Forward pass."""

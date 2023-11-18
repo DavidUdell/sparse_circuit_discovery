@@ -10,8 +10,8 @@ from tracr.compiler.lib import make_frac_prevs
 
 haiku_model = compiler.compiling.compile_rasp_to_model(
     make_frac_prevs(rasp.tokens == "x"),
-    vocab={"w", "x", "y", "z"},
-    max_seq_len=5,
+    vocab={"w", "x", "y", "z", "q", "r", "s", "t"},
+    max_seq_len=10,
     compiler_bos="BOS",
 )
 
@@ -60,4 +60,11 @@ for key in torch_tensors:
 #       vocab_size
 
 
-print(haiku_model.apply(["BOS", "w", "x", "y", "z"]).decoded)
+model_output = haiku_model.apply(
+    ["BOS", "w", "x", "y", "z", "q", "q", "q", "q"]
+).transformer_output
+
+print(model_output.shape)
+
+for i in range(9):
+    print(model_output[:, i, :].sum(-1))
