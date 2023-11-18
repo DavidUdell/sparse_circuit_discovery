@@ -60,4 +60,5 @@ for key in torch_tensors:
 #       vocab_size
 
 
-haiku_model.apply(["BOS", "w", "x", "y", "z"]).decoded
+print(dir(haiku_model.apply(["BOS", "w", "x", "y", "z"])))
+print(haiku_model.output_encoder.decode(haiku_model.apply(["BOS", "w", "x", "y", "z"])))

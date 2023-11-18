@@ -1,9 +1,12 @@
 """Looking over the rasp_to_torch model."""
 
 
+import numpy as np
 import torch as t
+import jax.numpy as jnp
 
 from sparse_coding.rasp.rasp_to_torch import RaspModel
+from sparse_coding.rasp.rasp_tokenizer import encode, decode
 
 
 model = RaspModel()
@@ -11,11 +14,12 @@ model.eval()
 input_tokens = model.haiku_model.input_encoder.encode(
     ["BOS", "w", "x", "y", "z"]
     )
-output_tokens = []
+outputs = []
 
 for input_token in input_tokens:
-    input_token = t.tensor(input_token).unsqueeze(0)
-    output = model(input_token)
-    output_tokens.append(output.sum().item())
+    # call encode
+    output = model(input_token).detach()
+    # call decode
+    outputs.append()
 
-print(output_tokens)
+print(output)
