@@ -145,12 +145,14 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_0/attn/linear_w"],
             torch_tensors["transformer/layer_0/attn/linear_b"],
         )
+        self.layer_norm_1 = t.nn.LayerNorm(14)
         self.mlp_1 = MLP(
             torch_tensors["transformer/layer_0/mlp/linear_1_w"],
             torch_tensors["transformer/layer_0/mlp/linear_1_b"],
             torch_tensors["transformer/layer_0/mlp/linear_2_w"],
             torch_tensors["transformer/layer_0/mlp/linear_2_b"],
         )
+        self.layer_norm_2 = t.nn.LayerNorm(14)
         self.attn_2 = Attn(
             torch_tensors["transformer/layer_1/attn/key_w"],
             torch_tensors["transformer/layer_1/attn/key_b"],
@@ -161,12 +163,14 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_1/attn/linear_w"],
             torch_tensors["transformer/layer_1/attn/linear_b"],
         )
+        self.layer_norm_3 = t.nn.LayerNorm(14)
         self.mlp_2 = MLP(
             torch_tensors["transformer/layer_1/mlp/linear_1_w"],
             torch_tensors["transformer/layer_1/mlp/linear_1_b"],
             torch_tensors["transformer/layer_1/mlp/linear_2_w"],
             torch_tensors["transformer/layer_1/mlp/linear_2_b"],
         )
+        self.layer_norm_4 = t.nn.LayerNorm(14)
 
     def forward(self, x) -> t.Tensor:
         """Forward pass."""
@@ -174,14 +178,14 @@ class RaspModel(t.nn.Module):
 
         # Block 1
         attn_out_1 = self.attn_1(x)
-        x = x + attn_out_1
+        x = self.layer_norm_1(x + attn_out_1)
         mlp_out_1 = self.mlp_1(x)
-        x = x + mlp_out_1
+        x = self.layer_norm_2(x + mlp_out_1)
 
         # Block 2
         attn_out_2 = self.attn_2(x)
-        x = x + attn_out_2
+        x = self.layer_norm_3(x + attn_out_2)
         mlp_out_2 = self.mlp_2(x)
-        x = x + mlp_out_2
+        x = self.layer_norm_4(x + mlp_out_2)
 
         return x

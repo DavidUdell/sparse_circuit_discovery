@@ -31,7 +31,21 @@ for key in torch_tensors:
 #   forward
 #   get_compiled_model
 #   model_config
+#       activation_function
+#       causal
+#       dropout_rate
+#       key_size
+#       layer_norm
+#       mlp_hidden_size
+#       num_heads
+#       num_layers
 #   output_encoder
+#       bos_encoding
+#       bos_token
+#       decode
+#       encode
+#       pad_encoding
+#       pad_token
 #   params
 #   residual_labels
 #   input_encoder
@@ -45,8 +59,5 @@ for key in torch_tensors:
 #       pad_token
 #       vocab_size
 
-print(haiku_model.model_config.num_heads)
-print(haiku_model.model_config.key_size)
-print(haiku_model.model_config.mlp_hidden_size)
 
-print(haiku_model.input_encoder.encode(["BOS", "x"]))
+haiku_model.apply(["BOS", "w", "x", "y", "z"]).decoded

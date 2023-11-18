@@ -20,7 +20,12 @@ def test_rasp_model_inference():
         )
     output_tokens = []
 
-    for idx, input_token, ground_truth in zip(range(5), input_tokens, (0, 0, 1, 0, 0)):
+    for idx, input_token, ground_truth in zip(
+        range(5),
+        input_tokens,
+        ("BOS", 0.0, 0.5, 0.33, 0.25)
+        ):
+
         input_token = t.tensor(input_token, dtype=t.int).unsqueeze(0)
         output = model(input_token)
         output_tokens.append(output.sum().item())
@@ -28,9 +33,13 @@ def test_rasp_model_inference():
         assert isinstance(output_tokens[-1], float), (
             f"Model output {output_tokens[-1]} must be a float."
         )
-        assert output_tokens[-1] == ground_truth, (
-            f"Model output (index {idx}) {output_tokens[-1]} should be {ground_truth}."
-        )
-
+        if isinstance(ground_truth, float):
+            assert t.isclose(
+                t.tensor(output_tokens[-1]),
+                t.tensor(ground_truth),
+                atol=0.00001), (
+                f"Model output (sequence index {idx}) {output_tokens[-1]} " \
+                f"should be {ground_truth}."
+                )
     output_tokens = model.haiku_model.input_encoder.decode(output_tokens)
     print(output_tokens)
