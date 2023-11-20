@@ -3,6 +3,7 @@
 
 
 from collections import defaultdict
+from textwrap import dedent
 
 import torch as t
 
@@ -32,11 +33,25 @@ t.manual_seed(SEED)
 # %%
 # This implementation validates against just the rasp model. After validation,
 # I will generalize to real-world autoencoded models.
+if MODEL_DIR != "rasp":
+    raise ValueError(
+        dedent(
+            f"""
+            `rasp_cache.py` requires that MODEL_DIR be set to `rasp`, not
+            {MODEL_DIR}.
+            """
+        )
+    )
 
-assert MODEL_DIR == "rasp", "MODEL_DIR must be 'rasp`, for now."
-assert ACTS_LAYERS_SLICE == slice(
-    0, 2
-), "ACTS_LAYERS_SLICE must be 0:2, for now."
+if ACTS_LAYERS_SLICE != slice(0, 2):
+    raise ValueError(
+        dedent(
+            f"""
+            `rasp_cache.py` requires that ACTS_LAYERS_SLICE be set to `slice(0,
+            2)`, not {ACTS_LAYERS_SLICE}.
+            """
+        )
+    )
 
 model = RaspModel()
 model.eval()
