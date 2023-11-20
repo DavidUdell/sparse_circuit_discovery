@@ -28,6 +28,20 @@ for key in torch_tensors:
 
 # haiku_model
 #   apply
+#       attn_logits
+#       decoded
+#       from_tuple
+#       get
+#       input_embeddings
+#       items
+#       keys
+#       layer_outputs
+#       replace
+#       residuals
+#       to_tuple
+#       transformer_output
+#       unembedded
+#       values
 #   forward
 #   get_compiled_model
 #   model_config
@@ -60,11 +74,4 @@ for key in torch_tensors:
 #       vocab_size
 
 
-model_output = haiku_model.apply(
-    ["BOS", "w", "x", "y", "z", "q", "q", "q", "q"]
-).transformer_output
-
-print(model_output.shape)
-
-for i in range(9):
-    print(model_output[:, i, :].sum(-1))
+haiku_model.apply(["BOS", "w", "x", "y", "z", "q", "q", "q", "q"]).decoded
