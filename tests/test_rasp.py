@@ -78,24 +78,36 @@ def test_rasp_model_internals():
         raw_tokens
     ).layer_outputs
 
-    for activation_tensor in jax_model_activation_tensors:
-        activation_tensor = t.tensor(np.array(activation_tensor))
+    assert isinstance(jax_model_activation_tensors, list)
 
-    torch_model_activation_tensors = []
+    for layer in jax_model_activation_tensors:
+        for matrix in layer:
+            for token in matrix:
+                token = t.tensor(np.array(token))
+            matrix = t.tensor(np.array(matrix))
+            assert isinstance(matrix, t.Tensor)
+        layer = t.tensor(np.array(layer))
+        assert isinstance(layer, t.Tensor)
+
+    print(jax_model_activation_tensors)
+
+    torch_model_activation_tensors = [None] * 11
+
     for token_id in torch_token_ids:
         with all_layer_hooks() as layer_outs:
+            token_id = t.tensor(token_id, dtype=t.int).unsqueeze(0)
             model(token_id)
             for idx, layer_out in enumerate(layer_outs):
                 if torch_model_activation_tensors[idx] is None:
                     torch_model_activation_tensors[idx] = layer_out
                 else:
                     torch_model_activation_tensors[idx] = t.cat(
-                        torch_model_activation_tensors[idx], layer_out
+                        (torch_model_activation_tensors[idx], layer_out), dim=0
                     )
 
     for jax_activation_tensor, torch_activation_tensor in zip(
         jax_model_activation_tensors, torch_model_activation_tensors
     ):
         assert t.allclose(
-            jax_activation_tensor, torch_activation_tensor, atol=0.0001
+            torch_activation_tensor, jax_activation_tensor, atol=0.0001
         )
