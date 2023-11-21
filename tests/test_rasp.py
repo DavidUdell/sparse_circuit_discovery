@@ -2,6 +2,7 @@
 
 
 from contextlib import contextmanager
+from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -80,8 +81,7 @@ def test_rasp_model_internals():
 
     assert isinstance(jax_model_activation_tensors, list)
 
-    for layer_idx in range(len(jax_model_activation_tensors)):
-        print(jax_model_activation_tensors[layer_idx])
+    for layer_idx, _ in enumerate(jax_model_activation_tensors):
         jax_model_activation_tensors[layer_idx] = t.tensor(
             np.array(jax_model_activation_tensors[layer_idx])
         )
@@ -99,10 +99,26 @@ def test_rasp_model_internals():
                     torch_model_activation_tensors[idx] = t.cat(
                         (torch_model_activation_tensors[idx], layer_out), dim=0
                     )
+    print(f"torch model sublayers: {len(torch_model_activation_tensors)}")
+    print(f"JAX model sublayers: {len(jax_model_activation_tensors)}")
 
-    for jax_activation_tensor, torch_activation_tensor in zip(
-        jax_model_activation_tensors, torch_model_activation_tensors
+    for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
+        range(11), jax_model_activation_tensors, torch_model_activation_tensors
+    ):
+        print(f"sublayer {sublayer_idx}:")
+        print(f"torch: {torch_activation_tensor}")
+        print(f"JAX: {jax_activation_tensor}")
+
+    for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
+        range(11), jax_model_activation_tensors, torch_model_activation_tensors
     ):
         assert t.allclose(
-            torch_activation_tensor, jax_activation_tensor, atol=0.0001
+            torch_activation_tensor,
+            jax_activation_tensor,
+            atol=0.0001,
+        ), dedent(
+            f"""
+            Sublayer {sublayer_idx} tensors {torch_activation_tensor} (torch)
+            and {jax_activation_tensor} (JAX) differ.
+            """
         )
