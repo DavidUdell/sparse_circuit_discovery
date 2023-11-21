@@ -80,16 +80,11 @@ def test_rasp_model_internals():
 
     assert isinstance(jax_model_activation_tensors, list)
 
-    for layer in jax_model_activation_tensors:
-        for matrix in layer:
-            for token in matrix:
-                token = t.tensor(np.array(token))
-            matrix = t.tensor(np.array(matrix))
-            assert isinstance(matrix, t.Tensor)
-        layer = t.tensor(np.array(layer))
-        assert isinstance(layer, t.Tensor)
-
-    print(jax_model_activation_tensors)
+    for layer_idx in range(len(jax_model_activation_tensors)):
+        print(jax_model_activation_tensors[layer_idx])
+        jax_model_activation_tensors[layer_idx] = t.tensor(
+            np.array(jax_model_activation_tensors[layer_idx])
+        )
 
     torch_model_activation_tensors = [None] * 11
 
