@@ -41,7 +41,7 @@ class Attn(t.nn.Module):
         K = t.einsum("ij,jk->ik", x, self.key_weights) + self.key_bias
         V = t.einsum("ij,jk->ik", x, self.value_weights) + self.value_bias
 
-        scores = t.matmul(Q, K.transpose(-2, -1) / sqrt(Q.size(-1)))
+        scores = t.matmul(Q, K.transpose(0, 1) / sqrt(Q.size(-1)))
         normalized_scores = t.nn.functional.softmax(scores, dim=-1)
 
         # VO circuit
@@ -77,6 +77,20 @@ class MLP(t.nn.Module):
         x = t.einsum("ij,jk->ik", x, self.weights_2) + self.bias_2
 
         return x
+
+
+class Residual(t.nn.Module):
+    """A minimal residual stream class, for easy hooking."""
+
+    def __init__(self):
+        """Initialize the layer object."""
+        super().__init__()
+
+    def forward(self, x: t.Tensor, other: t.Tensor) -> t.Tensor:
+        """Just add x and other."""
+        output = x + other
+
+        return output
 
 
 class RaspModel(t.nn.Module):
@@ -135,6 +149,8 @@ class RaspModel(t.nn.Module):
         self.embed = t.nn.Embedding.from_pretrained(
             torch_tensors["token_embed_embeddings"]
         )
+
+        self.layer_norm_1 = t.nn.LayerNorm(23, bias=False)
         self.attn_1 = Attn(
             torch_tensors["transformer/layer_0/attn/key_w"],
             torch_tensors["transformer/layer_0/attn/key_b"],
@@ -145,14 +161,18 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_0/attn/linear_w"],
             torch_tensors["transformer/layer_0/attn/linear_b"],
         )
-        self.layer_norm_1 = t.nn.LayerNorm(23)
+        self.residual_1 = Residual()
+
+        self.layer_norm_2 = t.nn.LayerNorm(23, bias=False)
         self.mlp_1 = MLP(
             torch_tensors["transformer/layer_0/mlp/linear_1_w"],
             torch_tensors["transformer/layer_0/mlp/linear_1_b"],
             torch_tensors["transformer/layer_0/mlp/linear_2_w"],
             torch_tensors["transformer/layer_0/mlp/linear_2_b"],
         )
-        self.layer_norm_2 = t.nn.LayerNorm(23)
+        self.residual_2 = Residual()
+
+        self.layer_norm_3 = t.nn.LayerNorm(23, bias=False)
         self.attn_2 = Attn(
             torch_tensors["transformer/layer_1/attn/key_w"],
             torch_tensors["transformer/layer_1/attn/key_b"],
@@ -163,29 +183,40 @@ class RaspModel(t.nn.Module):
             torch_tensors["transformer/layer_1/attn/linear_w"],
             torch_tensors["transformer/layer_1/attn/linear_b"],
         )
-        self.layer_norm_3 = t.nn.LayerNorm(23)
+        self.residual_3 = Residual()
+
+        self.layer_norm_4 = t.nn.LayerNorm(23, bias=False)
         self.mlp_2 = MLP(
             torch_tensors["transformer/layer_1/mlp/linear_1_w"],
             torch_tensors["transformer/layer_1/mlp/linear_1_b"],
             torch_tensors["transformer/layer_1/mlp/linear_2_w"],
             torch_tensors["transformer/layer_1/mlp/linear_2_b"],
         )
-        self.layer_norm_4 = t.nn.LayerNorm(23)
+        self.residual_4 = Residual()
+
+        self.layer_norm_5 = t.nn.LayerNorm(23)
 
     def forward(self, x) -> t.Tensor:
         """Forward pass."""
+        # Embedding
         x = self.embed(x) + self.pos_embed(x)
 
-        # Block 1
-        attn_out_1 = self.attn_1(x)
-        x = self.layer_norm_1(x + attn_out_1)
-        mlp_out_1 = self.mlp_1(x)
-        x = self.layer_norm_2(x + mlp_out_1)
+        # Transformer block 1
+        layernorm_out_1 = self.layer_norm_1(x)
+        attn_out_1 = self.attn_1(layernorm_out_1)
+        x = self.residual_1(x, attn_out_1)
+        layernorm_out_2 = self.layer_norm_2(x)
+        mlp_out_1 = self.mlp_1(layernorm_out_2)
+        x = self.residual_2(x, mlp_out_1)
 
-        # Block 2
-        attn_out_2 = self.attn_2(x)
-        x = self.layer_norm_3(x + attn_out_2)
-        mlp_out_2 = self.mlp_2(x)
-        x = self.layer_norm_4(x + mlp_out_2)
+        # Transformer block 2
+        layernorm_out_3 = self.layer_norm_3(x)
+        attn_out_2 = self.attn_2(layernorm_out_3)
+        x = self.residual_3(x, attn_out_2)
+        layernorm_out_4 = self.layer_norm_4(x)
+        mlp_out_2 = self.mlp_2(layernorm_out_4)
+        x = self.residual_4(x, mlp_out_2)
 
+        # Final layernorm
+        x = self.layer_norm_5(x)
         return x
