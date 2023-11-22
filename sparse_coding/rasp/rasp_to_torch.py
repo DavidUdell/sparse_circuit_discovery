@@ -68,8 +68,22 @@ class Attn(t.nn.Module):
         K = t.einsum("bij,jk->bik", x, self.key_weights) + self.key_bias
         V = t.einsum("bij,jk->bik", x, self.value_weights) + self.value_bias
 
+        # print(f"Q weights: {self.query_weights.detach()}\n")
+        # print(f"Q bias: {self.query_bias.detach()}\n")
+        # print(f"K weights: {self.key_weights.detach()}\n")
+        # print(f"K bias: {self.key_bias.detach()}\n")
+        # print(f"V weights: {self.value_weights.detach()}\n")
+        # print(f"V bias: {self.value_bias.detach()}\n")
+        # print(f"out weights: {self.out_weights.detach()}\n")
+        # print(f"out bias: {self.out_bias.detach()}\n")
+
+        # print(f"x: {x.detach()}\n")
+        # print(f"Q: {Q.detach()}\n")
+        # print(f"K: {K.detach()}\n")
+        # print(f"V: {V.detach()}\n")
+
         scores = t.matmul(Q, K.transpose(1, 2)) / sqrt(Q.size(-1))
-        normalized_scores = t.nn.functional.softmax(scores, dim=-1)
+        normalized_scores = t.nn.functional.softmax(scores)
 
         # VO circuit
         scored_value = t.matmul(normalized_scores, V)
@@ -77,6 +91,12 @@ class Attn(t.nn.Module):
             t.einsum("bij,jk->bik", scored_value, self.out_weights)
             + self.out_bias
         )
+
+        # print(f"scores: {scores.detach()}\n")
+        # print(f"normalized_scores: {normalized_scores.detach()}\n")
+        # print(f"scored_value: {scored_value.detach()}\n")
+        # print(f"attn out: {output.detach()}\n")
+
         return output
 
 
@@ -92,16 +112,27 @@ class MLP(t.nn.Module):
     ):
         """Initialize the layer."""
         super().__init__()
-        self.weights_1 = weights_1
+        self.weights_1 = weights_1.transpose(0, 1)
         self.bias_1 = bias_1
         self.weights_2 = weights_2
         self.bias_2 = bias_2
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
+        # print(f"MLP in: {x.detach()}\n")
+        # print(f"MLP 1 weights: {self.weights_1.detach()}\n")
+        # print(f"MLP 1 bias: {self.bias_1.detach()}\n")
+
         x = t.einsum("bij,jk->bik", x, self.weights_1) + self.bias_1
+        # print(f"MLP 1 out: {x.detach()}\n")
+
         x = t.nn.functional.relu(x)
+        # print(f"ReLU out: {x.detach()}\n")
+
+        # print(f"MLP 2 weights: {self.weights_2.detach()}\n")
+        # print(f"MLP 2 bias: {self.bias_2.detach()}\n")
         x = t.einsum("bij,jk->bik", x, self.weights_2) + self.bias_2
+        # print(f"MLP 2 out: {x.detach()}\n")
 
         return x
 
@@ -177,7 +208,7 @@ class RaspModel(t.nn.Module):
             torch_tensors["token_embed_embeddings"]
         )
 
-        self.layer_norm_1 = t.nn.LayerNorm(23, bias=False)
+        self.layer_norm_1 = t.nn.LayerNorm(23, elementwise_affine=False)
         self.attn_1 = Attn(
             torch_tensors["transformer/layer_0/attn/key_w"],
             torch_tensors["transformer/layer_0/attn/key_b"],
@@ -190,7 +221,7 @@ class RaspModel(t.nn.Module):
         )
         self.residual_1 = Residual()
 
-        self.layer_norm_2 = t.nn.LayerNorm(23, bias=False)
+        self.layer_norm_2 = t.nn.LayerNorm(23, elementwise_affine=False)
         self.mlp_1 = MLP(
             torch_tensors["transformer/layer_0/mlp/linear_1_w"],
             torch_tensors["transformer/layer_0/mlp/linear_1_b"],
@@ -199,7 +230,7 @@ class RaspModel(t.nn.Module):
         )
         self.residual_2 = Residual()
 
-        self.layer_norm_3 = t.nn.LayerNorm(23, bias=False)
+        self.layer_norm_3 = t.nn.LayerNorm(23, elementwise_affine=False)
         self.attn_2 = Attn(
             torch_tensors["transformer/layer_1/attn/key_w"],
             torch_tensors["transformer/layer_1/attn/key_b"],
@@ -212,7 +243,7 @@ class RaspModel(t.nn.Module):
         )
         self.residual_3 = Residual()
 
-        self.layer_norm_4 = t.nn.LayerNorm(23, bias=False)
+        self.layer_norm_4 = t.nn.LayerNorm(23, elementwise_affine=False)
         self.mlp_2 = MLP(
             torch_tensors["transformer/layer_1/mlp/linear_1_w"],
             torch_tensors["transformer/layer_1/mlp/linear_1_b"],
@@ -221,11 +252,12 @@ class RaspModel(t.nn.Module):
         )
         self.residual_4 = Residual()
 
-        self.layer_norm_5 = t.nn.LayerNorm(23)
+        self.layer_norm_5 = t.nn.LayerNorm(23, elementwise_affine=False)
 
     def forward(self, x) -> t.Tensor:
         """Forward pass."""
         # Embedding
+        print(f"token embedding: {self.embed(x).detach()}\n")
         x = self.pos_embed(x) + self.embed(x)
 
         # Transformer block 1

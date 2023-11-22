@@ -56,7 +56,7 @@ def test_rasp_model_internals():
         )
     model = RaspModel()
     model.eval()
-    raw_tokens = ["BOS"]
+    raw_tokens = ["BOS", "x"]
     torch_token_ids = model.haiku_model.input_encoder.encode(raw_tokens)
 
     jax_sublayer_tensors: list = model.haiku_model.apply(
