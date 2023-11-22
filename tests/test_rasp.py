@@ -14,35 +14,6 @@ from sparse_coding.rasp.rasp_tokenizer import rasp_encode
 t.manual_seed(0)
 
 
-def test_rasp_model_outputs():
-    """Compare JAX and rasp_to_torch model outputs."""
-
-    model = RaspModel()
-    model.eval()
-    raw_tokens = ["BOS"]
-
-    ground_truths = model.haiku_model.apply(raw_tokens).transformer_output
-    input_ids = rasp_encode(model, raw_tokens)
-    tensorized_input_ids = t.tensor(input_ids, dtype=t.int).unsqueeze(0)
-
-    outputs = model(tensorized_input_ids)
-
-    for idx, output, ground_truth in zip(
-        range(len(raw_tokens)), outputs, ground_truths
-        ):
-        assert t.isclose(
-            output.sum(-1)[idx].detach(),
-            t.tensor(np.array(ground_truth)).sum(-1)[idx],
-            atol=0.00001,
-        ), (
-            f"Seq {idx} torch/JAX disagreement:\n"
-            f"{output.sum(-1)[idx].detach()}\n"
-            f"{t.tensor(np.array(ground_truth)).sum(-1)[idx]}\n"
-        )
-        print(f"Outputs match at index {idx}!")
-    print(outputs)
-
-
 def test_rasp_model_internals():
     """Compare JAX and rasp_to_torch model internal activation tensors."""
 
@@ -135,3 +106,34 @@ def test_rasp_model_internals():
             f"{torch_activation_tensor}\n"
             f"{jax_activation_tensor}\n"
         )
+
+
+def test_rasp_model_outputs():
+    """Compare JAX and rasp_to_torch model outputs."""
+
+    model = RaspModel()
+    model.eval()
+    raw_tokens = ["BOS"]
+
+    ground_truths = model.haiku_model.apply(raw_tokens).transformer_output
+    input_ids = rasp_encode(model, raw_tokens)
+    tensorized_input_ids = t.tensor(input_ids, dtype=t.int).unsqueeze(0)
+
+    outputs = model(tensorized_input_ids)
+
+    for idx, output, ground_truth in zip(
+        range(len(raw_tokens)), outputs, ground_truths
+        ):
+
+        assert t.isclose(
+            output.sum(-1)[idx].detach(),
+            t.tensor(np.array(ground_truth)).sum(-1)[idx],
+            atol=0.00001,
+        ), (
+            f"JAX/torch mismatch at sequence index {idx}:\n"
+            f"{t.tensor(np.array(ground_truth)).sum(-1)[idx]}\n"
+            f"{output.sum(-1)[idx].detach()}\n"
+        )
+
+        print(f"Outputs match at index {idx}!")
+    print(outputs)
