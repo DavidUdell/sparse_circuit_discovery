@@ -80,7 +80,7 @@ def test_rasp_model_internals():
 
     model = RaspModel()
     model.eval()
-    raw_tokens = ["BOS"]
+    raw_tokens = ["BOS", "x"]
     torch_token_ids = model.haiku_model.input_encoder.encode(raw_tokens)
 
     jax_model_activation_tensors: list = model.haiku_model.apply(
@@ -96,17 +96,16 @@ def test_rasp_model_internals():
 
     torch_model_activation_tensors = [None] * 4
 
-    for positional_id, token_id in enumerate(torch_token_ids):
-        with all_layer_hooks(model) as layer_outs:
-            token_id = t.tensor(token_id, dtype=t.int).unsqueeze(0)
-            model(token_id, positional_id)
-            for idx, layer_out in enumerate(layer_outs):
-                if torch_model_activation_tensors[idx] is None:
-                    torch_model_activation_tensors[idx] = layer_out
-                else:
-                    torch_model_activation_tensors[idx] = t.cat(
-                        (torch_model_activation_tensors[idx], layer_out), dim=0
-                    )
+    with all_layer_hooks(model) as layer_outs:
+        token_ids = t.tensor(torch_token_ids, dtype=t.int).unsqueeze(0)
+        model(token_ids)
+        for idx, layer_out in enumerate(layer_outs):
+            if torch_model_activation_tensors[idx] is None:
+                torch_model_activation_tensors[idx] = layer_out
+            else:
+                torch_model_activation_tensors[idx] = t.cat(
+                    (torch_model_activation_tensors[idx], layer_out), dim=0
+                )
 
     for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
         range(4), jax_model_activation_tensors, torch_model_activation_tensors

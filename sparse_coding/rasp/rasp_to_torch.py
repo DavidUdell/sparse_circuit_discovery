@@ -14,15 +14,24 @@ class PositionalEmbedding(t.nn.Module):
     """Custom positional embedding layer."""
 
     def __init__(self, positional_weights: t.Tensor):
-        """Initialize the layer object."""
+        """Initialize the layer."""
         super().__init__()
         self.positional_weights = positional_weights
 
-    def forward(self, positional_index: t.Tensor) -> t.Tensor:
-        """Forward pass."""
-        index = t.tensor(positional_index, dtype=t.int64)
-        one_hot = t.nn.functional.one_hot(index, num_classes=11).unsqueeze(0)
-        one_hot = t.tensor(one_hot, dtype=t.float32)
+    def forward(self, x: list[t.int64]) -> t.Tensor:
+        """Build positional data."""
+
+        positional_indices = range(len(x))
+        positional_one_hots = []
+        for pos_index in positional_indices:
+            pos_index = t.tensor(pos_index, dtype=t.int64)
+            one_hot = t.nn.functional.one_hot(
+                pos_index,
+                num_classes=11
+            ).unsqueeze(0)
+            one_hot = t.tensor(one_hot, dtype=t.float32)
+            positional_one_hots.append(one_hot)
+        one_hot = t.cat(positional_one_hots, dim=1)
         x = t.einsum("ij,jk->ik", one_hot, self.positional_weights)
 
         return x
@@ -55,17 +64,17 @@ class Attn(t.nn.Module):
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
-        Q = t.einsum("ij,jk->ik", x, self.query_weights) + self.query_bias
-        K = t.einsum("ij,jk->ik", x, self.key_weights) + self.key_bias
-        V = t.einsum("ij,jk->ik", x, self.value_weights) + self.value_bias
+        Q = t.einsum("bij,jk->bik", x, self.query_weights) + self.query_bias
+        K = t.einsum("bij,jk->bik", x, self.key_weights) + self.key_bias
+        V = t.einsum("bij,jk->bik", x, self.value_weights) + self.value_bias
 
-        scores = t.matmul(Q, K.transpose(0, 1) / sqrt(Q.size(-1)))
+        scores = t.matmul(Q, K.transpose(1, 2)) / sqrt(Q.size(-1))
         normalized_scores = t.nn.functional.softmax(scores, dim=-1)
 
         # VO circuit
         scored_value = t.matmul(normalized_scores, V)
         output = (
-            t.einsum("ij,jk->ik", scored_value, self.out_weights)
+            t.einsum("bij,jk->bik", scored_value, self.out_weights)
             + self.out_bias
         )
         return output
@@ -90,9 +99,9 @@ class MLP(t.nn.Module):
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         """Forward pass."""
-        x = t.einsum("ij,jk->ik", x, self.weights_1) + self.bias_1
+        x = t.einsum("bij,jk->bik", x, self.weights_1) + self.bias_1
         x = t.nn.functional.relu(x)
-        x = t.einsum("ij,jk->ik", x, self.weights_2) + self.bias_2
+        x = t.einsum("bij,jk->bik", x, self.weights_2) + self.bias_2
 
         return x
 
@@ -214,10 +223,10 @@ class RaspModel(t.nn.Module):
 
         self.layer_norm_5 = t.nn.LayerNorm(23)
 
-    def forward(self, x, positional_index) -> t.Tensor:
+    def forward(self, x) -> t.Tensor:
         """Forward pass."""
         # Embedding
-        x = self.pos_embed(positional_index) + self.embed(x)
+        x = self.pos_embed(x) + self.embed(x)
 
         # Transformer block 1
         layernorm_out_1 = self.layer_norm_1(x)
