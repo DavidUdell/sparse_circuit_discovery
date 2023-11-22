@@ -93,10 +93,10 @@ def test_rasp_model_internals():
 
     torch_model_activation_tensors = [None] * 4
 
-    for token_id in torch_token_ids:
+    for positional_id, token_id in enumerate(torch_token_ids):
         with all_layer_hooks(model) as layer_outs:
             token_id = t.tensor(token_id, dtype=t.int).unsqueeze(0)
-            model(token_id)
+            model(token_id, positional_id)
             for idx, layer_out in enumerate(layer_outs):
                 if torch_model_activation_tensors[idx] is None:
                     torch_model_activation_tensors[idx] = layer_out

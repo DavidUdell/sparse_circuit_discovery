@@ -18,9 +18,9 @@ class PositionalEmbedding(t.nn.Module):
         super().__init__()
         self.positional_weights = positional_weights
 
-    def forward(self, x: t.Tensor) -> t.Tensor:
+    def forward(self, positional_index: t.Tensor) -> t.Tensor:
         """Forward pass."""
-        index = t.tensor(x.item(), dtype=t.int64)
+        index = t.tensor(positional_index, dtype=t.int64)
         one_hot = t.nn.functional.one_hot(index, num_classes=11).unsqueeze(0)
         one_hot = t.tensor(one_hot, dtype=t.float32)
         print(f"one_hot: {one_hot}")
@@ -216,10 +216,10 @@ class RaspModel(t.nn.Module):
 
         self.layer_norm_5 = t.nn.LayerNorm(23)
 
-    def forward(self, x) -> t.Tensor:
+    def forward(self, x, positional_index) -> t.Tensor:
         """Forward pass."""
         # Embedding
-        x = self.pos_embed(x) + self.embed(x)
+        x = self.pos_embed(positional_index) + self.embed(x)
 
         # Transformer block 1
         layernorm_out_1 = self.layer_norm_1(x)
