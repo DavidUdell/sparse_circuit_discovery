@@ -25,7 +25,7 @@ class PositionalEmbedding(t.nn.Module):
         positional_one_hots = []
         for pos_index in positional_indices:
             pos_index = t.tensor(pos_index, dtype=t.int64)
-            one_hot = t.nn.functional.one_hot(
+            one_hot = t.nn.functional.one_hot(    # pylint: disable=not-callable
                 pos_index,
                 num_classes=11
             ).unsqueeze(0)
@@ -51,7 +51,7 @@ class Attn(t.nn.Module):
         out_weights: t.Tensor,
         out_bias: t.Tensor,
     ):
-        """Initialize the layer object."""
+        """Initialize the layer."""
         super().__init__()
         self.key_weights = key_weights
         self.key_bias = key_bias
@@ -90,7 +90,7 @@ class MLP(t.nn.Module):
         weights_2: t.Tensor,
         bias_2: t.Tensor,
     ):
-        """Initialize the layer object."""
+        """Initialize the layer."""
         super().__init__()
         self.weights_1 = weights_1
         self.bias_1 = bias_1
@@ -110,7 +110,7 @@ class Residual(t.nn.Module):
     """A minimal residual stream class, for easy hooking."""
 
     def __init__(self):
-        """Initialize the layer object."""
+        """Initialize the layer."""
         super().__init__()
 
     def forward(self, x: t.Tensor, other: t.Tensor) -> t.Tensor:

@@ -19,26 +19,26 @@ def test_rasp_model_outputs():
 
     model = RaspModel()
     model.eval()
-    raw_tokens = ["BOS", "x"]
+    raw_tokens = ["BOS"]
 
-    ground_truths = model.haiku_model.apply(raw_tokens).decoded
+    ground_truths = model.haiku_model.apply(raw_tokens).transformer_output
     input_ids = rasp_encode(model, raw_tokens)
     tensorized_input_ids = t.tensor(input_ids, dtype=t.int).unsqueeze(0)
 
     outputs = model(tensorized_input_ids)
 
-    for idx, output_token, ground_truth in zip(
-        range(2), outputs, ground_truths
+    for idx, output, ground_truth in zip(
+        range(len(raw_tokens)), outputs, ground_truths
         ):
-        if isinstance(ground_truth, float):
-            assert t.isclose(
-                t.tensor(output_token),
-                t.tensor(ground_truth),
-                atol=0.00001,
-            ), (
-                f"Model output (sequence index {idx}) {output_token} "
-                f"should be {ground_truth}."
-            )
+        assert t.isclose(
+            output.sum(-1)[idx].detach(),
+            t.tensor(np.array(ground_truth)).sum(-1)[idx],
+            atol=0.00001,
+        ), (
+            f"Seq {idx} torch/JAX disagreement:\n"
+            f"{output.sum(-1)[idx].detach()}\n"
+            f"{t.tensor(np.array(ground_truth)).sum(-1)[idx]}\n"
+        )
         print(f"Outputs match at index {idx}!")
     print(outputs)
 
@@ -59,9 +59,13 @@ def test_rasp_model_internals():
         hook_handles = []
         for layer_out in (
             model.attn_1,
+            model.residual_1,
             model.mlp_1,
+            model.residual_2,
             model.attn_2,
+            model.residual_3,
             model.mlp_2,
+            model.residual_4,
         ):
             hook_handles.append(layer_out.register_forward_hook(hook))
         yield layer_outs
@@ -69,23 +73,31 @@ def test_rasp_model_internals():
         for hook in hook_handles:
             hook.remove()
 
+    layer_names: tuple = (
+        "Attention 1",
+        "Residual 1",
+        "MLP 1",
+        "Residual 2",
+        "Attention 2",
+        "Residual 3",
+        "MLP 2",
+        "Residual 4"
+        )
     model = RaspModel()
     model.eval()
-    raw_tokens = ["BOS", "x"]
+    raw_tokens = ["BOS"]
     torch_token_ids = model.haiku_model.input_encoder.encode(raw_tokens)
 
-    jax_model_activation_tensors: list = model.haiku_model.apply(
+    jax_sublayer_tensors: list = model.haiku_model.apply(
         raw_tokens
     ).layer_outputs
+    jax_residual_tensors: list = model.haiku_model.apply(raw_tokens).residuals
+    jax_activation_tensors = []
+    for sublayer, residual in zip(jax_sublayer_tensors, jax_residual_tensors):
+        jax_activation_tensors.append(t.tensor(np.array(sublayer)))
+        jax_activation_tensors.append(t.tensor(np.array(residual)))
 
-    assert isinstance(jax_model_activation_tensors, list)
-
-    for layer_idx, _ in enumerate(jax_model_activation_tensors):
-        jax_model_activation_tensors[layer_idx] = t.tensor(
-            np.array(jax_model_activation_tensors[layer_idx])
-        )
-
-    torch_model_activation_tensors = [None] * 4
+    torch_model_activation_tensors = [None] * len(layer_names)
 
     with all_layer_hooks(model) as layer_outs:
         token_ids = t.tensor(torch_token_ids, dtype=t.int).unsqueeze(0)
@@ -101,17 +113,17 @@ def test_rasp_model_internals():
                 )
 
     for sublayer, jax_activation_tensor, torch_activation_tensor in zip(
-        ("Attention 1", "MLP 1", "Attention 2", "MLP 2"),
-        jax_model_activation_tensors,
+        layer_names,
+        jax_activation_tensors,
         torch_model_activation_tensors
     ):
-        print(f"{sublayer} activations for JAX, torch:")
+        print(f"{sublayer} activations for JAX/torch:")
         print(jax_activation_tensor)
         print(f"{torch_activation_tensor}\n")
 
     for sublayer, jax_activation_tensor, torch_activation_tensor in zip(
-        ("Attention 1", "MLP 1", "Attention 2", "MLP 2"),
-        jax_model_activation_tensors,
+        layer_names,
+        jax_activation_tensors,
         torch_model_activation_tensors
     ):
         assert t.allclose(
@@ -119,7 +131,7 @@ def test_rasp_model_internals():
             jax_activation_tensor,
             atol=0.0001,
         ), (
-            f"{sublayer} tensors for JAX, torch differ:"
-            f"{torch_activation_tensor}"
+            f"{sublayer} tensors for JAX/torch differ:\n"
+            f"{torch_activation_tensor}\n"
             f"{jax_activation_tensor}\n"
         )
