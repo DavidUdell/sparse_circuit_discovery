@@ -74,4 +74,4 @@ for key in torch_tensors:
 #       vocab_size
 
 
-haiku_model.apply(["BOS", "x", "x"]).input_embeddings
+haiku_model.apply(["BOS", "x"]).residuals

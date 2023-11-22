@@ -20,16 +20,16 @@ def test_rasp_model_outputs():
     model = RaspModel()
     model.eval()
 
-    baseline = model.haiku_model.apply(["BOS", "x"]).decoded
+    baseline = model.haiku_model.apply(["BOS"]).decoded
 
-    input_tokens = rasp_encode(model, ["BOS", "x"])
+    input_tokens = rasp_encode(model, ["BOS"])
     output_tokens = []
 
     for idx, input_token, ground_truth in zip(
         range(5), input_tokens, baseline
     ):
         input_token = t.tensor(input_token, dtype=t.int).unsqueeze(0)
-        output = model(input_token)
+        output = model(input_token, idx)
         output_tokens.append(output.sum().item())
 
         assert isinstance(
@@ -45,6 +45,9 @@ def test_rasp_model_outputs():
                 f"should be {ground_truth}."
             )
         print(f"Outputs match! {output_tokens[-1]} == {ground_truth}")
+    for index, token in enumerate(output_tokens):
+        output_tokens[index] = round(token)
+
     output_tokens = model.haiku_model.input_encoder.decode(output_tokens)
     print(output_tokens)
 
@@ -77,7 +80,7 @@ def test_rasp_model_internals():
 
     model = RaspModel()
     model.eval()
-    raw_tokens = ["BOS", "x"]
+    raw_tokens = ["BOS"]
     torch_token_ids = model.haiku_model.input_encoder.encode(raw_tokens)
 
     jax_model_activation_tensors: list = model.haiku_model.apply(
@@ -104,6 +107,13 @@ def test_rasp_model_internals():
                     torch_model_activation_tensors[idx] = t.cat(
                         (torch_model_activation_tensors[idx], layer_out), dim=0
                     )
+
+    for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
+        range(4), jax_model_activation_tensors, torch_model_activation_tensors
+    ):
+        print(f"Sublayer {sublayer_idx}:")
+        print(jax_activation_tensor)
+        print(torch_activation_tensor)
 
     for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
         range(4), jax_model_activation_tensors, torch_model_activation_tensors

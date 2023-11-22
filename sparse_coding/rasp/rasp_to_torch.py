@@ -23,8 +23,6 @@ class PositionalEmbedding(t.nn.Module):
         index = t.tensor(positional_index, dtype=t.int64)
         one_hot = t.nn.functional.one_hot(index, num_classes=11).unsqueeze(0)
         one_hot = t.tensor(one_hot, dtype=t.float32)
-        print(f"one_hot: {one_hot}")
-        print(f"positional_weights: {self.positional_weights}")
         x = t.einsum("ij,jk->ik", one_hot, self.positional_weights)
 
         return x
