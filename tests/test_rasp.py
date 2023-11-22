@@ -19,37 +19,28 @@ def test_rasp_model_outputs():
 
     model = RaspModel()
     model.eval()
+    raw_tokens = ["BOS", "x"]
 
-    baseline = model.haiku_model.apply(["BOS"]).decoded
+    ground_truths = model.haiku_model.apply(raw_tokens).decoded
+    input_ids = rasp_encode(model, raw_tokens)
+    tensorized_input_ids = t.tensor(input_ids, dtype=t.int).unsqueeze(0)
 
-    input_tokens = rasp_encode(model, ["BOS"])
-    output_tokens = []
+    outputs = model(tensorized_input_ids)
 
-    for idx, input_token, ground_truth in zip(
-        range(5), input_tokens, baseline
-    ):
-        input_token = t.tensor(input_token, dtype=t.int).unsqueeze(0)
-        output = model(input_token, idx)
-        output_tokens.append(output.sum().item())
-
-        assert isinstance(
-            output_tokens[-1], float
-        ), f"Model output {output_tokens[-1]} must be a float."
+    for idx, output_token, ground_truth in zip(
+        range(2), outputs, ground_truths
+        ):
         if isinstance(ground_truth, float):
             assert t.isclose(
-                t.tensor(output_tokens[-1]),
+                t.tensor(output_token),
                 t.tensor(ground_truth),
                 atol=0.00001,
             ), (
-                f"Model output (sequence index {idx}) {output_tokens[-1]} "
+                f"Model output (sequence index {idx}) {output_token} "
                 f"should be {ground_truth}."
             )
-        print(f"Outputs match! {output_tokens[-1]} == {ground_truth}")
-    for index, token in enumerate(output_tokens):
-        output_tokens[index] = round(token)
-
-    output_tokens = model.haiku_model.input_encoder.decode(output_tokens)
-    print(output_tokens)
+        print(f"Outputs match at index {idx}!")
+    print(outputs)
 
 
 def test_rasp_model_internals():
@@ -101,27 +92,34 @@ def test_rasp_model_internals():
         model(token_ids)
         for idx, layer_out in enumerate(layer_outs):
             if torch_model_activation_tensors[idx] is None:
-                torch_model_activation_tensors[idx] = layer_out
+                torch_model_activation_tensors[idx] = layer_out.detach()
             else:
                 torch_model_activation_tensors[idx] = t.cat(
-                    (torch_model_activation_tensors[idx], layer_out), dim=0
+                    torch_model_activation_tensors[idx],
+                    layer_out.detach(),
+                    dim=0
                 )
 
-    for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
-        range(4), jax_model_activation_tensors, torch_model_activation_tensors
+    for sublayer, jax_activation_tensor, torch_activation_tensor in zip(
+        ("Attention 1", "MLP 1", "Attention 2", "MLP 2"),
+        jax_model_activation_tensors,
+        torch_model_activation_tensors
     ):
-        print(f"Sublayer {sublayer_idx}:")
+        print(f"{sublayer} activations for JAX, torch:")
         print(jax_activation_tensor)
-        print(torch_activation_tensor)
+        print(f"{torch_activation_tensor}\n")
 
-    for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
-        range(4), jax_model_activation_tensors, torch_model_activation_tensors
+    for sublayer, jax_activation_tensor, torch_activation_tensor in zip(
+        ("Attention 1", "MLP 1", "Attention 2", "MLP 2"),
+        jax_model_activation_tensors,
+        torch_model_activation_tensors
     ):
         assert t.allclose(
             torch_activation_tensor,
             jax_activation_tensor,
             atol=0.0001,
         ), (
-            f"Sublayer {sublayer_idx} tensors {torch_activation_tensor} "
-            f"(torch) and {jax_activation_tensor} (JAX) differ."
+            f"{sublayer} tensors for JAX, torch differ:"
+            f"{torch_activation_tensor}"
+            f"{jax_activation_tensor}\n"
         )
