@@ -10,6 +10,26 @@ from tracr.rasp import rasp
 from tracr.compiler.lib import make_frac_prevs
 
 
+class PositionalEmbedding(t.nn.Module):
+    """Custom positional embedding layer."""
+
+    def __init__(self, positional_weights: t.Tensor):
+        """Initialize the layer object."""
+        super().__init__()
+        self.positional_weights = positional_weights
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        """Forward pass."""
+        index = t.tensor(x.item(), dtype=t.int64)
+        one_hot = t.nn.functional.one_hot(index, num_classes=11).unsqueeze(0)
+        one_hot = t.tensor(one_hot, dtype=t.float32)
+        print(f"one_hot: {one_hot}")
+        print(f"positional_weights: {self.positional_weights}")
+        x = t.einsum("ij,jk->ik", one_hot, self.positional_weights)
+
+        return x
+
+
 class Attn(t.nn.Module):
     """A custom single-headed attention layer, loading from tensors."""
 
@@ -143,7 +163,7 @@ class RaspModel(t.nn.Module):
         # transformer/layer_1/mlp/linear_2_b
         # transformer/layer_1/mlp/linear_2_w
 
-        self.pos_embed = t.nn.Embedding.from_pretrained(
+        self.pos_embed = PositionalEmbedding(
             torch_tensors["pos_embed_embeddings"]
         )
         self.embed = t.nn.Embedding.from_pretrained(
@@ -199,7 +219,7 @@ class RaspModel(t.nn.Module):
     def forward(self, x) -> t.Tensor:
         """Forward pass."""
         # Embedding
-        x = self.embed(x) + self.pos_embed(x)
+        x = self.pos_embed(x) + self.embed(x)
 
         # Transformer block 1
         layernorm_out_1 = self.layer_norm_1(x)

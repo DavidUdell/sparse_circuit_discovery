@@ -74,4 +74,4 @@ for key in torch_tensors:
 #       vocab_size
 
 
-haiku_model.input_encoder.encoding_map
+haiku_model.apply(["BOS", "x", "x"]).input_embeddings

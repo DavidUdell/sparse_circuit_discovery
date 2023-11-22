@@ -54,7 +54,7 @@ def test_rasp_model_internals():
 
     @contextmanager
     def all_layer_hooks(model: t.nn.Module):
-        """Pull all the _layer_ out activations from the torch model."""
+        """Pull all the layer out activations from the torch model."""
         layer_outs = []
 
         def hook(
@@ -104,15 +104,6 @@ def test_rasp_model_internals():
                     torch_model_activation_tensors[idx] = t.cat(
                         (torch_model_activation_tensors[idx], layer_out), dim=0
                     )
-    print(f"torch model sublayers: {len(torch_model_activation_tensors)}")
-    print(f"JAX model sublayers: {len(jax_model_activation_tensors)}")
-
-    for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
-        range(4), jax_model_activation_tensors, torch_model_activation_tensors
-    ):
-        print(f"sublayer {sublayer_idx}:")
-        print(f"torch: {torch_activation_tensor}")
-        print(f"JAX: {jax_activation_tensor}")
 
     for sublayer_idx, jax_activation_tensor, torch_activation_tensor in zip(
         range(4), jax_model_activation_tensors, torch_model_activation_tensors
