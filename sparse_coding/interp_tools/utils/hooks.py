@@ -59,10 +59,10 @@ def ablations_lifecycle(
 
     # Register the hooks with `torch`. Note that `attn_1` and `attn_2` are
     # hardcoded for the rasp model for now.
-    ablations_hook_handle = torch_model.attn_1.register_forward_hook(
+    ablations_hook_handle = torch_model.attn_0.register_forward_hook(
         ablations_hook_fac(neuron_index)
     )
-    caching_hook_handle = torch_model.attn_2.register_forward_hook(
+    caching_hook_handle = torch_model.attn_1.register_forward_hook(
         caching_hook_fac(neuron_index, layer_index, token, activations_dict)
     )
 
@@ -85,7 +85,8 @@ def base_caching_lifecycle(
 ) -> None:
     """Define, register, and unregister just the caching hook."""
 
-    caching_hook_handle = torch_model.attn_2.register_forward_hook(
+    print(torch_model.hook_resid_pre())
+    caching_hook_handle = torch_model.attn_1.register_forward_hook(
         caching_hook_fac(neuron_index, layer_index, token, activations_dict)
     )
 

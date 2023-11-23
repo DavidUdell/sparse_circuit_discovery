@@ -9,7 +9,7 @@ import torch as t
 
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
 from sparse_coding.utils.caching import parse_slice, slice_to_seq
-from sparse_coding.rasp.rasp_to_torch import RaspModel
+from sparse_coding.rasp.rasp_to_transformer_lens import base_rasp_model
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
 from sparse_coding.interp_tools.utils.hooks import (
     ablations_lifecycle,
@@ -53,7 +53,7 @@ if ACTS_LAYERS_SLICE != slice(0, 2):
         )
     )
 
-model = RaspModel()
+model = base_rasp_model
 model.eval()
 
 # Record the differential downstream effects of ablating each dim.
