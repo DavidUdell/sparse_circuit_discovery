@@ -2,7 +2,6 @@
 """Ablate autoencoder dimensions during inference and graph causal effects."""
 
 
-from collections import defaultdict
 from textwrap import dedent
 
 import torch as t
@@ -59,14 +58,14 @@ token_ids = tokenize(prompt)
 base_activations = {}
 ablated_activations = {}
 
-# Cache the base activations.
+# Cache base activations.
 for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
     for neuron_idx in range(transformer_lens_model.cfg.d_model):
         _, base_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
             transformer_lens_model.run_with_cache(token_ids)
         )
 
-# Cache the ablated activations.
+# Cache ablated activations.
 for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
     for neuron_idx in range(transformer_lens_model.cfg.d_model):
         transformer_lens_model.add_perma_hook(
@@ -80,16 +79,14 @@ for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
 
         transformer_lens_model.reset_hooks(including_permanent=True)
 
-print(base_activations)
-print(ablated_activations)
-
 # %%
 # Graph the causal effects.
-activation_diffs = defaultdict(float)
+activation_diffs = {}
 
 for i, j in ablated_activations:
     activation_diffs[i, j] = (
-        ablated_activations[(i, j)]["blocks.1.hook_resid_pre"] - base_activations[(i, j)]["blocks.1.hook_resid_pre"]
+        ablated_activations[(i, j)]["blocks.1.hook_resid_pre"]
+        - base_activations[(i, j)]["blocks.1.hook_resid_pre"]
     )
 
 graph_causal_effects(activation_diffs).draw(
