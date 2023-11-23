@@ -7,14 +7,12 @@ from textwrap import dedent
 
 import torch as t
 
+from sparse_coding.interp_tools.utils.hooks import ablations_hook_fac
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
 from sparse_coding.utils.caching import parse_slice, slice_to_seq
-from sparse_coding.rasp.rasp_to_transformer_lens import base_rasp_model
+from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
+from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
-from sparse_coding.interp_tools.utils.hooks import (
-    ablations_lifecycle,
-    base_caching_lifecycle,
-)
 
 
 # %%
@@ -53,37 +51,35 @@ if ACTS_LAYERS_SLICE != slice(0, 2):
         )
     )
 
-model = base_rasp_model
-model.eval()
-
+# %%
 # Record the differential downstream effects of ablating each dim.
+prompt = ["BOS", "w", "w", "w", "w", "x", "x", "x", "z", "z"]
+token_ids = tokenize(prompt)
+
 base_activations = {}
 ablated_activations = {}
 
-for layer_index in slice_to_seq(ACTS_LAYERS_SLICE):
-    for neuron_index in range(7):
-        for prompt in [
-            ["BOS", "w"],
-            ["BOS", "x"],
-            ["BOS", "y"],
-            ["BOS", "z"],
-        ]:
-            tokens = model.haiku_model.input_encoder.encode(prompt)
-            for token in tokens:
-                for context, dictionary in (
-                    (base_caching_lifecycle, base_activations),
-                    (ablations_lifecycle, ablated_activations),
-                ):
-                    with context(
-                        model,
-                        neuron_index,
-                        layer_index,
-                        token,
-                        dictionary,
-                    ):
-                        # Run inference.
-                        model_input = t.tensor(token, dtype=t.int).unsqueeze(0)
-                        model(model_input)
+# Cache the base activations.
+for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
+    for neuron_idx in range(transformer_lens_model.cfg.d_model):
+        _, base_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
+            transformer_lens_model.run_with_cache(token_ids)
+        )
+
+# Cache the ablated activations.
+for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
+    for neuron_idx in range(transformer_lens_model.cfg.d_model):
+        transformer_lens_model.run_with_hooks(
+            token_ids,
+            fwd_hooks=[
+                (
+                    "blocks.0.hook_resid_pre",
+                    ablations_hook_fac(neuron_idx)
+                )
+            ],
+        )
+
+        transformer_lens_model.reset_hooks()
 
 # %%
 # Graph the causal effects.

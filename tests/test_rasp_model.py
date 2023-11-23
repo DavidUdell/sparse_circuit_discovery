@@ -33,7 +33,6 @@ def test_rasp_model_activations(inference_setup):  # pylint: disable=redefined-o
 
     haiku_output, _, lens_activations, __ = inference_setup
 
-    # Compare activations.
     for layer_idx in range(transformer_lens_model.cfg.n_layers):
 
         # Attention outs.
@@ -60,10 +59,11 @@ def test_rasp_model_outputs(inference_setup):  # pylint: disable=redefined-outer
     haiku_output_array = np.array(haiku_output.transformer_output)
     haiku_proportions = []
     for token_idx, __ in enumerate(prompt):
-        haiku_proportions.append(haiku_output_array[:, token_idx, :vocab_out_length])
+        haiku_proportions.append(
+            haiku_output_array[:, token_idx, :vocab_out_length]
+        )
     haiku_proportions = np.array(haiku_proportions).sum(axis=2).T
 
-    # Compare outputs.
     assert np.allclose(
         haiku_proportions,
         lens_proportions,
