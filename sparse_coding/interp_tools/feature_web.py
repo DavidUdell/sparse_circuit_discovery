@@ -80,15 +80,17 @@ for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
         transformer_lens_model.reset_hooks(including_permanent=True)
 
 # %%
-# Graph the causal effects.
+# Compute effects.
 activation_diffs = {}
 
-for i, j in ablated_activations:
-    activation_diffs[i, j] = (
-        ablated_activations[(i, j)]["blocks.1.hook_resid_pre"]
-        - base_activations[(i, j)]["blocks.1.hook_resid_pre"]
+for layer_idx, neuron_idx in ablated_activations:
+    activation_diffs[layer_idx, neuron_idx] = (
+        base_activations[(layer_idx, neuron_idx)]["blocks.1.hook_resid_pre"].sum(axis=1).squeeze()
+        - ablated_activations[(layer_idx, neuron_idx)]["blocks.1.hook_resid_pre"].sum(axis=1).squeeze()
     )
 
+# %%
+# Plot and save effects.
 graph_causal_effects(activation_diffs).draw(
     save_paths(__file__, "feature_web.png"), prog="dot"
 )
