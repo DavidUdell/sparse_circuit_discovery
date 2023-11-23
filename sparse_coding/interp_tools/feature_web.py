@@ -85,17 +85,12 @@ print(ablated_activations)
 
 # %%
 # Graph the causal effects.
-activation_diffs_by_tokens = {}
 activation_diffs = defaultdict(float)
 
-for i, j, tok in ablated_activations:
-    activation_diffs_by_tokens[i, j, tok] = (
-        ablated_activations[i, j, tok] - base_activations[i, j, tok]
+for i, j in ablated_activations:
+    activation_diffs[i, j] = (
+        ablated_activations[(i, j)]["blocks.1.hook_resid_pre"] - base_activations[(i, j)]["blocks.1.hook_resid_pre"]
     )
-
-# Sum over tokens.
-for i, j, tok in activation_diffs_by_tokens:
-    activation_diffs[i, j] += activation_diffs_by_tokens[i, j, tok]
 
 graph_causal_effects(activation_diffs).draw(
     save_paths(__file__, "feature_web.png"), prog="dot"
