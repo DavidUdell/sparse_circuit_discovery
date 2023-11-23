@@ -12,7 +12,7 @@ def ablations_hook_fac(neuron_index: int):
         """Zero out a particular neuron's activations."""
 
         print(f"acts tensor shape: {acts_tensor.shape}")
-        acts_tensor[:, neuron_index] = 0.0
+        acts_tensor[:, :, neuron_index] = 0.0
 
         return acts_tensor
 

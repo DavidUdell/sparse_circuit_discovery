@@ -69,17 +69,19 @@ for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
 # Cache the ablated activations.
 for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
     for neuron_idx in range(transformer_lens_model.cfg.d_model):
-        transformer_lens_model.run_with_hooks(
-            token_ids,
-            fwd_hooks=[
-                (
-                    "blocks.0.hook_resid_pre",
-                    ablations_hook_fac(neuron_idx)
-                )
-            ],
+        transformer_lens_model.add_perma_hook(
+            "blocks.0.hook_resid_pre",
+            ablations_hook_fac(neuron_idx),
         )
 
-        transformer_lens_model.reset_hooks()
+        _, ablated_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
+            transformer_lens_model.run_with_cache(token_ids)
+        )
+
+        transformer_lens_model.reset_hooks(including_permanent=True)
+
+print(base_activations)
+print(ablated_activations)
 
 # %%
 # Graph the causal effects.
