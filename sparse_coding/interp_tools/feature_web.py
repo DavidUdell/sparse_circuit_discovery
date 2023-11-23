@@ -85,12 +85,17 @@ activation_diffs = {}
 
 for layer_idx, neuron_idx in ablated_activations:
     activation_diffs[layer_idx, neuron_idx] = (
-        base_activations[(layer_idx, neuron_idx)]["blocks.1.hook_resid_pre"].sum(axis=1).squeeze()
-        - ablated_activations[(layer_idx, neuron_idx)]["blocks.1.hook_resid_pre"].sum(axis=1).squeeze()
+        base_activations[(layer_idx, neuron_idx)][
+            "blocks.1.hook_resid_pre"
+            ].sum(axis=1).squeeze()
+        - ablated_activations[(layer_idx, neuron_idx)][
+            "blocks.1.hook_resid_pre"
+            ].sum(axis=1).squeeze()
     )
 
 # %%
 # Plot and save effects.
 graph_causal_effects(activation_diffs).draw(
-    save_paths(__file__, "feature_web.png"), prog="dot"
+    save_paths(__file__, "feature_web.png"),
+    prog="dot",
 )

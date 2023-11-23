@@ -9,21 +9,20 @@ def graph_causal_effects(activations: dict) -> AGraph:
 
     graph = AGraph(directed=True)
 
-    # Plot nodes.
-    for layer_index, neuron_idx in activations.keys():
-        graph.add_node(f"neuron_{layer_index}.{neuron_idx}")
+    # Plot neuron nodes.
+    for layer_idx, neuron_idx in activations.keys():
+        graph.add_node(f"neuron_{layer_idx}.{neuron_idx}")
 
-    # Plot edges.
-    graph.add_edges_from(
-        [
-            (
-                f"neuron_{layer_index}.{neuron_idx}",
-                f"neuron_{layer_index + 1}.{neuron_idx}"
-            )
-            for layer_index, neuron_idx in activations.keys()
-            if int(layer_index) + 1 < 2
-        ],
-        label=str(activations[layer_index, neuron_idx])  # pylint: disable=undefined-loop-variable
-    )
+    # Plot effect edges.
+    for (layer_idx, neuron_idx), effects_vector in activations.items():
+        if layer_idx == 1:  # Effects are all downstream.
+            for downstream_neuron_idx, effect in enumerate(effects_vector):
+                if effect.item() == 0:
+                    continue
+                graph.add_edge(
+                    f"neuron_0.{neuron_idx}",
+                    f"neuron_1.{downstream_neuron_idx}",
+                    label=str(effect.item())
+                )
 
     return graph
