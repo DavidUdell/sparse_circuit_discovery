@@ -28,7 +28,7 @@ setup(
         "prettytable",
         "einops",
         "pygraphviz",
-        "transformer_lens"
+        "transformer_lens",
         "tracr @ git+https://github.com/google-deepmind/tracr.git",
     ],
 )
