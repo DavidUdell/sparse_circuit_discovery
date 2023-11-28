@@ -10,11 +10,6 @@ MODEL_DIR: "EleutherAI/pythia-70m"
 # layers.
 ACTS_LAYERS_SLICE: "0:2"
 
-# Large Model Mode
-# Set True for `Llama-2 7B` and larger, False for smaller. This solves a
-# devicing bug in `accelerate` that occurs with smaller models.
-LARGE_MODEL_MODE: True
-
 # Encoder Size
 PROJECTION_FACTOR: 10
 
@@ -48,7 +43,7 @@ EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
 # Stable Dev Constants for `interp_top_tokens.py`
-# _Leave out entries_ for None: None values are unfortunately interpreted as
-# the string "None"
+# _Leave out entries_ for None: None values here are interpreted as the string
+# "None"
 DIMS_IN_BATCH: 500
 TOP_K: 6

@@ -20,7 +20,6 @@ def per_input_token_effects(
     tokenizer: AutoTokenizer,
     accelerator: Accelerator,
     dims_per_batch: int,
-    large_model_mode: bool,
 ) -> defaultdict[int, defaultdict[str, float]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
@@ -34,7 +33,7 @@ def per_input_token_effects(
 
     # Pre-process `token_ids_by_q`.
     flat_input_token_ids, unique_input_token_ids = pre_process_input_token_ids(
-        token_ids_by_q, encoder, accelerator, large_model_mode
+        token_ids_by_q, encoder, accelerator
     )
 
     print("Pre-processing complete!")
@@ -48,7 +47,6 @@ def per_input_token_effects(
         effect_scalar_by_dim_by_input_token,
         unique_input_token_ids,
         flat_input_token_ids,
-        large_model_mode,
     )
 
     return effect_scalar_by_dim_by_input_token
@@ -85,8 +83,10 @@ def defaultdict_factory():
 
 
 def pre_process_input_token_ids(
-    token_ids_by_q, encoder, accelerator, large_model_mode
-):
+        token_ids_by_q,
+        encoder,
+        accelerator: Accelerator,
+    ):
     """Pre-process the `token_ids_by_q`."""
 
     # Flatten the input token ids.
@@ -102,7 +102,7 @@ def pre_process_input_token_ids(
     # Tensorize and accelerate `flat_input_token_ids`.
     flat_input_token_ids = t.tensor(flat_input_token_ids)
     flat_input_token_ids = modal_tensor_acceleration(
-        flat_input_token_ids, encoder, accelerator, large_model_mode
+        flat_input_token_ids, encoder, accelerator
     )
 
     return flat_input_token_ids, unique_input_token_ids
@@ -118,7 +118,6 @@ def batches_loop(
     effect_scalar_by_dim_by_input_token,
     unique_input_token_ids,
     flat_input_token_ids,
-    large_model_mode: bool,
 ) -> defaultdict[int, defaultdict[str, float]]:
     """Loop over the batches while printing current progress."""
 
@@ -146,7 +145,6 @@ def batches_loop(
                 accelerator,
                 starting_dim_index,
                 ending_dim_index,
-                large_model_mode,
             )
         )
 
@@ -199,7 +197,6 @@ def pre_process_encoder_activations_by_batch(
     accelerator,
     starting_dim_index,
     ending_dim_index,
-    large_model_mode,
 ) -> t.Tensor:
     """Pre-process the `encoder_activations_by_q` for each batch."""
     batched_dims_from_encoder_activations: list = []
@@ -224,7 +221,6 @@ def pre_process_encoder_activations_by_batch(
         batched_dims_from_encoder_activations,
         encoder,
         accelerator,
-        large_model_mode,
     )
 
     return batched_dims_from_encoder_activations

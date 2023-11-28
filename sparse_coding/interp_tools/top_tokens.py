@@ -49,17 +49,17 @@ tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
 HIDDEN_DIM = tsfm_config.hidden_size
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
-LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 TOP_K = config.get("TOP_K", 6)
-SIG_FIGS = config.get("SIG_FIGS", None)  # None means "round to int."
-DIMS_IN_BATCH = config.get("DIMS_IN_BATCH", 200)  # Tunable
+# None means "round to int", in SIG_FIGS.
+SIG_FIGS = config.get("SIG_FIGS", None)
+# DIMS_IN_BATCH is tunable, to fit in GPU memory.
+DIMS_IN_BATCH = config.get("DIMS_IN_BATCH", 200)
 
 if config.get("N_DIMS_PRINTED_OVERRIDE") is not None:
     N_DIMS_PRINTED = config.get("N_DIMS_PRINTED_OVERRIDE")
 else:
     N_DIMS_PRINTED = PROJECTION_DIM
 
-assert isinstance(LARGE_MODEL_MODE, bool), "LARGE_MODEL_MODE must be a bool."
 assert (
     0 < DIMS_IN_BATCH <= PROJECTION_DIM
 ), "DIMS_IN_BATCH must be at least 1 and at most PROJECTION_DIM."
@@ -100,9 +100,8 @@ class Encoder(t.nn.Module):
     def forward(self, inputs):
         """Project to the sparse latent space."""
 
-        if not LARGE_MODEL_MODE:
-            inputs = inputs.to(self.encoder_layer.weight.device)
-
+        # Apparently unneeded patch for `accelerate` with small models:
+        # inputs = inputs.to(self.encoder_layer.weight.device)
         return self.encoder(inputs)
 
 
@@ -145,7 +144,6 @@ def populate_table(
         # Cast survivors to string.
         keeper_values = [str(v) for v in keeper_values]
 
-        # Append row to table and csv list.
         processed_row = [
             f"{feature_dim}",
             ", ".join(keeper_tokens),
@@ -189,15 +187,13 @@ for layer_idx in seq_layer_indices:
     )
     layer_acts_data: t.Tensor = accelerator.prepare(t.load(LAYER_ACTS_PATH))
 
-    # Unpad the activations. Note that activations are stored as a list of
-    # question tensors from here on out. Functions may internally unpack that
-    # into individual activations, but that's the general protocol between
-    # functions.
+    # Note that activations are stored as a list of question tensors from this
+    # function on out. Functions may internally unpack that into individual
+    # activations, but that's the general protocol between functions.
     unpadded_acts: list[t.Tensor] = top_k.unpad_activations(
         layer_acts_data, unpacked_prompts_ids
     )
 
-    # Project the activations.
     # If you want to _directly_ interpret the model's activations, assign
     # `feature_acts` directly to `unpadded_acts` and ensure constants are set
     # to the model's embedding dimensionality.
@@ -205,7 +201,6 @@ for layer_idx in seq_layer_indices:
         unpadded_acts, model, accelerator
     )
 
-    # Initialize the table.
     table = prettytable.PrettyTable()
     table.field_names = [
         "Dimension",
@@ -222,7 +217,6 @@ for layer_idx in seq_layer_indices:
         tokenizer,
         accelerator,
         DIMS_IN_BATCH,
-        LARGE_MODEL_MODE,
     )
 
     # Select just the top-k effects.
@@ -230,11 +224,9 @@ for layer_idx in seq_layer_indices:
         int, list[tuple[str, float]]
     ] = top_k.select_top_k_tokens(effects, TOP_K)
 
-    # Populate the table and save it to csv.
     populate_table(
         table, truncated_effects, MODEL_DIR, TOP_K_INFO_FILE, layer_idx
     )
     print(table)
 
-    # Empty out memory for next run.
     accelerator.free_memory()
