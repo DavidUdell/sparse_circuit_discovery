@@ -3,7 +3,7 @@
 # "meta-llama/Llama-2-7b-hf"
 # "meta-llama/Llama-2-70b-hf"
 # "rasp"
-MODEL_DIR: "rasp"
+MODEL_DIR: "EleutherAI/pythia-70m"
 
 # Slice of Layers to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
@@ -13,7 +13,7 @@ ACTS_LAYERS_SLICE: "0:2"
 # Large Model Mode
 # Set True for `Llama-2 7B` and larger, False for smaller. This solves a
 # devicing bug in `accelerate` that occurs with smaller models.
-LARGE_MODEL_MODE: False
+LARGE_MODEL_MODE: True
 
 # Encoder Size
 PROJECTION_FACTOR: 10

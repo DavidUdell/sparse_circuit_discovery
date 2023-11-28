@@ -48,18 +48,12 @@ tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
 EMBEDDING_DIM = tsfm_config.hidden_size
 PROJECTION_DIM = int(EMBEDDING_DIM * PROJECTION_FACTOR)
 NUM_WORKERS = config.get("NUM_WORKERS")
-LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 LOG_EVERY_N_STEPS = config.get("LOG_EVERY_N_STEPS", 5)
 EPOCHS = config.get("EPOCHS", 150)
 SYNC_DIST_LOGGING = config.get("SYNC_DIST_LOGGING", True)
+# For smaller autoencoders, larger batch sizes are possible.
 TRAINING_BATCH_SIZE = config.get("TRAINING_BATCH_SIZE", 16)
 ACCUMULATE_GRAD_BATCHES = config.get("ACCUMULATE_GRAD_BATCHES", 1)
-
-assert isinstance(LARGE_MODEL_MODE, bool), "LARGE_MODEL_MODE must be a bool."
-
-if not LARGE_MODEL_MODE:
-    NUM_WORKERS: int = 0
-    ACCUMULATE_GRAD_BATCHES: int = 1
 
 # %%
 # Use available tensor cores.
@@ -109,6 +103,42 @@ class ActivationsDataset(Dataset):
 
 
 # %%
+# Set up and run training and validation.
+def train_autoencoder() -> None:
+    """Train an autoencoder on activations, from constants."""
+
+    training_loader: DataLoader = DataLoader(
+        dataset,
+        batch_size=TRAINING_BATCH_SIZE,
+        sampler=training_sampler,
+        num_workers=NUM_WORKERS,
+    )
+    validation_loader: DataLoader = DataLoader(
+        dataset,
+        batch_size=TRAINING_BATCH_SIZE,
+        sampler=validation_sampler,
+        num_workers=NUM_WORKERS,
+    )
+    # The `accumulate_grad_batches` argument helps with memory on the largest
+    # autoencoders. I don't currently do anything about "dead neurons," as
+    # Bricken et al. 2023 found and discussed.
+    trainer: L.Trainer = L.Trainer(
+        accelerator="auto",
+        accumulate_grad_batches=ACCUMULATE_GRAD_BATCHES,
+        callbacks=early_stop,
+        log_every_n_steps=LOG_EVERY_N_STEPS,
+        logger=logger,
+        max_epochs=EPOCHS,
+    )
+
+    trainer.fit(
+        model,
+        train_dataloaders=training_loader,
+        val_dataloaders=validation_loader,
+    )
+
+
+# %%
 # Input token ids are constant across model layers.
 unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
@@ -139,20 +169,6 @@ for layer_idx in seq_layer_indices:
     training_sampler = t.utils.data.SubsetRandomSampler(training_indices)
     validation_sampler = t.utils.data.SubsetRandomSampler(val_indices)
 
-    # For smaller autoencoders, larger batch sizes are possible.
-    training_loader: DataLoader = DataLoader(
-        dataset,
-        batch_size=TRAINING_BATCH_SIZE,
-        sampler=training_sampler,
-        num_workers=NUM_WORKERS,
-    )
-
-    validation_loader: DataLoader = DataLoader(
-        dataset,
-        batch_size=TRAINING_BATCH_SIZE,
-        sampler=validation_sampler,
-        num_workers=NUM_WORKERS,
-    )
 
     # Define a tied autoencoder, with `lightning`.
     class Autoencoder(L.LightningModule):
@@ -258,23 +274,17 @@ for layer_idx in seq_layer_indices:
     # parallelization.
     model: Autoencoder = Autoencoder()
     logger = L.pytorch.loggers.CSVLogger("logs", name="autoencoder")
-    # The `accumulate_grad_batches` argument helps with memory on the largest
-    # autoencoders. I don't currently do anything about "dead neurons," as
-    # Bricken et al. 2023 found and discussed.
-    trainer: L.Trainer = L.Trainer(
-        accelerator="auto",
-        accumulate_grad_batches=ACCUMULATE_GRAD_BATCHES,
-        callbacks=early_stop,
-        log_every_n_steps=LOG_EVERY_N_STEPS,
-        logger=logger,
-        max_epochs=EPOCHS,
-    )
 
-    trainer.fit(
-        model,
-        train_dataloaders=training_loader,
-        val_dataloaders=validation_loader,
-    )
+    try:
+        train_autoencoder()
+
+    except RuntimeError:
+        # `accelerate` does not degrade gracefully as you scale down to small
+        # models. This global change fixes that from here on in the loop.
+        NUM_WORKERS: int = 0
+        ACCUMULATE_GRAD_BATCHES: int = 1
+
+        train_autoencoder()
 
     # Save the trained encoder weights and biases.
     cache_layer_tensor(

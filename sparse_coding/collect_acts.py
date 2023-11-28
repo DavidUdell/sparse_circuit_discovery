@@ -43,7 +43,6 @@ access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 MODEL_DIR = config.get("MODEL_DIR")
-LARGE_MODEL_MODE = config.get("LARGE_MODEL_MODE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -53,7 +52,6 @@ NUM_RETURN_SEQUENCES = config.get("NUM_RETURN_SEQUENCES", 1)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 817)
 
-assert isinstance(LARGE_MODEL_MODE, bool), "LARGE_MODEL_MODE must be a bool."
 assert (
     NUM_QUESTIONS_EVALED > NUM_SHOT
 ), "There must be a question not used for the multishot demonstration."
@@ -203,12 +201,13 @@ for question_num in sampled_indices:
 
     # (The `accelerate` parallelization doesn't degrade gracefully with small
     # models.)
-    if not LARGE_MODEL_MODE:
+    try:
+        input_ids = accelerator.prepare(input_ids)
+        outputs = model(input_ids)
+    except RuntimeError:
         input_ids = input_ids.to(model.device)
-
-    input_ids = accelerator.prepare(input_ids)
-    # Generate a completion.
-    outputs = model(input_ids)
+        input_ids = accelerator.prepare(input_ids)
+        outputs = model(input_ids)
 
     # Get the model's answer string from its logits. We want the _answer
     # stream's_ logits, so we pass `outputs.logits[:,-1,:]`. `dim=-1` here
@@ -256,15 +255,17 @@ np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 # Functionality to pad out activations for saving.
 def pad_activations(tensor, length) -> t.Tensor:
     """Pad activation tensors to a certain stream-dim length."""
+
     padding_size: int = length - tensor.size(1)
     padding: t.Tensor = t.zeros(tensor.size(0), padding_size, tensor.size(2))
 
-    if not LARGE_MODEL_MODE:
+    try:
+        padding: t.Tensor = accelerator.prepare(padding)
+        return t.cat([tensor, padding], dim=1)
+    except RuntimeError:
         padding: t.Tensor = padding.to(tensor.device)
-
-    padding: t.Tensor = accelerator.prepare(padding)
-    # Concat and return.
-    return t.cat([tensor, padding], dim=1)
+        padding: t.Tensor = accelerator.prepare(padding)
+        return t.cat([tensor, padding], dim=1)
 
 
 # %%

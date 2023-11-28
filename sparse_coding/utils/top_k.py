@@ -56,12 +56,15 @@ def per_input_token_effects(
 
 # Helper functions for `per_token_effects`.
 def modal_tensor_acceleration(
-    tensor: t.Tensor, encoder, accelerator: Accelerator, large_model_mode: bool
+    tensor: t.Tensor, encoder, accelerator: Accelerator
 ) -> t.Tensor:
-    """Accelerate a tensor; manually move it where the accelerator fails."""
-    if large_model_mode is False:
+    """Accelerate a tensor; directly move it where the accelerator fails."""
+
+    try:
+        tensor = accelerator.prepare(tensor)
+    except RuntimeError:
         tensor = tensor.to(encoder.encoder_layer.weight.device)
-    tensor = accelerator.prepare(tensor)
+        tensor = accelerator.prepare(tensor)
 
     return tensor
 
