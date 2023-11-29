@@ -12,7 +12,7 @@ import torch as t
 import lightning as L
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
-from transformers import AutoConfig
+from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
 from sparse_coding.utils.caching import (
@@ -144,7 +144,11 @@ unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 # %%
 # Loop over the layer_idx values in the model slice.
-seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
+hf_model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+    MODEL_DIR,
+    token=HF_ACCESS_TOKEN,
+)
+seq_layer_indices: range = slice_to_seq(hf_model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:
     # Load, preprocess, and split an activations dataset.

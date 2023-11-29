@@ -12,11 +12,10 @@ from sparse_coding.utils.configure import save_paths
 
 
 def parse_slice(slice_string: str) -> slice:
-    """Parse a well-formed slice string into a proper slice."""
+    """Parse any valid slice string into its slice object."""
 
     start = stop = step = None
-
-    slice_parts = slice_string.split(":")
+    slice_parts: list = slice_string.split(":")
 
     if not 0 <= len(slice_parts) <= 3:
         raise ValueError(
@@ -36,12 +35,15 @@ def parse_slice(slice_string: str) -> slice:
         step = int(slice_parts[2])
 
     layers_slice = slice(start, stop, step)
-    assert start < stop, dedent(
-        f"""
-        Slice start ({layers_slice.start}) must be less than stop
-        ({layers_slice.stop})
-        """
-    )
+
+    if layers_slice.start is not None and layers_slice.stop is not None:
+        assert start < stop, dedent(
+            f"""
+            Slice start ({layers_slice.start}) must be less than stop
+            ({layers_slice.stop})
+            """
+        )
+
     return layers_slice
 
 
@@ -108,12 +110,14 @@ def cache_layer_tensor(
     t.save(layer_tensor, save_subdir_path + f"/{save_append}")
 
 
-def slice_to_seq(input_slice: slice) -> range:
+def slice_to_seq(model: PreTrainedModel, input_slice: slice) -> range:
     """Build a range corresponding to an input slice."""
 
     output_range = range(
-        input_slice.start,
-        input_slice.stop,
+        0 if input_slice.start is None else input_slice.start,
+        model.config.num_hidden_layers if (
+            input_slice.stop is None
+            ) else input_slice.stop,
         1 if input_slice.step is None else input_slice.step,
     )
 

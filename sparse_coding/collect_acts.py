@@ -270,9 +270,8 @@ def pad_activations(tensor, length) -> t.Tensor:
 
 # %%
 # Save activations.
-seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
+seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
-# %%
 # Deal with the single layer case, since there are no tuples there.
 if isinstance(activations, list) and isinstance(activations[0], t.Tensor):
     activations: list[tuple[t.Tensor]] = [(tensor,) for tensor in activations]

@@ -16,7 +16,13 @@ import prettytable
 import torch as t
 import transformers
 from accelerate import Accelerator
-from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizer
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizer,
+)
 
 from sparse_coding.utils import top_k
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
@@ -70,7 +76,7 @@ t.manual_seed(SEED)
 np.random.seed(SEED)
 
 # %%
-# We need the original tokenizer here.
+# We need the original tokenizer.
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,
@@ -163,7 +169,11 @@ def populate_table(
 
 # %%
 # Loop over all the sliced model layers.
-seq_layer_indices: range = slice_to_seq(ACTS_LAYERS_SLICE)
+model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+    MODEL_DIR,
+    token=HF_ACCESS_TOKEN,
+)
+seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:
     ENCODER_PATH = save_paths(
