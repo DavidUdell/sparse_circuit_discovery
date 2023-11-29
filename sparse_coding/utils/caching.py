@@ -113,12 +113,27 @@ def cache_layer_tensor(
 def slice_to_seq(model: PreTrainedModel, input_slice: slice) -> range:
     """Build a range corresponding to an input slice."""
 
+    if input_slice.start is None:
+        start = 0
+    elif input_slice.start < 0:
+        start: int = model.config.num_hidden_layers + input_slice.start
+    else:
+        start: int = input_slice.start
+
+    if input_slice.stop is None:
+        stop = model.config.num_hidden_layers
+    elif input_slice.stop < 0:
+        stop: int = model.config.num_hidden_layers + input_slice.stop
+    else:
+        stop: int = input_slice.stop
+
+    step: int = 1 if input_slice.step is None else input_slice.step
+
+    # Truncate final ranges to the model's size.
     output_range = range(
-        0 if input_slice.start is None else input_slice.start,
-        model.config.num_hidden_layers if (
-            input_slice.stop is None
-            ) else input_slice.stop,
-        1 if input_slice.step is None else input_slice.step,
+        max(start, 0),
+        min(stop, model.config.num_hidden_layers),
+        step,
     )
 
     return output_range
