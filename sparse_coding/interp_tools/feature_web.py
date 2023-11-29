@@ -4,7 +4,9 @@
 
 from textwrap import dedent
 
+from datasets import load_dataset
 import torch as t
+from transformers import AutoModelForCausalLM, PreTrainedModel
 
 from sparse_coding.interp_tools.utils.hooks import ablations_hook_fac
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
@@ -31,74 +33,77 @@ SEED = config.get("SEED")
 _ = t.manual_seed(SEED)
 
 # %%
-# This implementation validates against just the rasp model. After validation,
-# I will generalize to real-world autoencoded models.
-if MODEL_DIR != "rasp":
-    raise ValueError(
-        dedent(
-            f"""
-            `rasp_cache.py` requires that MODEL_DIR be set to `rasp`, not
-            {MODEL_DIR}.
-            """
-        )
-    )
-
-if ACTS_LAYERS_SLICE != slice(0, 2):
-    raise ValueError(
-        dedent(
-            f"""
-            `rasp_cache.py` requires that ACTS_LAYERS_SLICE be set to `slice(0,
-            2)`, not {ACTS_LAYERS_SLICE}.
-            """
-        )
-    )
-
-# %%
-# Record the differential downstream effects of ablating each dim.
-prompt = ["BOS", "w", "w", "w", "w", "x", "x", "x", "z", "z"]
-token_ids = tokenize(prompt)
-
-base_activations = {}
-ablated_activations = {}
-
-# Cache base activations.
-for residual_idx in range(0, 2):
-    for neuron_idx in range(transformer_lens_model.cfg.d_model):
-        _, base_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
-            transformer_lens_model.run_with_cache(token_ids)
+# This pathway validates against just the rasp model.
+if MODEL_DIR == "rasp":
+    if ACTS_LAYERS_SLICE != slice(0, 2):
+        raise ValueError(
+            dedent(
+                f"""
+                `rasp_cache.py` requires that ACTS_LAYERS_SLICE be set to
+                `slice(0, 2)`, not {ACTS_LAYERS_SLICE}.
+                """
+            )
         )
 
-# Cache ablated activations.
-for residual_idx in range(0, 2):
-    for neuron_idx in range(transformer_lens_model.cfg.d_model):
-        transformer_lens_model.add_perma_hook(
-            "blocks.0.hook_resid_pre",
-            ablations_hook_fac(neuron_idx),
+    # Record the differential downstream effects of ablating each dim.
+    prompt = ["BOS", "w", "w", "w", "w", "x", "x", "x", "z", "z"]
+    token_ids = tokenize(prompt)
+
+    base_activations = {}
+    ablated_activations = {}
+
+    # Cache base activations.
+    for residual_idx in range(0, 2):
+        for neuron_idx in range(transformer_lens_model.cfg.d_model):
+            _, base_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
+                transformer_lens_model.run_with_cache(token_ids)
+            )
+
+    # Cache ablated activations.
+    for residual_idx in range(0, 2):
+        for neuron_idx in range(transformer_lens_model.cfg.d_model):
+            transformer_lens_model.add_perma_hook(
+                "blocks.0.hook_resid_pre",
+                ablations_hook_fac(neuron_idx),
+            )
+
+            _, ablated_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
+                transformer_lens_model.run_with_cache(token_ids)
+            )
+
+            transformer_lens_model.reset_hooks(including_permanent=True)
+
+    # Compute effects.
+    activation_diffs = {}
+
+    for layer_idx, neuron_idx in ablated_activations:
+        activation_diffs[layer_idx, neuron_idx] = (
+            base_activations[(layer_idx, neuron_idx)][
+                "blocks.1.hook_resid_pre"
+                ].sum(axis=1).squeeze()
+            - ablated_activations[(layer_idx, neuron_idx)][
+                "blocks.1.hook_resid_pre"
+                ].sum(axis=1).squeeze()
         )
 
-        _, ablated_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
-            transformer_lens_model.run_with_cache(token_ids)
-        )
-
-        transformer_lens_model.reset_hooks(including_permanent=True)
-
-# %%
-# Compute effects.
-activation_diffs = {}
-
-for layer_idx, neuron_idx in ablated_activations:
-    activation_diffs[layer_idx, neuron_idx] = (
-        base_activations[(layer_idx, neuron_idx)][
-            "blocks.1.hook_resid_pre"
-            ].sum(axis=1).squeeze()
-        - ablated_activations[(layer_idx, neuron_idx)][
-            "blocks.1.hook_resid_pre"
-            ].sum(axis=1).squeeze()
+    # Plot and save effects.
+    graph_causal_effects(activation_diffs).draw(
+        save_paths(__file__, "feature_web.png"),
+        prog="dot",
     )
 
 # %%
-# Plot and save effects.
-graph_causal_effects(activation_diffs).draw(
-    save_paths(__file__, "feature_web.png"),
-    prog="dot",
+# This pathway finds circuits in the full HF models, from the repo's interface.
+# else:
+model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+    MODEL_DIR,
+    token=HF_ACCESS_TOKEN,
 )
+
+
+# Load up the encoder matrix and its biases.
+encoder = t.load(ENCODER_PATH)
+biases = t.load(BIASES_PATH)
+
+# Load the dataset.
+dataset = load_dataset()

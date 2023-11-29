@@ -48,7 +48,13 @@ def parse_slice(slice_string: str) -> slice:
 
 
 def validate_slice(model: PreTrainedModel, layers_slice: slice) -> None:
-    """See whether the layers slice fits in the model's layers."""
+    """
+    See whether the layers slice fits in the model's layers.
+    
+    Note that this is unnecessary when the slice is preprocessed with
+    `slice_to_seq`; only use this when you need to validate the _slice_ object,
+    not the corresponding range.
+    """
 
     if layers_slice.stop is None:
         return

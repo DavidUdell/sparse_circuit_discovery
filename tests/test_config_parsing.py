@@ -41,7 +41,7 @@ def mock_slices():
 def test_parse_slice(mock_slices):  # pylint: disable=redefined-outer-name
     """Test parse_slice, especially for the weirder slice syntaxes."""
 
-    _, slice_strings, slices, __ = mock_slices
+    _, slice_strings, slices, _ = mock_slices
 
     for slice_string, ground_truth in zip(slice_strings, slices):
         assert parse_slice(slice_string) == ground_truth, (
