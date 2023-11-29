@@ -58,7 +58,7 @@ assert (
 
 # %%
 # Reproducibility.
-t.manual_seed(SEED)
+_ = t.manual_seed(SEED)
 np.random.seed(SEED)
 
 # %%

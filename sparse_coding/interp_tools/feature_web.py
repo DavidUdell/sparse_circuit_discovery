@@ -8,7 +8,7 @@ import torch as t
 
 from sparse_coding.interp_tools.utils.hooks import ablations_hook_fac
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
-from sparse_coding.utils.caching import parse_slice, slice_to_seq
+from sparse_coding.utils.caching import parse_slice
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
 from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
@@ -21,11 +21,14 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
+ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
+BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
+TOP_K_INFO_PATH = save_paths(__file__, config.get("TOP_K_INFO_FILE"))
 SEED = config.get("SEED")
 
 # %%
 # Reproducibility.
-t.manual_seed(SEED)
+_ = t.manual_seed(SEED)
 
 # %%
 # This implementation validates against just the rasp model. After validation,
@@ -59,14 +62,14 @@ base_activations = {}
 ablated_activations = {}
 
 # Cache base activations.
-for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
+for residual_idx in range(0, 2):
     for neuron_idx in range(transformer_lens_model.cfg.d_model):
         _, base_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
             transformer_lens_model.run_with_cache(token_ids)
         )
 
 # Cache ablated activations.
-for residual_idx in slice_to_seq(ACTS_LAYERS_SLICE):
+for residual_idx in range(0, 2):
     for neuron_idx in range(transformer_lens_model.cfg.d_model):
         transformer_lens_model.add_perma_hook(
             "blocks.0.hook_resid_pre",
