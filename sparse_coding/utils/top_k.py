@@ -1,13 +1,13 @@
 """Functions for processing autoencoders into top-k tokens."""
 
 
-import textwrap
 from collections import defaultdict
 from math import ceil
 
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoTokenizer
+from tqdm.auto import tqdm
 
 
 # `per_input_token_effects` is a linchpin interpretability function. I break up
@@ -25,7 +25,6 @@ def per_input_token_effects(
     at each input token."""
 
     # Begin pre-processing. Calulate the number of dimensional batches to run.
-    print("Starting pre-processing...")
     num_dim_batches: int = batching_setup(dims_per_batch, encoder)
 
     # Initialize the effects dictionary.
@@ -36,7 +35,6 @@ def per_input_token_effects(
         token_ids_by_q, encoder, accelerator
     )
 
-    print("Pre-processing complete!")
     effect_scalar_by_dim_by_input_token = batches_loop(
         num_dim_batches,
         dims_per_batch,
@@ -72,7 +70,6 @@ def batching_setup(dims_per_batch: int, encoder) -> int:
     num_dim_batches: int = ceil(
         encoder.encoder_layer.weight.shape[0] / dims_per_batch
     )
-    print(f"Total number of batches to be run: {num_dim_batches}")
 
     return num_dim_batches
 
@@ -123,9 +120,7 @@ def batches_loop(
 
     starting_dim_index, ending_dim_index = 0, 0
 
-    for batch in range(num_dim_batches):
-        print(f"Starting batch {batch+1} of {num_dim_batches}...")
-
+    for batch in tqdm(range(num_dim_batches), desc="Feature Batches Progress"):
         ending_dim_index += dims_per_batch
         if ending_dim_index > encoder.encoder_layer.weight.shape[0]:
             ending_dim_index = encoder.encoder_layer.weight.shape[0]
@@ -174,15 +169,6 @@ def batches_loop(
                 effect_scalar_by_dim_by_input_token[
                     starting_dim_index + dim_in_batch
                 ][input_token_string] = averaged_activation_per_dim.item()
-
-        print(
-            textwrap.dedent(
-                f"""
-                Batch {batch+1} complete: data for encoder dims indices
-                {starting_dim_index} through {ending_dim_index-1} appended!
-                """
-            )
-        )
 
         # Update `starting_dim_index` for the next batch.
         starting_dim_index = ending_dim_index

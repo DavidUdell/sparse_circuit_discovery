@@ -29,6 +29,7 @@ setup(
         "einops",
         "pygraphviz",
         "transformer_lens",
+        "tqdm",
         "tracr @ git+https://github.com/google-deepmind/tracr.git",
     ],
 )
