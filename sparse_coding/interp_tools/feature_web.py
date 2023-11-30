@@ -2,16 +2,22 @@
 """Ablate autoencoder dimensions during inference and graph causal effects."""
 
 
+import csv
 from textwrap import dedent
 
 import numpy as np
 import torch as t
+from accelerate import Accelerator
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, PreTrainedModel
+from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 
-from sparse_coding.interp_tools.utils.hooks import ablations_hook_fac
+from sparse_coding.interp_tools.utils.hooks import (
+    rasp_ablations_hook_fac,
+    ablations_lifecycle,
+)
 from sparse_coding.utils.configure import load_yaml_constants, save_paths
-from sparse_coding.utils.caching import parse_slice
+from sparse_coding.utils.caching import parse_slice, slice_to_seq
+from sparse_coding.utils.tasks import multiple_choice_task
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
 from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
@@ -28,6 +34,7 @@ ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
 BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
 TOP_K_INFO_PATH = save_paths(__file__, config.get("TOP_K_INFO_FILE"))
 NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 717)
+NUM_SHOT = config.get("NUM_SHOT", 6)
 SEED = config.get("SEED")
 
 # %%
@@ -58,21 +65,22 @@ if MODEL_DIR == "rasp":
     # Cache base activations.
     for residual_idx in range(0, 2):
         for neuron_idx in range(transformer_lens_model.cfg.d_model):
-            _, base_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
-                transformer_lens_model.run_with_cache(token_ids)
-            )
-
+            (  # pylint: disable=unpacking-non-sequence
+                _,
+                base_activations[residual_idx, neuron_idx],
+            ) = transformer_lens_model.run_with_cache(token_ids)
     # Cache ablated activations.
     for residual_idx in range(0, 2):
         for neuron_idx in range(transformer_lens_model.cfg.d_model):
             transformer_lens_model.add_perma_hook(
                 "blocks.0.hook_resid_pre",
-                ablations_hook_fac(neuron_idx),
+                rasp_ablations_hook_fac(neuron_idx),
             )
 
-            _, ablated_activations[residual_idx, neuron_idx] = (  # pylint: disable=unpacking-non-sequence
-                transformer_lens_model.run_with_cache(token_ids)
-            )
+            (  # pylint: disable=unpacking-non-sequence
+                _,
+                ablated_activations[residual_idx, neuron_idx],
+            ) = transformer_lens_model.run_with_cache(token_ids)
 
             transformer_lens_model.reset_hooks(including_permanent=True)
 
@@ -83,10 +91,14 @@ if MODEL_DIR == "rasp":
         activation_diffs[layer_idx, neuron_idx] = (
             base_activations[(layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
-                ].sum(axis=1).squeeze()
+            ]
+            .sum(axis=1)
+            .squeeze()
             - ablated_activations[(layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
-                ].sum(axis=1).squeeze()
+            ]
+            .sum(axis=1)
+            .squeeze()
         )
 
     # Plot and save effects.
@@ -102,7 +114,11 @@ model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,
 )
+tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
+accelerator = Accelerator()
+model.eval()
 
+layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
 # Load up the encoder matrix and its biases.
 encoder = t.load(ENCODER_PATH)
@@ -116,3 +132,37 @@ all_indices: np.ndarray = np.random.choice(
     replace=False,
 )
 validation_indices: list = all_indices[NUM_QUESTIONS_EVALED:].tolist()
+
+# Load the meainingful dimensions from the top-k info file.
+meaningful_dims = []
+with open(TOP_K_INFO_PATH, mode="r", encoding="utf-8") as top_k_info_file:
+    reader = csv.reader(top_k_info_file)
+    next(reader)
+    for row in reader:
+        meaningful_dims.append(int(row[0]))
+
+ablated_activations = {}
+ablations_range: range = layer_range[:-1]
+
+for layer_idx in ablations_range:
+    for neuron_idx in meaningful_dims:
+        with ablations_lifecycle(
+            neuron_idx,
+            layer_idx,
+            model,
+            encoder,
+            biases,
+            ablated_activations,
+        ):
+            _, _, _ = multiple_choice_task(
+                dataset,
+                validation_indices,
+                model,
+                tokenizer,
+                accelerator,
+                NUM_SHOT,
+                ACTS_LAYERS_SLICE,
+            )
+
+# Compute diffs. Baseline activations were cached back in `collect_acts`.
+print(ablated_activations)
