@@ -51,15 +51,14 @@ np.random.seed(SEED)
 # %%
 # This pathway validates against just the rasp model.
 if MODEL_DIR == "rasp":
-    if ACTS_LAYERS_SLICE != slice(0, 2):
-        raise ValueError(
-            dedent(
-                f"""
-                `rasp_cache.py` requires that ACTS_LAYERS_SLICE be set to
-                `slice(0, 2)`, not {ACTS_LAYERS_SLICE}.
-                """
-            )
+    print(
+        dedent(
+            """
+            `feature_web.py` will always use RASP layers 0 and 1 when the model
+            directory "rasp" is passed to it.
+            """
         )
+    )
 
     # Record the differential downstream effects of ablating each dim.
     prompt = ["BOS", "w", "w", "w", "w", "x", "x", "x", "z", "z"]
@@ -186,6 +185,7 @@ for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
     ):
         with ablations_lifecycle(
             ablation_idx,
+            meaningful_dims,
             layer_idx,
             layer_range,
             model,
