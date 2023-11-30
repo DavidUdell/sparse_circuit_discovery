@@ -190,7 +190,7 @@ for layer_idx in ablations_range:
             biases,
             ablated_activations,
         ):
-            _, _, _ = multiple_choice_task(
+            multiple_choice_task(
                 dataset,
                 validation_indices,
                 model,
@@ -198,6 +198,7 @@ for layer_idx in ablations_range:
                 accelerator,
                 NUM_SHOT,
                 ACTS_LAYERS_SLICE,
+                streamlined_mode=True,
             )
             print(f"Ablation at dim {ablation_idx}, layer {layer_idx} done!")
 

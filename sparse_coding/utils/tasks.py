@@ -29,8 +29,13 @@ def multiple_choice_task(
     accelerator,
     num_shot: int,
     acts_layers_slice: slice,
-) -> tuple[list, dict, list]:
-    """The model does the `truthful_qa multiple-choice 1` task."""
+    streamlined_mode: bool = False,
+) -> tuple[list, dict, list] | None:
+    """
+    The model does the `truthful_qa multiple-choice 1` task.
+    
+    `streamlined_mode` runs the task without returning any outputs.
+    """
 
     activations = []
     answers_with_rubric = {}
@@ -107,6 +112,8 @@ def multiple_choice_task(
             input_ids = accelerator.prepare(input_ids)
             outputs = model(input_ids)
 
+        if streamlined_mode:
+            continue
         # We want the answer stream's logits, so we pass
         # `outputs.logits[:,-1,:]`. `dim=-1` means greedy sampling over the
         # token dim.
@@ -119,10 +126,6 @@ def multiple_choice_task(
 
         ground_truth: int = unhot(shuffled_labels_current)
         answers_with_rubric[question_idx] = [int(model_answer), ground_truth]
-        # `feature_web` ablations mess this up, but it doesn't matter.
-        try:
-            activations.append(outputs.hidden_states[acts_layers_slice])
-        except TypeError:
-            continue
+        activations.append(outputs.hidden_states[acts_layers_slice])
 
     return activations, answers_with_rubric, prompts_ids
