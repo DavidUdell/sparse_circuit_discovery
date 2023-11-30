@@ -25,6 +25,7 @@ def rasp_ablations_hook_fac(neuron_index: int):
 @contextmanager
 def ablations_lifecycle(
     dim_idx: int,
+    meaningful_dims: list[int],
     layer_idx: int,
     layer_range: range,
     model,
@@ -71,7 +72,8 @@ def ablations_lifecycle(
         return ablations_hook
 
     def caching_hook_fac(
-        dim_idx: int,
+        ablated_dim_idx: int,
+        meaningful_dims: list[int],
         layer_idx: int,
         encoder: t.Tensor,
         biases: t.Tensor,
@@ -93,8 +95,11 @@ def ablations_lifecycle(
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=True
             )
-            # Cache the activations at dim_idx.
-            cache[layer_idx][dim_idx] = projected_acts
+            # Cache the activations.
+            for downstream_dim in meaningful_dims:
+                cache[
+                    layer_idx][ablated_dim_idx][downstream_dim
+                ] = projected_acts[:, :, downstream_dim]
 
         return caching_hook
 
@@ -112,7 +117,14 @@ def ablations_lifecycle(
         caching_hook_handles[index] = model.gpt_neox.layers[
             layer
         ].register_forward_hook(
-            caching_hook_fac(dim_idx, layer, encoder, biases, cache)
+            caching_hook_fac(
+                dim_idx,
+                meaningful_dims,
+                layer,
+                encoder,
+                biases,
+                cache
+            )
         )
 
     try:

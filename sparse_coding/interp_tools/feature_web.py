@@ -181,7 +181,9 @@ for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
         for row in reader:
             meaningful_dims.append(int(row[0]))
 
-    for ablation_idx in tqdm(meaningful_dims, desc="Feature Ablations Progress"):
+    for ablation_idx in tqdm(
+        meaningful_dims, desc="Feature Ablations Progress"
+    ):
         with ablations_lifecycle(
             ablation_idx,
             layer_idx,
@@ -201,7 +203,6 @@ for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
                 ACTS_LAYERS_SLICE,
                 streamlined_mode=True,
             )
-            print(f"Ablation at dim {ablation_idx}, layer {layer_idx} done!")
 
 # Compute diffs. Baseline activations were cached back in `collect_acts`.
 print(ablated_activations)
