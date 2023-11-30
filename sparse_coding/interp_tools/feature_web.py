@@ -20,6 +20,7 @@ from sparse_coding.utils.interface import (
     slice_to_seq,
     load_yaml_constants,
     save_paths,
+    sanitize_model_name,
 )
 from sparse_coding.utils.tasks import multiple_choice_task
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
@@ -34,9 +35,9 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
-ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
-BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
-TOP_K_INFO_PATH = save_paths(__file__, config.get("TOP_K_INFO_FILE"))
+ENCODER_FILE = config.get("ENCODER_FILE")
+BIASES_FILE = config.get("BIASES_FILE")
+TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 717)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 SEED = config.get("SEED")
@@ -124,10 +125,6 @@ model.eval()
 
 layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
-# Load up the encoder matrix and its biases.
-encoder = t.load(ENCODER_PATH)
-biases = t.load(BIASES_PATH)
-
 # Load the complementary validation dataset subset.
 dataset: dict = load_dataset("truthful_qa", "multiple_choice")
 all_indices: np.ndarray = np.random.choice(
@@ -137,18 +134,48 @@ all_indices: np.ndarray = np.random.choice(
 )
 validation_indices: list = all_indices[NUM_QUESTIONS_EVALED:].tolist()
 
-# Load the meainingful dimensions from the top-k info file.
-meaningful_dims = []
-with open(TOP_K_INFO_PATH, mode="r", encoding="utf-8") as top_k_info_file:
-    reader = csv.reader(top_k_info_file)
-    next(reader)
-    for row in reader:
-        meaningful_dims.append(int(row[0]))
-
 ablated_activations = {}
 ablations_range: range = layer_range[:-1]
 
 for layer_idx in ablations_range:
+    # Load the per-layer data.
+    encoder = t.load(
+        save_paths(
+            __file__,
+            sanitize_model_name(MODEL_DIR)
+            + "/"
+            + str(layer_idx)
+            + "/"
+            + ENCODER_FILE,
+        )
+    )
+    biases = t.load(
+        save_paths(
+            __file__,
+            sanitize_model_name(MODEL_DIR)
+            + "/"
+            + str(layer_idx)
+            + "/"
+            + BIASES_FILE,
+        )
+    )
+    meaningful_dims = []
+    with open(
+        save_paths(
+            __file__,
+            sanitize_model_name(MODEL_DIR)
+            + str(layer_idx)
+            + "/"
+            + TOP_K_INFO_FILE,
+        ),
+        mode="r",
+        encoding="utf-8",
+    ) as top_k_info_file:
+        reader = csv.reader(top_k_info_file)
+        next(reader)
+        for row in reader:
+            meaningful_dims.append(int(row[0]))
+
     for neuron_idx in meaningful_dims:
         with ablations_lifecycle(
             neuron_idx,
