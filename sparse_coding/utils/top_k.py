@@ -119,8 +119,12 @@ def batches_loop(
     """Loop over the batches while printing current progress."""
 
     starting_dim_index, ending_dim_index = 0, 0
+    features_progress_bar = tqdm(
+        total=encoder.encoder_layer.weight.shape[0],
+        desc="Feature Dims Progress",
+    )
 
-    for batch in tqdm(range(num_dim_batches), desc="Feature Batches Progress"):
+    for batch in range(num_dim_batches):
         ending_dim_index += dims_per_batch
         if ending_dim_index > encoder.encoder_layer.weight.shape[0]:
             ending_dim_index = encoder.encoder_layer.weight.shape[0]
@@ -170,8 +174,12 @@ def batches_loop(
                     starting_dim_index + dim_in_batch
                 ][input_token_string] = averaged_activation_per_dim.item()
 
+        # Manually closed, because there isn't a natural iterable for tqdm.
+        features_progress_bar.update(ending_dim_index - starting_dim_index)
         # Update `starting_dim_index` for the next batch.
         starting_dim_index = ending_dim_index
+
+    features_progress_bar.close()
 
     return effect_scalar_by_dim_by_input_token
 
