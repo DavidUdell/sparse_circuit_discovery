@@ -28,7 +28,7 @@ def multiple_choice_task(
     tokenizer,
     accelerator,
     num_shot: int,
-    acts_layers_slice: slice
+    acts_layers_slice: slice,
 ) -> tuple[list, dict, list]:
     """The model does the `truthful_qa multiple-choice 1` task."""
 
@@ -77,11 +77,11 @@ def multiple_choice_task(
             "Q: " + dataset["validation"]["question"][question_idx] + "\n"
         )
         unshuffled_choices_current: list = dataset["validation"][
-            "mc1_targets"][question_idx]["choices"
-        ]
-        unshuffled_labels_current: list = dataset["validation"][
-            "mc1_targets"][question_idx]["labels"
-        ]
+            "mc1_targets"
+        ][question_idx]["choices"]
+        unshuffled_labels_current: list = dataset["validation"]["mc1_targets"][
+            question_idx
+        ]["labels"]
         shuffled_choices_current, shuffled_labels_current = shuffle_answers(
             unshuffled_choices_current, unshuffled_labels_current
         )
@@ -119,6 +119,10 @@ def multiple_choice_task(
 
         ground_truth: int = unhot(shuffled_labels_current)
         answers_with_rubric[question_idx] = [int(model_answer), ground_truth]
-        activations.append(outputs.hidden_states[acts_layers_slice])
+        # `feature_web` ablations mess this up, but it doesn't matter.
+        try:
+            activations.append(outputs.hidden_states[acts_layers_slice])
+        except TypeError:
+            continue
 
     return activations, answers_with_rubric, prompts_ids

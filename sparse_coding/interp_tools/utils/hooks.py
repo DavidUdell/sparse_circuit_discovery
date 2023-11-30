@@ -35,7 +35,8 @@ def ablations_lifecycle(
     """
     Context manager for the full-scale ablations and caching.
 
-    Ablates the specified feature at `layer_idx` and caches the downstream effects.
+    Ablates the specified feature at `layer_idx` and caches the downstream
+    effects.
     """
 
     def encoder_hook_fac(dim_idx: int, encoder: t.Tensor, biases: t.Tensor):
@@ -49,7 +50,7 @@ def ablations_lifecycle(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    input, encoder, bias=biases
+                    input[0], encoder, bias=biases
                 )
             )
             projected_acts = t.nn.functional.relu(
@@ -58,11 +59,8 @@ def ablations_lifecycle(
             # Zero out the activation at dim_idx.
             projected_acts[:, dim_idx] = 0.0
             # Project back to activation space.
-            output = t.nn.functional.linear(  # pylint: disable=not-callable
-                projected_acts,
-                encoder.t(),
-                bias=biases,
-            )
+            output = projected_acts - biases
+            output = t.einsum("bij, jk -> bik", projected_acts, encoder)
 
         return ablations_hook
 
@@ -98,14 +96,16 @@ def ablations_lifecycle(
         raise ValueError("Cannot ablate and cache from the last layer.")
 
     downstream_range: range = range(layer_idx + 1, layer_range[-1])
-
-    encoder_hook_handle = model[layer_idx].register_forward_hook(
-        encoder_hook_fac(dim_idx, encoder, biases)
-    )
+    # Pythia layer syntax, for now.
+    encoder_hook_handle = model.gpt_neox.layers[
+        layer_idx
+    ].register_forward_hook(encoder_hook_fac(dim_idx, encoder, biases))
 
     caching_hook_handles = {}
     for index, layer in enumerate(downstream_range):
-        caching_hook_handles[index] = model[layer].register_forward_hook(
+        caching_hook_handles[index] = model.gpt_neox.layers[
+            layer
+        ].register_forward_hook(
             caching_hook_fac(dim_idx, layer, encoder, biases, cache)
         )
 
