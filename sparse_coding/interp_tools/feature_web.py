@@ -10,6 +10,7 @@ import torch as t
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
+from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.hooks import (
     rasp_ablations_hook_fac,
@@ -138,7 +139,7 @@ validation_indices: list = all_indices[NUM_QUESTIONS_EVALED:].tolist()
 ablated_activations = {}
 ablations_range: range = layer_range[:-1]
 
-for layer_idx in ablations_range:
+for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
     # Load the per-layer data.
     encoder = t.load(
         save_paths(
@@ -180,7 +181,7 @@ for layer_idx in ablations_range:
         for row in reader:
             meaningful_dims.append(int(row[0]))
 
-    for ablation_idx in meaningful_dims:
+    for ablation_idx in tqdm(meaningful_dims, desc="Feature Ablations Progress"):
         with ablations_lifecycle(
             ablation_idx,
             layer_idx,
