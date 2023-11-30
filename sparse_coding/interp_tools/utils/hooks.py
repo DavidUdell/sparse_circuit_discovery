@@ -50,7 +50,9 @@ def ablations_lifecycle(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    input[0], encoder, bias=biases
+                    input[0],
+                    encoder.to(model.device),
+                    bias=biases.to(model.device),
                 )
             )
             projected_acts = t.nn.functional.relu(
@@ -59,8 +61,12 @@ def ablations_lifecycle(
             # Zero out the activation at dim_idx.
             projected_acts[:, dim_idx] = 0.0
             # Project back to activation space.
-            output = projected_acts - biases
-            output = t.einsum("bij, jk -> bik", projected_acts, encoder)
+            output = projected_acts.to(model.device) - biases.to(model.device)
+            output = t.einsum(
+                "bij, jk -> bik",
+                projected_acts.to(model.device),
+                encoder.to(model.device),
+            )
 
         return ablations_hook
 
@@ -76,7 +82,7 @@ def ablations_lifecycle(
         def caching_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
         ) -> None:
-            """Cache the projected activations at dim_idx."""
+            """Cache projected activations."""
 
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
@@ -88,7 +94,7 @@ def ablations_lifecycle(
                 projected_acts_unrec, inplace=True
             )
             # Cache the activations at dim_idx.
-            cache[layer_idx][dim_idx] = projected_acts[:, dim_idx]
+            cache[layer_idx][dim_idx] = projected_acts
 
         return caching_hook
 

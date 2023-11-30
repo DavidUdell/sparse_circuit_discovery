@@ -38,7 +38,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
-NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 717)
+NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 800)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 SEED = config.get("SEED")
 
@@ -121,6 +121,7 @@ model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
 )
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
 accelerator = Accelerator()
+model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
@@ -149,6 +150,7 @@ for layer_idx in ablations_range:
             + ENCODER_FILE,
         )
     )
+    encoder = accelerator.prepare(encoder)
     biases = t.load(
         save_paths(
             __file__,
@@ -159,6 +161,7 @@ for layer_idx in ablations_range:
             + BIASES_FILE,
         )
     )
+    biases = accelerator.prepare(biases)
     meaningful_dims = []
     with open(
         save_paths(
@@ -177,9 +180,9 @@ for layer_idx in ablations_range:
         for row in reader:
             meaningful_dims.append(int(row[0]))
 
-    for neuron_idx in meaningful_dims:
+    for ablation_idx in meaningful_dims:
         with ablations_lifecycle(
-            neuron_idx,
+            ablation_idx,
             layer_idx,
             layer_range,
             model,
@@ -196,6 +199,7 @@ for layer_idx in ablations_range:
                 NUM_SHOT,
                 ACTS_LAYERS_SLICE,
             )
+            print(f"Ablation at {ablation_idx}, layer {layer_idx} done!")
 
 # Compute diffs. Baseline activations were cached back in `collect_acts`.
 print(ablated_activations)
