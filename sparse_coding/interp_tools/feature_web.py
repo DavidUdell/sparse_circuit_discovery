@@ -4,8 +4,9 @@
 
 from textwrap import dedent
 
-from datasets import load_dataset
+import numpy as np
 import torch as t
+from datasets import load_dataset
 from transformers import AutoModelForCausalLM, PreTrainedModel
 
 from sparse_coding.interp_tools.utils.hooks import ablations_hook_fac
@@ -26,11 +27,13 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_PATH = save_paths(__file__, config.get("ENCODER_FILE"))
 BIASES_PATH = save_paths(__file__, config.get("BIASES_FILE"))
 TOP_K_INFO_PATH = save_paths(__file__, config.get("TOP_K_INFO_FILE"))
+NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 717)
 SEED = config.get("SEED")
 
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
+np.random.seed(SEED)
 
 # %%
 # This pathway validates against just the rasp model.
@@ -105,5 +108,11 @@ model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
 encoder = t.load(ENCODER_PATH)
 biases = t.load(BIASES_PATH)
 
-# Load the dataset.
-dataset = load_dataset()
+# Load the complementary validation dataset subset.
+dataset: dict = load_dataset("truthful_qa", "multiple_choice")
+all_indices: np.ndarray = np.random.choice(
+    len(dataset["validation"]["question"]),
+    size=len(dataset["validation"]["question"]),
+    replace=False,
+)
+validation_indices: list = all_indices[NUM_QUESTIONS_EVALED:].tolist()

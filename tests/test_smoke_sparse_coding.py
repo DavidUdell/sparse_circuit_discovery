@@ -5,10 +5,14 @@ Note that this integration test will necessarily be somewhat slow.
 """
 
 
+import os
 from runpy import run_module
 
 import pytest
 import yaml
+import torch as t
+
+from sparse_coding.utils.caching import sanitize_model_name
 
 
 @pytest.fixture
@@ -40,6 +44,11 @@ def mock_configure(monkeypatch):
 
         return access, config
 
+    monkeypatch.setattr(
+        "sparse_coding.utils.configure.load_yaml_constants",
+        mock_load_yaml_constants,
+    )
+
     def mock_save_paths(  # pylint: disable=unused-argument
         base_file, save_append
     ) -> str:
@@ -50,11 +59,37 @@ def mock_configure(monkeypatch):
         return "smoke_test_data/" + save_append
 
     monkeypatch.setattr(
-        "sparse_coding.utils.configure.load_yaml_constants",
-        mock_load_yaml_constants,
-    )
-    monkeypatch.setattr(
         "sparse_coding.utils.configure.save_paths", mock_save_paths
+    )
+
+    def mock_cache_layer_tensor(  # pylint: disable=unused-argument
+        layer_tensor,
+        layer_idx: int,
+        save_append: str,
+        base_file: str,
+        model_name: str
+    ) -> None:
+        """Forcibly cache layer tensors in the smoke test directory."""
+
+        assert isinstance(
+            layer_idx, int
+        ), f"Layer index {layer_idx} is not an int."
+
+        assert not isinstance(
+            layer_idx, bool
+        ), f"Layer index {layer_idx} is a bool, not an int."
+
+        safe_model_name = sanitize_model_name(model_name)
+        save_subdir_path = (
+            "smoke_test_data/" + f"/{safe_model_name}/{layer_idx}"
+        )
+
+        os.makedirs(save_subdir_path, exist_ok=True)
+        t.save(layer_tensor, save_subdir_path + f"/{save_append}")
+
+    monkeypatch.setattr(
+        "sparse_coding.utils.caching.cache_layer_tensor",
+        mock_cache_layer_tensor,
     )
 
 

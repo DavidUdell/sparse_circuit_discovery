@@ -1,6 +1,6 @@
 # Smoke Test Model
 MODEL_DIR: "EleutherAI/pythia-70m"
-ACTS_LAYERS_SLICE: "1:2"
+ACTS_LAYERS_SLICE: "0:2"
 
 # Encoder Size
 PROJECTION_FACTOR: 1
