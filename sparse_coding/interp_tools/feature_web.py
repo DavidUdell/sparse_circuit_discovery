@@ -199,7 +199,7 @@ for layer_idx in ablations_range:
                 NUM_SHOT,
                 ACTS_LAYERS_SLICE,
             )
-            print(f"Ablation at {ablation_idx}, layer {layer_idx} done!")
+            print(f"Ablation at dim {ablation_idx}, layer {layer_idx} done!")
 
 # Compute diffs. Baseline activations were cached back in `collect_acts`.
 print(ablated_activations)
