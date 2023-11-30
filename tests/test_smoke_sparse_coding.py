@@ -12,11 +12,11 @@ import pytest
 import yaml
 import torch as t
 
-from sparse_coding.utils.caching import sanitize_model_name
+from sparse_coding.utils.interface import sanitize_model_name
 
 
 @pytest.fixture
-def mock_configure(monkeypatch):
+def mock_interface(monkeypatch):
     """Load to and from the smoke test yaml files."""
 
     def mock_load_yaml_constants(base_file):  # pylint: disable=unused-argument
@@ -45,7 +45,7 @@ def mock_configure(monkeypatch):
         return access, config
 
     monkeypatch.setattr(
-        "sparse_coding.utils.configure.load_yaml_constants",
+        "sparse_coding.utils.interface.load_yaml_constants",
         mock_load_yaml_constants,
     )
 
@@ -59,7 +59,7 @@ def mock_configure(monkeypatch):
         return "smoke_test_data/" + save_append
 
     monkeypatch.setattr(
-        "sparse_coding.utils.configure.save_paths", mock_save_paths
+        "sparse_coding.utils.interface.save_paths", mock_save_paths
     )
 
     def mock_cache_layer_tensor(  # pylint: disable=unused-argument
@@ -67,7 +67,7 @@ def mock_configure(monkeypatch):
         layer_idx: int,
         save_append: str,
         base_file: str,
-        model_name: str
+        model_name: str,
     ) -> None:
         """Forcibly cache layer tensors in the smoke test directory."""
 
@@ -88,13 +88,13 @@ def mock_configure(monkeypatch):
         t.save(layer_tensor, save_subdir_path + f"/{save_append}")
 
     monkeypatch.setattr(
-        "sparse_coding.utils.caching.cache_layer_tensor",
+        "sparse_coding.utils.interface.cache_layer_tensor",
         mock_cache_layer_tensor,
     )
 
 
 def test_smoke_sparse_coding(
-    mock_configure,
+    mock_interface,
 ):  # pylint: disable=redefined-outer-name, unused-argument
     """Run the submodule scripts in sequence."""
     for script in [

@@ -26,6 +26,7 @@ def rasp_ablations_hook_fac(neuron_index: int):
 def ablations_lifecycle(
     dim_idx: int,
     layer_idx: int,
+    layer_range: range,
     model,
     encoder: t.Tensor,
     biases: t.Tensor,
@@ -34,8 +35,7 @@ def ablations_lifecycle(
     """
     Context manager for the full-scale ablations and caching.
 
-    Ablates the specified feature at `layer_idx`, and caches the downstream
-    value at `layer_idx + 1` in `cache`. Be sure `layer_idx + 1` exists.
+    Ablates the specified feature at `layer_idx` and caches the downstream effects.
     """
 
     def encoder_hook_fac(dim_idx: int, encoder: t.Tensor, biases: t.Tensor):
@@ -94,15 +94,25 @@ def ablations_lifecycle(
 
         return caching_hook
 
+    if layer_idx == layer_range[-1]:
+        raise ValueError("Cannot ablate and cache from the last layer.")
+
+    downstream_range: range = range(layer_idx + 1, layer_range[-1])
+
     encoder_hook_handle = model[layer_idx].register_forward_hook(
         encoder_hook_fac(dim_idx, encoder, biases)
     )
-    caching_hook_handle = model[layer_idx + 1].register_forward_hook(
-        caching_hook_fac(dim_idx, layer_idx + 1, encoder, biases, cache)
-    )
+
+    caching_hook_handles = {}
+    for index, layer in enumerate(downstream_range):
+        caching_hook_handles[index] = model[layer].register_forward_hook(
+            caching_hook_fac(dim_idx, layer, encoder, biases, cache)
+        )
 
     try:
         yield
+
     finally:
         encoder_hook_handle.remove()
-        caching_hook_handle.remove()
+        for handle in caching_hook_handles.items():
+            handle.remove()

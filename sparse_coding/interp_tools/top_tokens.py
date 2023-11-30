@@ -25,12 +25,13 @@ from transformers import (
 )
 
 from sparse_coding.utils import top_k
-from sparse_coding.utils.configure import load_yaml_constants, save_paths
-from sparse_coding.utils.caching import (
+from sparse_coding.utils.interface import (
     parse_slice,
     slice_to_seq,
     load_input_token_ids,
     sanitize_model_name,
+    load_yaml_constants,
+    save_paths,
 )
 
 

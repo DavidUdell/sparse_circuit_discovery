@@ -15,8 +15,12 @@ from sparse_coding.interp_tools.utils.hooks import (
     rasp_ablations_hook_fac,
     ablations_lifecycle,
 )
-from sparse_coding.utils.configure import load_yaml_constants, save_paths
-from sparse_coding.utils.caching import parse_slice, slice_to_seq
+from sparse_coding.utils.interface import (
+    parse_slice,
+    slice_to_seq,
+    load_yaml_constants,
+    save_paths,
+)
 from sparse_coding.utils.tasks import multiple_choice_task
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
 from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
@@ -149,6 +153,7 @@ for layer_idx in ablations_range:
         with ablations_lifecycle(
             neuron_idx,
             layer_idx,
+            layer_range,
             model,
             encoder,
             biases,

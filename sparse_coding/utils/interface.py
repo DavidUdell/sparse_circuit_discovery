@@ -1,14 +1,14 @@
-"""Help cache data and layer tensors from many model layers."""
+"""Read from and write to the module-level interface."""
 
 
 import os
+from pathlib import Path
 from textwrap import dedent
 
+import yaml
 import numpy as np
 import torch as t
 from transformers import PreTrainedModel
-
-from sparse_coding.utils.configure import save_paths
 
 
 def parse_slice(slice_string: str) -> slice:
@@ -50,7 +50,7 @@ def parse_slice(slice_string: str) -> slice:
 def validate_slice(model: PreTrainedModel, layers_slice: slice) -> None:
     """
     See whether the layers slice fits in the model's layers.
-    
+
     Note that this is unnecessary when the slice is preprocessed with
     `slice_to_seq`; only use this when you need to validate the _slice_ object,
     not the corresponding range.
@@ -158,3 +158,76 @@ def load_input_token_ids(prompt_ids_path: str) -> list[list[int]]:
     ]
 
     return unpacked_ids
+
+
+def load_yaml_constants(base_file):
+    """Load config files."""
+
+    current_dir = Path(base_file).parent
+    hf_access_file: str = "config/hf_access.yaml"
+    central_config_file: str = "config/central_config.yaml"
+
+    if current_dir.name == "sparse_coding":
+        hf_access_path = current_dir / hf_access_file
+        central_config_path = current_dir / central_config_file
+
+    elif current_dir.name in ("interp_tools", "rasp"):
+        hf_access_path = current_dir.parent / hf_access_file
+        central_config_path = current_dir.parent / central_config_file
+
+    else:
+        raise ValueError(
+            dedent(
+                f"""
+                Trying to access config files from an unfamiliar working
+                directory: {current_dir}
+                """
+            )
+        )
+
+    try:
+        with open(hf_access_path, "r", encoding="utf-8") as f:
+            access = yaml.safe_load(f)
+    except FileNotFoundError:
+        print("hf_access.yaml not found. Creating it now.")
+        with open(hf_access_path, "w", encoding="utf-8") as w:
+            w.write('HF_ACCESS_TOKEN: ""\n')
+        access = {}
+    except yaml.YAMLError as e:
+        print(e)
+
+    with open(central_config_path, "r", encoding="utf-8") as f:
+        try:
+            config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            print(e)
+
+    return access, config
+
+
+def save_paths(base_file, save_append: str) -> str:
+    """Route to save paths from the current working directory."""
+
+    assert isinstance(
+        save_append, str
+    ), f"`save_append` must be a string: {save_append}."
+
+    current_dir = Path(base_file).parent
+
+    if current_dir.name == "sparse_coding":
+        save_path = current_dir / "data" / save_append
+        return str(save_path)
+
+    if current_dir.name in ("interp_tools", "rasp"):
+        save_path = current_dir.parent / "data" / save_append
+        return str(save_path)
+
+    raise ValueError(
+        dedent(
+            f"""
+            Trying to route to save directory from an unfamiliar working
+            directory:
+            {current_dir}
+            """
+        )
+    )

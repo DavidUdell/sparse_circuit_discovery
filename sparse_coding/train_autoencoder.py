@@ -14,13 +14,14 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
-from sparse_coding.utils.configure import load_yaml_constants, save_paths
-from sparse_coding.utils.caching import (
+from sparse_coding.utils.interface import (
     parse_slice,
     slice_to_seq,
     sanitize_model_name,
     cache_layer_tensor,
     load_input_token_ids,
+    load_yaml_constants,
+    save_paths,
 )
 
 
@@ -172,7 +173,6 @@ for layer_idx in seq_layer_indices:
 
     training_sampler = t.utils.data.SubsetRandomSampler(training_indices)
     validation_sampler = t.utils.data.SubsetRandomSampler(val_indices)
-
 
     # Define a tied autoencoder, with `lightning`.
     class Autoencoder(L.LightningModule):

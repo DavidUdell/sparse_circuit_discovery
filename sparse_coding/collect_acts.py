@@ -23,13 +23,14 @@ from transformers import (
     PreTrainedTokenizer,
 )
 
-from sparse_coding.utils.caching import (
+from sparse_coding.utils.interface import (
     parse_slice,
     validate_slice,
     cache_layer_tensor,
     slice_to_seq,
+    load_yaml_constants,
+    save_paths,
 )
-from sparse_coding.utils.configure import load_yaml_constants, save_paths
 from sparse_coding.utils.tasks import multiple_choice_task
 
 
