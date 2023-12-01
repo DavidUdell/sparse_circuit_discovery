@@ -24,10 +24,10 @@ def rasp_ablations_hook_fac(neuron_index: int):
 
 @contextmanager
 def ablations_lifecycle(
-    dim_idx: int,
+    ablation_dim_idx: int,
     meaningful_dims: list[int],
-    layer_idx: int,
-    layer_range: range,
+    ablation_layer_idx: int,
+    full_layer_range: range,
     model,
     encoder: t.Tensor,
     biases: t.Tensor,
@@ -74,7 +74,7 @@ def ablations_lifecycle(
     def caching_hook_fac(
         ablated_dim_idx: int,
         meaningful_dims: list[int],
-        layer_idx: int,
+        ablation_layer_idx: int,
         encoder: t.Tensor,
         biases: t.Tensor,
         cache: dict,
@@ -89,7 +89,7 @@ def ablations_lifecycle(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    input, encoder, bias=biases
+                    input[0], encoder, bias=biases
                 )
             )
             projected_acts = t.nn.functional.relu(
@@ -98,19 +98,21 @@ def ablations_lifecycle(
             # Cache the activations.
             for downstream_dim in meaningful_dims:
                 cache[
-                    layer_idx][ablated_dim_idx][downstream_dim
+                    ablation_layer_idx][ablated_dim_idx][downstream_dim
                 ] = projected_acts[:, :, downstream_dim]
 
         return caching_hook
 
-    if layer_idx == layer_range[-1]:
+    if ablation_layer_idx == full_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
 
-    downstream_range: range = range(layer_idx + 1, layer_range[-1])
+    downstream_range: range = range(ablation_layer_idx, full_layer_range[-1])
     # Pythia layer syntax, for now.
     encoder_hook_handle = model.gpt_neox.layers[
-        layer_idx
-    ].register_forward_hook(encoder_hook_fac(dim_idx, encoder, biases))
+        ablation_layer_idx
+    ].register_forward_hook(
+        encoder_hook_fac(ablation_dim_idx, encoder, biases)
+    )
 
     caching_hook_handles = {}
     for index, layer in enumerate(downstream_range):
@@ -118,7 +120,7 @@ def ablations_lifecycle(
             layer
         ].register_forward_hook(
             caching_hook_fac(
-                dim_idx,
+                ablation_dim_idx,
                 meaningful_dims,
                 layer,
                 encoder,
@@ -132,5 +134,5 @@ def ablations_lifecycle(
 
     finally:
         encoder_hook_handle.remove()
-        for handle in caching_hook_handles.items():
+        for handle in caching_hook_handles.values():
             handle.remove()
