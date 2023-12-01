@@ -93,14 +93,14 @@ if MODEL_DIR == "rasp":
     # Compute effects.
     activation_diffs = {}
 
-    for layer_idx, neuron_idx in ablated_activations:
-        activation_diffs[layer_idx, neuron_idx] = (
-            base_activations[(layer_idx, neuron_idx)][
+    for ablations_layer_idx, neuron_idx in ablated_activations:
+        activation_diffs[ablations_layer_idx, neuron_idx] = (
+            base_activations[(ablations_layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
             .sum(axis=1)
             .squeeze()
-            - ablated_activations[(layer_idx, neuron_idx)][
+            - ablated_activations[(ablations_layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
             .sum(axis=1)
@@ -145,14 +145,14 @@ def recursive_defaultdict():
 ablated_activations = defaultdict(recursive_defaultdict)
 ablations_range: range = layer_range[:-1]
 
-for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
+for ablations_layer_idx in tqdm(ablations_range, desc="Layer Progress"):
     # Load the per-layer data.
     encoder = t.load(
         save_paths(
             __file__,
             sanitize_model_name(MODEL_DIR)
             + "/"
-            + str(layer_idx)
+            + str(ablations_layer_idx)
             + "/"
             + ENCODER_FILE,
         )
@@ -163,19 +163,22 @@ for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
             __file__,
             sanitize_model_name(MODEL_DIR)
             + "/"
-            + str(layer_idx)
+            + str(ablations_layer_idx)
             + "/"
             + BIASES_FILE,
         )
     )
     biases = accelerator.prepare(biases)
-    meaningful_dims = []
+
+    to_ablate_dims = []
+    to_cache_dims = {}
+
     with open(
         save_paths(
             __file__,
             sanitize_model_name(MODEL_DIR)
             + "/"
-            + str(layer_idx)
+            + str(ablations_layer_idx)
             + "/"
             + TOP_K_INFO_FILE,
         ),
@@ -185,15 +188,36 @@ for layer_idx in tqdm(ablations_range, desc="Layer Progress"):
         reader = csv.reader(top_k_info_file)
         next(reader)
         for row in reader:
-            meaningful_dims.append(int(row[0]))
+            to_ablate_dims.append(int(row[0]))
 
-    for ablation_idx in tqdm(
-        meaningful_dims, desc="Feature Ablations Progress"
+    for caching_layer_idx in layer_range[ablations_layer_idx + 1:]:
+        cache_dims = []
+        with open(
+            save_paths(
+                __file__,
+                sanitize_model_name(MODEL_DIR)
+                + "/"
+                + str(caching_layer_idx)
+                + "/"
+                + TOP_K_INFO_FILE,
+            ),
+            mode="r",
+            encoding="utf-8",
+        ) as file:
+            reader = csv.reader(file)
+            next(reader)
+            for row in reader:
+                cache_dims.append(int(row[0]))
+        to_cache_dims[caching_layer_idx] = cache_dims
+
+    for ablation_dim_idx in tqdm(
+        to_ablate_dims, desc="Feature Ablations Progress"
     ):
         with ablations_lifecycle(
-            ablation_idx,
-            meaningful_dims,
-            layer_idx,
+            ablation_dim_idx,
+            to_ablate_dims,
+            to_cache_dims,
+            ablations_layer_idx,
             layer_range,
             model,
             encoder,

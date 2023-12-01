@@ -26,7 +26,8 @@ def rasp_ablations_hook_fac(neuron_index: int):
 @contextmanager
 def ablations_lifecycle(
     ablation_dim_idx: int,
-    meaningful_dims: list[int],
+    to_ablate_dims: list[int],
+    to_cache_dims: dict[int, list[int]],
     ablation_layer_idx: int,
     full_layer_range: range,
     model,
@@ -74,7 +75,7 @@ def ablations_lifecycle(
 
     def caching_hook_fac(
         ablated_dim_idx: int,
-        meaningful_dims: list[int],
+        cache_dims: list[int],
         ablation_layer_idx: int,
         encoder: t.Tensor,
         biases: t.Tensor,
@@ -99,7 +100,7 @@ def ablations_lifecycle(
                 projected_acts_unrec, inplace=True
             )
             # Cache the activations.
-            for downstream_dim in meaningful_dims:
+            for downstream_dim in cache_dims:
                 cache[
                     ablation_layer_idx][ablated_dim_idx][downstream_dim
                 ] = projected_acts[:, :, downstream_dim]
@@ -109,7 +110,7 @@ def ablations_lifecycle(
     if ablation_layer_idx == full_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
 
-    downstream_range: range = range(ablation_layer_idx, full_layer_range[-1])
+    downstream_range: range = full_layer_range[ablation_layer_idx + 1 :]
     # Pythia layer syntax, for now.
     encoder_hook_handle = model.gpt_neox.layers[
         ablation_layer_idx
@@ -124,7 +125,7 @@ def ablations_lifecycle(
         ].register_forward_hook(
             caching_hook_fac(
                 ablation_dim_idx,
-                meaningful_dims,
+                to_cache_dims[layer],
                 layer,
                 encoder,
                 biases,
@@ -134,7 +135,6 @@ def ablations_lifecycle(
 
     try:
         yield
-
     finally:
         encoder_hook_handle.remove()
         for handle in caching_hook_handles.values():
