@@ -3,6 +3,7 @@
 
 
 import csv
+from collections import defaultdict
 from textwrap import dedent
 
 import numpy as np
@@ -135,7 +136,13 @@ all_indices: np.ndarray = np.random.choice(
 )
 validation_indices: list = all_indices[NUM_QUESTIONS_EVALED:].tolist()
 
-ablated_activations = {}
+
+def recursive_defaultdict():
+    """Recursively create a defaultdict."""
+    return defaultdict(recursive_defaultdict)
+
+
+ablated_activations = defaultdict(recursive_defaultdict)
 ablations_range: range = layer_range[:-1]
 
 for layer_idx in tqdm(ablations_range, desc="Layer Progress"):

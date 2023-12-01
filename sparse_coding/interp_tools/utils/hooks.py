@@ -1,6 +1,7 @@
 """Ablation and caching hooks."""
 
 
+from collections import defaultdict
 from contextlib import contextmanager
 
 import torch as t
@@ -31,7 +32,7 @@ def ablations_lifecycle(
     model,
     encoder: t.Tensor,
     biases: t.Tensor,
-    cache: dict,
+    cache: defaultdict,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -77,7 +78,7 @@ def ablations_lifecycle(
         ablation_layer_idx: int,
         encoder: t.Tensor,
         biases: t.Tensor,
-        cache: dict,
+        cache: defaultdict,
     ):
         """Create hooks that cache the projected activations."""
 
@@ -89,7 +90,9 @@ def ablations_lifecycle(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    input[0], encoder, bias=biases
+                    input[0],
+                    encoder.to(model.device),
+                    bias=biases.to(model.device),
                 )
             )
             projected_acts = t.nn.functional.relu(
