@@ -93,14 +93,14 @@ if MODEL_DIR == "rasp":
     # Compute effects.
     activation_diffs = {}
 
-    for ablations_layer_idx, neuron_idx in ablated_activations:
-        activation_diffs[ablations_layer_idx, neuron_idx] = (
-            base_activations[(ablations_layer_idx, neuron_idx)][
+    for ablations_layer, neuron_idx in ablated_activations:
+        activation_diffs[ablations_layer, neuron_idx] = (
+            base_activations[(ablations_layer, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
             .sum(axis=1)
             .squeeze()
-            - ablated_activations[(ablations_layer_idx, neuron_idx)][
+            - ablated_activations[(ablations_layer, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
             .sum(axis=1)
@@ -126,6 +126,7 @@ model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+ablations_range: range = layer_range[:-1]
 
 # Load the complementary validation dataset subset.
 dataset: dict = load_dataset("truthful_qa", "multiple_choice")
@@ -143,55 +144,61 @@ def recursive_defaultdict():
 
 
 ablated_activations = defaultdict(recursive_defaultdict)
-ablations_range: range = layer_range[:-1]
 
-for ablations_layer_idx in tqdm(ablations_range, desc="Layer Progress"):
-    # Load the per-layer data.
+for abs_idx, ablations_layer in enumerate(ablations_range):
     encoder = t.load(
         save_paths(
             __file__,
             sanitize_model_name(MODEL_DIR)
             + "/"
-            + str(ablations_layer_idx)
+            + str(ablations_layer)
             + "/"
             + ENCODER_FILE,
         )
     )
     encoder = accelerator.prepare(encoder)
+
     biases = t.load(
         save_paths(
             __file__,
             sanitize_model_name(MODEL_DIR)
             + "/"
-            + str(ablations_layer_idx)
+            + str(ablations_layer)
             + "/"
             + BIASES_FILE,
         )
     )
     biases = accelerator.prepare(biases)
 
-    to_ablate_dims = []
-    to_cache_dims = {}
+    ablate_dims_todo = []
+    cache_dims_todo_by_caching_layer = {}
 
     with open(
         save_paths(
             __file__,
             sanitize_model_name(MODEL_DIR)
             + "/"
-            + str(ablations_layer_idx)
+            + str(ablations_layer)
             + "/"
             + TOP_K_INFO_FILE,
         ),
         mode="r",
         encoding="utf-8",
     ) as top_k_info_file:
+
         reader = csv.reader(top_k_info_file)
         next(reader)
         for row in reader:
-            to_ablate_dims.append(int(row[0]))
+            ablate_dims_todo.append(int(row[0]))
 
-    for caching_layer_idx in layer_range[ablations_layer_idx + 1:]:
-        cache_dims = []
+    # At each ablation layer, register caching hooks for all downstream layers.
+    # I think `ablations_layer` here needs to be absolute, not an index.
+    cachings_range = layer_range[abs_idx + 1:]
+
+    for caching_layer_idx in cachings_range:
+
+        layer_cache_dims = []
+
         with open(
             save_paths(
                 __file__,
@@ -204,20 +211,22 @@ for ablations_layer_idx in tqdm(ablations_range, desc="Layer Progress"):
             mode="r",
             encoding="utf-8",
         ) as file:
+
             reader = csv.reader(file)
             next(reader)
             for row in reader:
-                cache_dims.append(int(row[0]))
-        to_cache_dims[caching_layer_idx] = cache_dims
+                layer_cache_dims.append(int(row[0]))
+            cache_dims_todo_by_caching_layer[
+                caching_layer_idx
+            ] = layer_cache_dims
 
     for ablation_dim_idx in tqdm(
-        to_ablate_dims, desc="Feature Ablations Progress"
+        ablate_dims_todo, desc="Feature Ablations Progress"
     ):
         with ablations_lifecycle(
             ablation_dim_idx,
-            to_ablate_dims,
-            to_cache_dims,
-            ablations_layer_idx,
+            cache_dims_todo_by_caching_layer,
+            ablations_layer,
             layer_range,
             model,
             encoder,

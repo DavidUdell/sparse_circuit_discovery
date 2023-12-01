@@ -26,7 +26,6 @@ def rasp_ablations_hook_fac(neuron_index: int):
 @contextmanager
 def ablations_lifecycle(
     ablation_dim_idx: int,
-    to_ablate_dims: list[int],
     to_cache_dims: dict[int, list[int]],
     ablation_layer_idx: int,
     full_layer_range: range,
@@ -110,7 +109,7 @@ def ablations_lifecycle(
     if ablation_layer_idx == full_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
 
-    downstream_range: range = full_layer_range[ablation_layer_idx + 1 :]
+    downstream_range: range = range(ablation_layer_idx + 1, full_layer_range[-1] + 1)
     # Pythia layer syntax, for now.
     encoder_hook_handle = model.gpt_neox.layers[
         ablation_layer_idx
