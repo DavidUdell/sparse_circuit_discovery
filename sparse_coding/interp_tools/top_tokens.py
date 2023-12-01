@@ -23,7 +23,6 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
-from tqdm.auto import tqdm
 
 from sparse_coding.utils import top_k
 from sparse_coding.utils.interface import (
@@ -177,7 +176,7 @@ model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
 )
 seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
-for layer_idx in tqdm(seq_layer_indices, desc="Layers Progress"):
+for layer_idx in seq_layer_indices:
     ENCODER_PATH = save_paths(
         __file__,
         f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENCODER_FILE}",
