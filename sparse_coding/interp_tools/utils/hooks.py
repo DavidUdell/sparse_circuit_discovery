@@ -60,7 +60,7 @@ def ablations_lifecycle(
                 projected_acts_unrec, inplace=True
             )
             # Zero out the activation at dim_idx.
-            projected_acts[:, dim_idx] = 0.0
+            projected_acts[:, :, dim_idx] = 0.0
             # Project back to activation space.
             output = projected_acts.to(model.device) - biases.to(model.device)
             output = t.einsum(
