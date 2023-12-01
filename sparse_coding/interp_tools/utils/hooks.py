@@ -102,14 +102,16 @@ def ablations_lifecycle(
             for downstream_dim in cache_dims:
                 cache[
                     ablation_layer_idx][ablated_dim_idx][downstream_dim
-                ] = projected_acts[:, :, downstream_dim]
+                ] = projected_acts[:, :, downstream_dim].detach().cpu()
 
         return caching_hook
 
     if ablation_layer_idx == full_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
 
-    downstream_range: range = range(ablation_layer_idx + 1, full_layer_range[-1] + 1)
+    downstream_range: range = range(
+        ablation_layer_idx + 1, full_layer_range[-1] + 1
+    )
     # Pythia layer syntax, for now.
     encoder_hook_handle = model.gpt_neox.layers[
         ablation_layer_idx
@@ -125,7 +127,7 @@ def ablations_lifecycle(
             caching_hook_fac(
                 ablation_dim_idx,
                 to_cache_dims[layer],
-                layer,
+                ablation_layer_idx,
                 encoder,
                 biases,
                 cache
