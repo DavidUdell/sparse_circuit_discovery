@@ -35,7 +35,7 @@ def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
 
         # Plot effect edges.
         for (
-            ablation_layer_idx, ablated_dim, downstream_dim
+            (ablation_layer_idx, ablated_dim, downstream_dim)
         ), effect in activations.items():
             if effect.item() == 0:
                 continue

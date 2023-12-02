@@ -280,9 +280,11 @@ activation_diffs = {}
 for i in ablations_range:
     for j in base_activations[i].keys():
         for k in base_activations[i][j].keys():
+            print(base_activations[i][j][k].sum(axis=1).squeeze())
+            print(ablated_activations[i][j][k].sum(axis=1).squeeze())
             activation_diffs[(i, j, k)] = (
-                base_activations[i][j][k]
-                - ablated_activations[i][j][k]
+                base_activations[i][j][k].sum(axis=1).squeeze()
+                - ablated_activations[i][j][k].sum(axis=1).squeeze()
             )
 
 # %%

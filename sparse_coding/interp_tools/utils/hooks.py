@@ -33,7 +33,7 @@ def hooks_lifecycle(
     encoder: t.Tensor,
     biases: t.Tensor,
     cache: defaultdict,
-    ablations_mode=True,
+    ablations_mode: bool = True,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -73,8 +73,11 @@ def hooks_lifecycle(
             output = (output,)
 
             assert output[0].shape == input[0].shape, (
-                f"Ablations hook output shape {output[0].shape} does not match "
+                f"Ablations hook output shape {output[0].shape} does not match"
                 f"input[0] shape {input[0].shape}."
+            )
+            assert output[0].sum() != input[0].sum(), (
+                f"Ablation had no effect; output {output[0]} == {input[0]}"
             )
 
         return ablations_hook
@@ -125,7 +128,7 @@ def hooks_lifecycle(
     downstream_range: range = range(
         ablation_layer_idx + 1, full_layer_range[-1] + 1
     )
-    # Pythia layer syntax, for now.
+    # Just Pythia layer syntax, for now.
     if ablations_mode:
         encoder_hook_handle = model.gpt_neox.layers[
             ablation_layer_idx
