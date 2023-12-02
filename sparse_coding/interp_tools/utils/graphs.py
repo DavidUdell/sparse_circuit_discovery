@@ -28,7 +28,11 @@ def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
 
     else:
         # Plot neuron nodes.
-        for (ablation_layer_idx, ablated_dim, downstream_dim) in activations:
+        for (
+            ablation_layer_idx,
+            ablated_dim,
+            downstream_dim
+        ) in activations.keys():
             # I need to be saving the downstream layer too. This works for now.
             graph.add_node(f"neuron_{ablation_layer_idx}.{ablated_dim}")
             graph.add_node(f"neuron_{ablation_layer_idx + 1}.{downstream_dim}")
@@ -37,8 +41,8 @@ def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
         for (
             (ablation_layer_idx, ablated_dim, downstream_dim)
         ), effect in activations.items():
-            if effect.item() == 0:
-                continue
+            if effect.item() != 0:
+                print(effect)
             graph.add_edge(
                 f"neuron_{ablation_layer_idx}.{ablated_dim}",
                 f"neuron_{ablation_layer_idx + 1}.{downstream_dim}",

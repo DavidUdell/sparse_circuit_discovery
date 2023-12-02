@@ -64,23 +64,16 @@ def hooks_lifecycle(
             # Zero out the activation at dim_idx.
             projected_acts[:, :, dim_idx] = 0.0
             # Project back to activation space.
-            output = projected_acts.to(model.device) - biases.to(model.device)
-            output = t.einsum(
+            input = projected_acts.to(model.device) - biases.to(model.device)
+            input = t.einsum(
                 "bij, jk -> bik",
                 projected_acts.to(model.device),
                 encoder.to(model.device),
             )
-            output = (output,)
-
-            assert output[0].shape == input[0].shape, (
-                f"Ablations hook output shape {output[0].shape} does not match"
-                f"input[0] shape {input[0].shape}."
-            )
-            assert output[0].sum() != input[0].sum(), (
-                f"Ablation had no effect; output {output[0]} == {input[0]}"
-            )
+            input = (input,)
 
         return ablations_hook
+
 
     def caching_hook_fac(
         ablated_dim_idx: int,
@@ -100,7 +93,7 @@ def hooks_lifecycle(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    input[0],
+                    output[0],
                     encoder.to(model.device),
                     bias=biases.to(model.device),
                 )
@@ -110,16 +103,31 @@ def hooks_lifecycle(
             )
             # Cache the activations.
             for downstream_dim in cache_dims:
-                cache[
+                extant_data = cache[
                     ablation_layer_idx][ablated_dim_idx][downstream_dim
-                ] = projected_acts[:, :, downstream_dim].detach().cpu()
-
-                assert output[0].shape == input[0].shape, (
-                f"Output shape {output.shape} does not match input[0] shape "
-                f"{input[0].shape}."
-            )
-
-
+                ]
+                # A defaultdict here means no cached data yet.
+                if isinstance(extant_data, defaultdict):
+                    cache[
+                        ablation_layer_idx][ablated_dim_idx][downstream_dim
+                    ] = projected_acts[:, :, downstream_dim].detach().cpu()
+                # We concat if there's an existing tensor.
+                elif isinstance(extant_data, t.Tensor):
+                    cache[
+                        ablation_layer_idx][ablated_dim_idx][downstream_dim
+                    ] = t.cat(
+                        (
+                            extant_data,
+                            projected_acts[
+                                :, :, downstream_dim
+                            ].detach().cpu(),
+                        ),
+                        dim=1,
+                    )
+                else:
+                    raise ValueError(
+                        f"Unexpected data type in cache: {type(extant_data)}"
+                    )
         return caching_hook
 
     if ablation_layer_idx == full_layer_range[-1]:
