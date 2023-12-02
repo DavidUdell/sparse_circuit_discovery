@@ -102,8 +102,6 @@ def hooks_lifecycle(
                     bias=biases.to(model.device),
                 )
             )
-            print(len(input))
-            print(input[0].shape)
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=False
             )

@@ -273,20 +273,21 @@ for abs_idx, ablations_layer in enumerate(ablations_range):
             )
 
 # Compute diffs.
-activation_diffs = defaultdict(recursive_defaultdict)
+activation_diffs = {}
 
 # %%
 # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
 for i in ablations_range:
     for j in base_activations[i].keys():
         for k in base_activations[i][j].keys():
-            activation_diffs[i][j][k] = (
+            activation_diffs[(i, j, k)] = (
                 base_activations[i][j][k]
                 - ablated_activations[i][j][k]
             )
 
+# %%
 # Plot and save effects.
-graph_causal_effects(activation_diffs).draw(
+graph_causal_effects(activation_diffs, full_scale=True).draw(
     save_paths(__file__, "feature_web.png"),
     prog="dot",
 )
