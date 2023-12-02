@@ -24,7 +24,7 @@ def rasp_ablations_hook_fac(neuron_index: int):
 
 
 @contextmanager
-def ablations_lifecycle(
+def hooks_lifecycle(
     ablation_dim_idx: int,
     to_cache_dims: dict[int, list[int]],
     ablation_layer_idx: int,
@@ -33,6 +33,7 @@ def ablations_lifecycle(
     encoder: t.Tensor,
     biases: t.Tensor,
     cache: defaultdict,
+    ablations_mode=True,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -58,7 +59,7 @@ def ablations_lifecycle(
                 )
             )
             projected_acts = t.nn.functional.relu(
-                projected_acts_unrec, inplace=True
+                projected_acts_unrec, inplace=False
             )
             # Zero out the activation at dim_idx.
             projected_acts[:, :, dim_idx] = 0.0
@@ -68,6 +69,12 @@ def ablations_lifecycle(
                 "bij, jk -> bik",
                 projected_acts.to(model.device),
                 encoder.to(model.device),
+            )
+            output = (output,)
+
+            assert output[0].shape == input[0].shape, (
+                f"Ablations hook output shape {output[0].shape} does not match "
+                f"input[0] shape {input[0].shape}."
             )
 
         return ablations_hook
@@ -95,14 +102,22 @@ def ablations_lifecycle(
                     bias=biases.to(model.device),
                 )
             )
+            print(len(input))
+            print(input[0].shape)
             projected_acts = t.nn.functional.relu(
-                projected_acts_unrec, inplace=True
+                projected_acts_unrec, inplace=False
             )
             # Cache the activations.
             for downstream_dim in cache_dims:
                 cache[
                     ablation_layer_idx][ablated_dim_idx][downstream_dim
                 ] = projected_acts[:, :, downstream_dim].detach().cpu()
+
+                assert output[0].shape == input[0].shape, (
+                f"Output shape {output.shape} does not match input[0] shape "
+                f"{input[0].shape}."
+            )
+
 
         return caching_hook
 
@@ -113,11 +128,12 @@ def ablations_lifecycle(
         ablation_layer_idx + 1, full_layer_range[-1] + 1
     )
     # Pythia layer syntax, for now.
-    encoder_hook_handle = model.gpt_neox.layers[
-        ablation_layer_idx
-    ].register_forward_hook(
-        encoder_hook_fac(ablation_dim_idx, encoder, biases)
-    )
+    if ablations_mode:
+        encoder_hook_handle = model.gpt_neox.layers[
+            ablation_layer_idx
+        ].register_forward_hook(
+            encoder_hook_fac(ablation_dim_idx, encoder, biases)
+        )
 
     caching_hook_handles = {}
     for index, layer in enumerate(downstream_range):
@@ -137,6 +153,7 @@ def ablations_lifecycle(
     try:
         yield
     finally:
-        encoder_hook_handle.remove()
+        if ablations_mode:
+            encoder_hook_handle.remove()
         for handle in caching_hook_handles.values():
             handle.remove()

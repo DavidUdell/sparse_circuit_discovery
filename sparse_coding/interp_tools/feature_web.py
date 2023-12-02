@@ -15,7 +15,7 @@ from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.hooks import (
     rasp_ablations_hook_fac,
-    ablations_lifecycle,
+    hooks_lifecycle,
 )
 from sparse_coding.utils.interface import (
     parse_slice,
@@ -143,6 +143,7 @@ def recursive_defaultdict():
     return defaultdict(recursive_defaultdict)
 
 
+base_activations = defaultdict(recursive_defaultdict)
 ablated_activations = defaultdict(recursive_defaultdict)
 
 for abs_idx, ablations_layer in enumerate(ablations_range):
@@ -223,7 +224,9 @@ for abs_idx, ablations_layer in enumerate(ablations_range):
     for ablation_dim_idx in tqdm(
         ablate_dims_todo, desc="Feature Ablations Progress"
     ):
-        with ablations_lifecycle(
+        # Cache base activations.
+        np.random.seed(SEED)
+        with hooks_lifecycle(
             ablation_dim_idx,
             cache_dims_todo_by_caching_layer,
             ablations_layer,
@@ -231,7 +234,8 @@ for abs_idx, ablations_layer in enumerate(ablations_range):
             model,
             encoder,
             biases,
-            ablated_activations,
+            base_activations,
+            ablations_mode=False,
         ):
             multiple_choice_task(
                 dataset,
@@ -244,5 +248,45 @@ for abs_idx, ablations_layer in enumerate(ablations_range):
                 streamlined_mode=True,
             )
 
-# Compute diffs. Baseline activations were cached back in `collect_acts`.
-print(ablated_activations)
+        # Cache ablated activations.
+        np.random.seed(SEED)
+        with hooks_lifecycle(
+            ablation_dim_idx,
+            cache_dims_todo_by_caching_layer,
+            ablations_layer,
+            layer_range,
+            model,
+            encoder,
+            biases,
+            ablated_activations,
+            ablations_mode=True,
+        ):
+            multiple_choice_task(
+                dataset,
+                validation_indices,
+                model,
+                tokenizer,
+                accelerator,
+                NUM_SHOT,
+                ACTS_LAYERS_SLICE,
+                streamlined_mode=True,
+            )
+
+# Compute diffs.
+activation_diffs = defaultdict(recursive_defaultdict)
+
+# %%
+# dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
+for i in ablations_range:
+    for j in base_activations[i].keys():
+        for k in base_activations[i][j].keys():
+            activation_diffs[i][j][k] = (
+                base_activations[i][j][k]
+                - ablated_activations[i][j][k]
+            )
+
+# Plot and save effects.
+graph_causal_effects(activation_diffs).draw(
+    save_paths(__file__, "feature_web.png"),
+    prog="dot",
+)
