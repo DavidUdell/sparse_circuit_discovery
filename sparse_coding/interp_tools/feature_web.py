@@ -50,7 +50,8 @@ _ = t.manual_seed(SEED)
 np.random.seed(SEED)
 
 # %%
-# This pathway validates against just the rasp model.
+# Either validate against the RASP toy model or run a full-scale HF model,
+# using the repo's interface.
 if MODEL_DIR == "rasp":
     print(
         dedent(
@@ -113,8 +114,6 @@ if MODEL_DIR == "rasp":
         prog="dot",
     )
 
-# %%
-# This pathway finds circuits in the full HF models, from the repo's interface.
 else:
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR,
@@ -246,7 +245,6 @@ else:
                     return_outputs=False,
                 )
 
-    # %%
     # Compute differential downstream ablation effects.
     # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
     activation_diffs = {}
@@ -259,8 +257,6 @@ else:
                     - ablated_activations[i][j][k].sum(axis=1).squeeze()
                 )
 
-    # %%
-    # Plot and save effects.
     # `rasp=False` is quite ugly; I'll want to factor that out by giving both
     # the rasp and full-scale models common output shapes with some squeezing.
     # Then, `graph_causal_effects` can be a single common call outside the

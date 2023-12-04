@@ -41,8 +41,8 @@ def graph_causal_effects(activations: dict, rasp=True) -> AGraph:
         for (
             (ablation_layer_idx, ablated_dim, downstream_dim)
         ), effect in activations.items():
-            if effect.item() != 0:
-                print(effect)
+            if effect.item() == 0:
+                continue
             graph.add_edge(
                 f"neuron_{ablation_layer_idx}.{ablated_dim}",
                 f"neuron_{ablation_layer_idx + 1}.{downstream_dim}",
