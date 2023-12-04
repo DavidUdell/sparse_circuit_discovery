@@ -108,162 +108,164 @@ if MODEL_DIR == "rasp":
         )
 
     # Plot and save effects.
-    graph_causal_effects(activation_diffs).draw(
+    graph_causal_effects(activation_diffs, rasp=True).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
     )
 
 # %%
 # This pathway finds circuits in the full HF models, from the repo's interface.
-# else:
-model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR,
-    token=HF_ACCESS_TOKEN,
-)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
-accelerator = Accelerator()
-model = accelerator.prepare(model)
-model.eval()
-
-layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
-ablate_range: range = layer_range[:-1]
-
-# Load the complementary validation dataset subset.
-dataset: dict = load_dataset("truthful_qa", "multiple_choice")
-dataset_indices: np.ndarray = np.random.choice(
-    len(dataset["validation"]["question"]),
-    size=len(dataset["validation"]["question"]),
-    replace=False,
-)
-validation_indices: list = dataset_indices[NUM_QUESTIONS_EVALED:].tolist()
-
-
-def recursive_defaultdict():
-    """Recursively create a defaultdict."""
-    return defaultdict(recursive_defaultdict)
-
-
-base_activations = defaultdict(recursive_defaultdict)
-ablated_activations = defaultdict(recursive_defaultdict)
-
-for meta_index, ablate_layer_idx in enumerate(ablate_range):
-    # Ablation layer autoencoder tensors.
-    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-        MODEL_DIR, ablate_layer_idx, ENCODER_FILE, BIASES_FILE, __file__
-    )
-    ablate_layer_encoder, ablate_layer_bias = accelerator.prepare(
-        ablate_layer_encoder, ablate_layer_bias
-    )
-    tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]] = {
-        ablate_layer_idx: (ablate_layer_encoder, ablate_layer_bias)
-    }
-
-    # Ablation layer feature-dim indices.
-    ablate_dim_indices = []
-    ablate_dim_indices = load_layer_feature_indices(
+else:
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR,
-        ablate_layer_idx,
-        TOP_K_INFO_FILE,
-        __file__,
-        ablate_dim_indices,
+        token=HF_ACCESS_TOKEN,
     )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
+    accelerator = Accelerator()
+    model = accelerator.prepare(model)
+    model.eval()
 
-    cache_dim_indices_per_layer = {}
-    cache_layer_range = layer_range[meta_index + 1 :]
+    layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+    ablate_range: range = layer_range[:-1]
 
-    for cache_layer_idx in cache_layer_range:
-        # Cache layer autoencoder tensors.
-        (cache_layer_encoder, cache_layer_bias) = load_layer_tensors(
+    # Load the complementary validation dataset subset.
+    dataset: dict = load_dataset("truthful_qa", "multiple_choice")
+    dataset_indices: np.ndarray = np.random.choice(
+        len(dataset["validation"]["question"]),
+        size=len(dataset["validation"]["question"]),
+        replace=False,
+    )
+    validation_indices: list = dataset_indices[NUM_QUESTIONS_EVALED:].tolist()
+
+    def recursive_defaultdict():
+        """Recursively create a defaultdict."""
+        return defaultdict(recursive_defaultdict)
+
+    base_activations = defaultdict(recursive_defaultdict)
+    ablated_activations = defaultdict(recursive_defaultdict)
+
+    for meta_index, ablate_layer_idx in enumerate(ablate_range):
+        # Ablation layer autoencoder tensors.
+        ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
+            MODEL_DIR, ablate_layer_idx, ENCODER_FILE, BIASES_FILE, __file__
+        )
+        ablate_layer_encoder, ablate_layer_bias = accelerator.prepare(
+            ablate_layer_encoder, ablate_layer_bias
+        )
+        tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]] = {
+            ablate_layer_idx: (ablate_layer_encoder, ablate_layer_bias)
+        }
+
+        # Ablation layer feature-dim indices.
+        ablate_dim_indices = []
+        ablate_dim_indices = load_layer_feature_indices(
             MODEL_DIR,
-            cache_layer_idx,
-            ENCODER_FILE,
-            BIASES_FILE,
-            __file__,
-        )
-        cache_layer_encoder, cache_layer_bias = accelerator.prepare(
-            cache_layer_encoder, cache_layer_bias
-        )
-        tensors_per_layer[cache_layer_idx] = (
-            cache_layer_encoder,
-            cache_layer_bias,
-        )
-
-        # Cache layer feature-dim indices.
-        layer_cache_dims = []
-        layer_cache_dims = load_layer_feature_indices(
-            MODEL_DIR,
-            cache_layer_idx,
+            ablate_layer_idx,
             TOP_K_INFO_FILE,
             __file__,
-            layer_cache_dims,
+            ablate_dim_indices,
         )
-        cache_dim_indices_per_layer[cache_layer_idx] = layer_cache_dims
 
-    for ablate_dim_idx in tqdm(
-        ablate_dim_indices, desc="Feature Ablations Progress"
-    ):
-        np.random.seed(SEED)
-        # Base run.
-        with hooks_lifecycle(
-            ablate_layer_idx,
-            ablate_dim_idx,
-            layer_range,
-            cache_dim_indices_per_layer,
-            model,
-            tensors_per_layer,
-            base_activations,
-            run_with_ablations=False,
+        cache_dim_indices_per_layer = {}
+        cache_layer_range = layer_range[meta_index + 1 :]
+
+        for cache_layer_idx in cache_layer_range:
+            # Cache layer autoencoder tensors.
+            (cache_layer_encoder, cache_layer_bias) = load_layer_tensors(
+                MODEL_DIR,
+                cache_layer_idx,
+                ENCODER_FILE,
+                BIASES_FILE,
+                __file__,
+            )
+            cache_layer_encoder, cache_layer_bias = accelerator.prepare(
+                cache_layer_encoder, cache_layer_bias
+            )
+            tensors_per_layer[cache_layer_idx] = (
+                cache_layer_encoder,
+                cache_layer_bias,
+            )
+
+            # Cache layer feature-dim indices.
+            layer_cache_dims = []
+            layer_cache_dims = load_layer_feature_indices(
+                MODEL_DIR,
+                cache_layer_idx,
+                TOP_K_INFO_FILE,
+                __file__,
+                layer_cache_dims,
+            )
+            cache_dim_indices_per_layer[cache_layer_idx] = layer_cache_dims
+
+        for ablate_dim_idx in tqdm(
+            ablate_dim_indices, desc="Feature Ablations Progress"
         ):
-            multiple_choice_task(
-                dataset,
-                validation_indices,
+            np.random.seed(SEED)
+            # Base run.
+            with hooks_lifecycle(
+                ablate_layer_idx,
+                ablate_dim_idx,
+                layer_range,
+                cache_dim_indices_per_layer,
                 model,
-                tokenizer,
-                accelerator,
-                NUM_SHOT,
-                ACTS_LAYERS_SLICE,
-                return_outputs=False,
-            )
+                tensors_per_layer,
+                base_activations,
+                run_with_ablations=False,
+            ):
+                multiple_choice_task(
+                    dataset,
+                    validation_indices,
+                    model,
+                    tokenizer,
+                    accelerator,
+                    NUM_SHOT,
+                    ACTS_LAYERS_SLICE,
+                    return_outputs=False,
+                )
 
-        np.random.seed(SEED)
-        # Ablated run.
-        with hooks_lifecycle(
-            ablate_layer_idx,
-            ablate_dim_idx,
-            layer_range,
-            cache_dim_indices_per_layer,
-            model,
-            tensors_per_layer,
-            ablated_activations,
-            run_with_ablations=True,
-        ):
-            multiple_choice_task(
-                dataset,
-                validation_indices,
+            np.random.seed(SEED)
+            # Ablated run.
+            with hooks_lifecycle(
+                ablate_layer_idx,
+                ablate_dim_idx,
+                layer_range,
+                cache_dim_indices_per_layer,
                 model,
-                tokenizer,
-                accelerator,
-                NUM_SHOT,
-                ACTS_LAYERS_SLICE,
-                return_outputs=False,
-            )
+                tensors_per_layer,
+                ablated_activations,
+                run_with_ablations=True,
+            ):
+                multiple_choice_task(
+                    dataset,
+                    validation_indices,
+                    model,
+                    tokenizer,
+                    accelerator,
+                    NUM_SHOT,
+                    ACTS_LAYERS_SLICE,
+                    return_outputs=False,
+                )
 
-# %%
-# Compute differential downstream ablation effects.
-# dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
-activation_diffs = {}
+    # %%
+    # Compute differential downstream ablation effects.
+    # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
+    activation_diffs = {}
 
-for i in ablate_range:
-    for j in base_activations[i].keys():
-        for k in base_activations[i][j].keys():
-            activation_diffs[(i, j, k)] = (
-                base_activations[i][j][k].sum(axis=1).squeeze()
-                - ablated_activations[i][j][k].sum(axis=1).squeeze()
-            )
+    for i in ablate_range:
+        for j in base_activations[i].keys():
+            for k in base_activations[i][j].keys():
+                activation_diffs[(i, j, k)] = (
+                    base_activations[i][j][k].sum(axis=1).squeeze()
+                    - ablated_activations[i][j][k].sum(axis=1).squeeze()
+                )
 
-# %%
-# Plot and save effects.
-graph_causal_effects(activation_diffs, rasp=False).draw(
-    save_paths(__file__, "feature_web.png"),
-    prog="dot",
-)
+    # %%
+    # Plot and save effects.
+    # `rasp=False` is quite ugly; I'll want to factor that out by giving both
+    # the rasp and full-scale models common output shapes with some squeezing.
+    # Then, `graph_causal_effects` can be a single common call outside the
+    # if/else.
+    graph_causal_effects(activation_diffs, rasp=False).draw(
+        save_paths(__file__, "feature_web.png"),
+        prog="dot",
+    )
