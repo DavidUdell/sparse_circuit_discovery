@@ -2,7 +2,6 @@
 """Ablate autoencoder dimensions during inference and graph causal effects."""
 
 
-import csv
 from collections import defaultdict
 from textwrap import dedent
 
@@ -22,7 +21,8 @@ from sparse_coding.utils.interface import (
     slice_to_seq,
     load_yaml_constants,
     save_paths,
-    sanitize_model_name,
+    load_layer_tensors,
+    load_layer_feature_indices,
 )
 from sparse_coding.utils.tasks import multiple_choice_task
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
@@ -93,14 +93,14 @@ if MODEL_DIR == "rasp":
     # Compute effects.
     activation_diffs = {}
 
-    for ablations_layer, neuron_idx in ablated_activations:
-        activation_diffs[ablations_layer, neuron_idx] = (
-            base_activations[(ablations_layer, neuron_idx)][
+    for ablate_layer_idx, neuron_idx in ablated_activations:
+        activation_diffs[ablate_layer_idx, neuron_idx] = (
+            base_activations[(ablate_layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
             .sum(axis=1)
             .squeeze()
-            - ablated_activations[(ablations_layer, neuron_idx)][
+            - ablated_activations[(ablate_layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
             .sum(axis=1)
@@ -126,16 +126,16 @@ model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
-ablations_range: range = layer_range[:-1]
+ablate_range: range = layer_range[:-1]
 
 # Load the complementary validation dataset subset.
 dataset: dict = load_dataset("truthful_qa", "multiple_choice")
-all_indices: np.ndarray = np.random.choice(
+dataset_indices: np.ndarray = np.random.choice(
     len(dataset["validation"]["question"]),
     size=len(dataset["validation"]["question"]),
     replace=False,
 )
-validation_indices: list = all_indices[NUM_QUESTIONS_EVALED:].tolist()
+validation_indices: list = dataset_indices[NUM_QUESTIONS_EVALED:].tolist()
 
 
 def recursive_defaultdict():
@@ -146,95 +146,70 @@ def recursive_defaultdict():
 base_activations = defaultdict(recursive_defaultdict)
 ablated_activations = defaultdict(recursive_defaultdict)
 
-for abs_idx, ablations_layer in enumerate(ablations_range):
-    encoder = t.load(
-        save_paths(
-            __file__,
-            sanitize_model_name(MODEL_DIR)
-            + "/"
-            + str(ablations_layer)
-            + "/"
-            + ENCODER_FILE,
-        )
+for index_idx, ablate_layer_idx in enumerate(ablate_range):
+    # Ablation layer autoencoder tensors.
+    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
+        MODEL_DIR, ablate_layer_idx, ENCODER_FILE, BIASES_FILE, __file__
     )
-    encoder = accelerator.prepare(encoder)
-
-    biases = t.load(
-        save_paths(
-            __file__,
-            sanitize_model_name(MODEL_DIR)
-            + "/"
-            + str(ablations_layer)
-            + "/"
-            + BIASES_FILE,
-        )
+    ablate_layer_encoder, ablate_layer_bias = accelerator.prepare(
+        ablate_layer_encoder, ablate_layer_bias
     )
-    biases = accelerator.prepare(biases)
 
-    ablate_dims_todo = []
-    cache_dims_todo_by_caching_layer = {}
+    # Ablation layer feature dim indices.
+    ablate_dims_indices = []
+    ablate_dims_indices = load_layer_feature_indices(
+        MODEL_DIR,
+        ablate_layer_idx,
+        TOP_K_INFO_FILE,
+        __file__,
+        ablate_dims_indices,
+    )
 
-    with open(
-        save_paths(
+    cache_dims_indices_per_layer = {}
+    cache_layer_range = layer_range[index_idx + 1 :]
+    cache_layer_tensors = {}
+
+    for cache_layer_idx in cache_layer_range:
+        # Cache layer autoencoder tensors.
+        (cache_layer_encoder, cache_layer_bias) = load_layer_tensors(
+            MODEL_DIR,
+            cache_layer_idx,
+            ENCODER_FILE,
+            BIASES_FILE,
             __file__,
-            sanitize_model_name(MODEL_DIR)
-            + "/"
-            + str(ablations_layer)
-            + "/"
-            + TOP_K_INFO_FILE,
-        ),
-        mode="r",
-        encoding="utf-8",
-    ) as top_k_info_file:
+        )
+        cache_layer_encoder, cache_layer_bias = accelerator.prepare(
+            cache_layer_encoder, cache_layer_bias
+        )
+        cache_layer_tensors[cache_layer_idx] = (
+            cache_layer_encoder,
+            cache_layer_bias,
+        )
 
-        reader = csv.reader(top_k_info_file)
-        next(reader)
-        for row in reader:
-            ablate_dims_todo.append(int(row[0]))
-
-    # At each ablation layer, register caching hooks for all downstream layers.
-    cachings_range = layer_range[abs_idx + 1:]
-
-    for caching_layer_idx in cachings_range:
-
+        # Cache layer feature dim indices.
         layer_cache_dims = []
+        layer_cache_dims = load_layer_feature_indices(
+            MODEL_DIR,
+            cache_layer_idx,
+            TOP_K_INFO_FILE,
+            __file__,
+            layer_cache_dims,
+        )
+        cache_dims_indices_per_layer[cache_layer_idx] = layer_cache_dims
 
-        with open(
-            save_paths(
-                __file__,
-                sanitize_model_name(MODEL_DIR)
-                + "/"
-                + str(caching_layer_idx)
-                + "/"
-                + TOP_K_INFO_FILE,
-            ),
-            mode="r",
-            encoding="utf-8",
-        ) as file:
-
-            reader = csv.reader(file)
-            next(reader)
-            for row in reader:
-                layer_cache_dims.append(int(row[0]))
-            cache_dims_todo_by_caching_layer[
-                caching_layer_idx
-            ] = layer_cache_dims
-
-    # I think this needs to be refactored to use the proper encoder and biases
-    # for downstream layers.
     for ablation_dim_idx in tqdm(
-        ablate_dims_todo, desc="Feature Ablations Progress"
+        ablate_dims_indices, desc="Feature Ablations Progress"
     ):
-        # Cache base activations.
+        # Base activations.
         np.random.seed(SEED)
         with hooks_lifecycle(
             ablation_dim_idx,
-            cache_dims_todo_by_caching_layer,
-            ablations_layer,
+            cache_dims_indices_per_layer,
+            ablate_layer_idx,
             layer_range,
             model,
-            encoder,
-            biases,
+            ablate_layer_encoder,
+            ablate_layer_bias,
             base_activations,
             ablations_mode=False,
         ):
@@ -249,16 +224,16 @@ for abs_idx, ablations_layer in enumerate(ablations_range):
                 streamlined_mode=True,
             )
 
-        # Cache ablated activations.
+        # Ablated activations.
         np.random.seed(SEED)
         with hooks_lifecycle(
             ablation_dim_idx,
-            cache_dims_todo_by_caching_layer,
-            ablations_layer,
+            cache_dims_indices_per_layer,
+            ablate_layer_idx,
             layer_range,
             model,
-            encoder,
-            biases,
+            ablate_layer_encoder,
+            ablate_layer_bias,
             ablated_activations,
             ablations_mode=True,
         ):
@@ -273,12 +248,11 @@ for abs_idx, ablations_layer in enumerate(ablations_range):
                 streamlined_mode=True,
             )
 
-# Compute diffs.
-activation_diffs = {}
-
 # %%
 # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
-for i in ablations_range:
+activation_diffs = {}
+
+for i in ablate_range:
     for j in base_activations[i].keys():
         for k in base_activations[i][j].keys():
             activation_diffs[(i, j, k)] = (
@@ -288,7 +262,7 @@ for i in ablations_range:
 
 # %%
 # Plot and save effects.
-graph_causal_effects(activation_diffs, full_scale=True).draw(
+graph_causal_effects(activation_diffs, rasp=False).draw(
     save_paths(__file__, "feature_web.png"),
     prog="dot",
 )

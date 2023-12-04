@@ -4,12 +4,12 @@
 from pygraphviz import AGraph
 
 
-def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
+def graph_causal_effects(activations: dict, rasp=True) -> AGraph:
     """Graph the causal effects of ablations."""
 
     graph = AGraph(directed=True)
 
-    if not full_scale:
+    if rasp:
         # Plot neuron nodes.
         for layer_idx, neuron_idx in activations.keys():
             graph.add_node(f"neuron_{layer_idx}.{neuron_idx}")
@@ -23,7 +23,7 @@ def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
                     graph.add_edge(
                         f"neuron_0.{neuron_idx}",
                         f"neuron_1.{downstream_neuron_idx}",
-                        label=str(effect.item())
+                        label=str(effect.item()),
                     )
 
     else:
@@ -31,7 +31,7 @@ def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
         for (
             ablation_layer_idx,
             ablated_dim,
-            downstream_dim
+            downstream_dim,
         ) in activations.keys():
             # I need to be saving the downstream layer too. This works for now.
             graph.add_node(f"neuron_{ablation_layer_idx}.{ablated_dim}")
@@ -46,7 +46,7 @@ def graph_causal_effects(activations: dict, full_scale=False) -> AGraph:
             graph.add_edge(
                 f"neuron_{ablation_layer_idx}.{ablated_dim}",
                 f"neuron_{ablation_layer_idx + 1}.{downstream_dim}",
-                label=str(effect.item())
+                label=str(effect.item()),
             )
 
     return graph

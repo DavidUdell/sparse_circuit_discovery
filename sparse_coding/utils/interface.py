@@ -1,6 +1,7 @@
 """Read from and write to the module-level interface."""
 
 
+import csv
 import os
 from pathlib import Path
 from textwrap import dedent
@@ -231,3 +232,82 @@ def save_paths(base_file, save_append: str) -> str:
             """
         )
     )
+
+
+def load_layer_tensors(
+    model_dir: str,
+    layer_idx: int,
+    encoder_file: str,
+    biases_file: str,
+    base_file: str,
+) -> t.Tensor:
+    """
+    Return the autoencoder, bias tensors for a model layer.
+
+    `base_file should be __file__ in the calling module.
+    """
+
+    encoder = t.load(
+        save_paths(
+            base_file,
+            (
+                sanitize_model_name(model_dir)
+                + "/"
+                + str(layer_idx)
+                + "/"
+                + encoder_file
+            ),
+        )
+    )
+
+    bias = t.load(
+        save_paths(
+            base_file,
+            (
+                sanitize_model_name(model_dir)
+                + "/"
+                + str(layer_idx)
+                + "/"
+                + biases_file
+            ),
+        )
+    )
+
+    return encoder, bias
+
+
+def load_layer_feature_indices(
+    model_dir: str,
+    layer_idx: int,
+    top_k_info_file: str,
+    base_file: str,
+    indices: list,
+) -> list[int]:
+    """
+    Return the meaningful feature indices for a model layer.
+
+    `base_file should be __file__ in the calling module.
+    """
+
+    with open(
+        save_paths(
+            base_file,
+            (
+                sanitize_model_name(model_dir)
+                + "/"
+                + str(layer_idx)
+                + "/"
+                + top_k_info_file
+            ),
+        ),
+        mode="r",
+        encoding="utf-8",
+    ) as file:
+        reader = csv.reader(file)
+        # Skip the header.
+        next(reader)
+
+        for row in reader:
+            indices.append(int(row[0]))
+
+    return indices
