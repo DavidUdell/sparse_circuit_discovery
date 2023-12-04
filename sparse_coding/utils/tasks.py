@@ -43,7 +43,7 @@ def multiple_choice_task(
     answers_with_rubric = {}
     prompts_ids = []
 
-    for question_idx in tqdm(indices, desc="Questions Progress", leave=False):
+    for question_idx in tqdm(indices, desc="Questions progress", leave=False):
         multishot = ""
         # The multishot part of the prompt should not include the current
         # question.

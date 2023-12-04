@@ -198,7 +198,7 @@ else:
             cache_dim_indices_per_layer[cache_layer_idx] = layer_cache_dims
 
         for ablate_dim_idx in tqdm(
-            ablate_dim_indices, desc="Feature Ablations Progress"
+            ablate_dim_indices, desc="Feature ablations progress"
         ):
             np.random.seed(SEED)
             # Base run.
