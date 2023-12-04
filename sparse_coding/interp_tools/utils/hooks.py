@@ -25,15 +25,14 @@ def rasp_ablations_hook_fac(neuron_index: int):
 
 @contextmanager
 def hooks_lifecycle(
-    ablation_dim_idx: int,
-    to_cache_dims: dict[int, list[int]],
     ablation_layer_idx: int,
+    ablate_dim_idx: int,
     full_layer_range: range,
+    cache_dim_indices: dict[int, list[int]],
     model,
-    encoder: t.Tensor,
-    biases: t.Tensor,
-    cache: defaultdict,
-    ablations_mode: bool = True,
+    tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    activations_dict: defaultdict,
+    run_with_ablations: bool = True,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -74,7 +73,6 @@ def hooks_lifecycle(
 
         return ablations_hook
 
-
     def caching_hook_fac(
         ablated_dim_idx: int,
         cache_dims: list[int],
@@ -103,24 +101,24 @@ def hooks_lifecycle(
             )
             # Cache the activations.
             for downstream_dim in cache_dims:
-                extant_data = cache[
-                    ablation_layer_idx][ablated_dim_idx][downstream_dim
+                extant_data = cache[ablation_layer_idx][ablated_dim_idx][
+                    downstream_dim
                 ]
                 # A defaultdict here means no cached data yet.
                 if isinstance(extant_data, defaultdict):
-                    cache[
-                        ablation_layer_idx][ablated_dim_idx][downstream_dim
-                    ] = projected_acts[:, :, downstream_dim].detach().cpu()
+                    cache[ablation_layer_idx][ablated_dim_idx][
+                        downstream_dim
+                    ] = (projected_acts[:, :, downstream_dim].detach().cpu())
                 # We concat if there's an existing tensor.
                 elif isinstance(extant_data, t.Tensor):
-                    cache[
-                        ablation_layer_idx][ablated_dim_idx][downstream_dim
+                    cache[ablation_layer_idx][ablated_dim_idx][
+                        downstream_dim
                     ] = t.cat(
                         (
                             extant_data,
-                            projected_acts[
-                                :, :, downstream_dim
-                            ].detach().cpu(),
+                            projected_acts[:, :, downstream_dim]
+                            .detach()
+                            .cpu(),
                         ),
                         dim=1,
                     )
@@ -128,6 +126,7 @@ def hooks_lifecycle(
                     raise ValueError(
                         f"Unexpected data type in cache: {type(extant_data)}"
                     )
+
         return caching_hook
 
     if ablation_layer_idx == full_layer_range[-1]:
@@ -137,32 +136,34 @@ def hooks_lifecycle(
         ablation_layer_idx + 1, full_layer_range[-1] + 1
     )
     # Just Pythia layer syntax, for now.
-    if ablations_mode:
+    if run_with_ablations:
+        encoder, bias = tensors_per_layer[ablation_layer_idx]
         encoder_hook_handle = model.gpt_neox.layers[
             ablation_layer_idx
         ].register_forward_hook(
-            encoder_hook_fac(ablation_dim_idx, encoder, biases)
+            encoder_hook_fac(ablate_dim_idx, encoder, bias)
         )
 
     caching_hook_handles = {}
-    for index, layer in enumerate(downstream_range):
-        caching_hook_handles[index] = model.gpt_neox.layers[
-            layer
+    for meta_index, layer_index in enumerate(downstream_range):
+        encoder, bias = tensors_per_layer[layer_index]
+        caching_hook_handles[meta_index] = model.gpt_neox.layers[
+            layer_index
         ].register_forward_hook(
             caching_hook_fac(
-                ablation_dim_idx,
-                to_cache_dims[layer],
+                ablate_dim_idx,
+                cache_dim_indices[layer_index],
                 ablation_layer_idx,
                 encoder,
-                biases,
-                cache
+                bias,
+                activations_dict,
             )
         )
 
     try:
         yield
     finally:
-        if ablations_mode:
+        if run_with_ablations:
             encoder_hook_handle.remove()
         for handle in caching_hook_handles.values():
             handle.remove()

@@ -30,12 +30,13 @@ def multiple_choice_task(
     accelerator,
     num_shot: int,
     acts_layers_slice: slice,
-    streamlined_mode: bool = False,
+    return_outputs: bool = True,
 ) -> tuple[list, dict, list] | None:
     """
     The model does the `truthful_qa multiple-choice 1` task.
-    
-    `streamlined_mode` runs the task without returning any outputs.
+
+    `return_outputs = False` runs the task without returning any outputs, for
+    activation collection purposes.
     """
 
     activations = []
@@ -113,7 +114,7 @@ def multiple_choice_task(
             input_ids = accelerator.prepare(input_ids)
             outputs = model(input_ids)
 
-        if streamlined_mode:
+        if not return_outputs:
             continue
         # We want the answer stream's logits, so we pass
         # `outputs.logits[:,-1,:]`. `dim=-1` means greedy sampling over the

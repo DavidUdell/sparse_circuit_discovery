@@ -146,7 +146,7 @@ def recursive_defaultdict():
 base_activations = defaultdict(recursive_defaultdict)
 ablated_activations = defaultdict(recursive_defaultdict)
 
-for index_idx, ablate_layer_idx in enumerate(ablate_range):
+for meta_index, ablate_layer_idx in enumerate(ablate_range):
     # Ablation layer autoencoder tensors.
     ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
         MODEL_DIR, ablate_layer_idx, ENCODER_FILE, BIASES_FILE, __file__
@@ -154,20 +154,22 @@ for index_idx, ablate_layer_idx in enumerate(ablate_range):
     ablate_layer_encoder, ablate_layer_bias = accelerator.prepare(
         ablate_layer_encoder, ablate_layer_bias
     )
+    tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]] = {
+        ablate_layer_idx: (ablate_layer_encoder, ablate_layer_bias)
+    }
 
-    # Ablation layer feature dim indices.
-    ablate_dims_indices = []
-    ablate_dims_indices = load_layer_feature_indices(
+    # Ablation layer feature-dim indices.
+    ablate_dim_indices = []
+    ablate_dim_indices = load_layer_feature_indices(
         MODEL_DIR,
         ablate_layer_idx,
         TOP_K_INFO_FILE,
         __file__,
-        ablate_dims_indices,
+        ablate_dim_indices,
     )
 
-    cache_dims_indices_per_layer = {}
-    cache_layer_range = layer_range[index_idx + 1 :]
-    cache_layer_tensors = {}
+    cache_dim_indices_per_layer = {}
+    cache_layer_range = layer_range[meta_index + 1 :]
 
     for cache_layer_idx in cache_layer_range:
         # Cache layer autoencoder tensors.
@@ -181,12 +183,12 @@ for index_idx, ablate_layer_idx in enumerate(ablate_range):
         cache_layer_encoder, cache_layer_bias = accelerator.prepare(
             cache_layer_encoder, cache_layer_bias
         )
-        cache_layer_tensors[cache_layer_idx] = (
+        tensors_per_layer[cache_layer_idx] = (
             cache_layer_encoder,
             cache_layer_bias,
         )
 
-        # Cache layer feature dim indices.
+        # Cache layer feature-dim indices.
         layer_cache_dims = []
         layer_cache_dims = load_layer_feature_indices(
             MODEL_DIR,
@@ -195,23 +197,22 @@ for index_idx, ablate_layer_idx in enumerate(ablate_range):
             __file__,
             layer_cache_dims,
         )
-        cache_dims_indices_per_layer[cache_layer_idx] = layer_cache_dims
+        cache_dim_indices_per_layer[cache_layer_idx] = layer_cache_dims
 
-    for ablation_dim_idx in tqdm(
-        ablate_dims_indices, desc="Feature Ablations Progress"
+    for ablate_dim_idx in tqdm(
+        ablate_dim_indices, desc="Feature Ablations Progress"
     ):
-        # Base activations.
         np.random.seed(SEED)
+        # Base run.
         with hooks_lifecycle(
-            ablation_dim_idx,
-            cache_dims_indices_per_layer,
             ablate_layer_idx,
+            ablate_dim_idx,
             layer_range,
+            cache_dim_indices_per_layer,
             model,
-            ablate_layer_encoder,
-            ablate_layer_bias,
+            tensors_per_layer,
             base_activations,
-            ablations_mode=False,
+            run_with_ablations=False,
         ):
             multiple_choice_task(
                 dataset,
@@ -221,21 +222,20 @@ for index_idx, ablate_layer_idx in enumerate(ablate_range):
                 accelerator,
                 NUM_SHOT,
                 ACTS_LAYERS_SLICE,
-                streamlined_mode=True,
+                return_outputs=False,
             )
 
-        # Ablated activations.
         np.random.seed(SEED)
+        # Ablated run.
         with hooks_lifecycle(
-            ablation_dim_idx,
-            cache_dims_indices_per_layer,
             ablate_layer_idx,
+            ablate_dim_idx,
             layer_range,
+            cache_dim_indices_per_layer,
             model,
-            ablate_layer_encoder,
-            ablate_layer_bias,
+            tensors_per_layer,
             ablated_activations,
-            ablations_mode=True,
+            run_with_ablations=True,
         ):
             multiple_choice_task(
                 dataset,
@@ -245,10 +245,11 @@ for index_idx, ablate_layer_idx in enumerate(ablate_range):
                 accelerator,
                 NUM_SHOT,
                 ACTS_LAYERS_SLICE,
-                streamlined_mode=True,
+                return_outputs=False,
             )
 
 # %%
+# Compute differential downstream ablation effects.
 # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
 activation_diffs = {}
 
