@@ -109,6 +109,11 @@ if MODEL_DIR == "rasp":
         )
 
     # Plot and save effects.
+    # `rasp=True` is quite ugly; I'll want to factor that out by giving both
+    # the rasp and full-scale models common output shapes with some squeezing.
+    # Then, `graph_causal_effects` can be a single common call outside the
+    # if/else.
+
     graph_causal_effects(activation_diffs, rasp=True).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
@@ -143,7 +148,7 @@ else:
     base_activations = defaultdict(recursive_defaultdict)
     ablated_activations = defaultdict(recursive_defaultdict)
 
-    for meta_index, ablate_layer_idx in enumerate(ablate_range):
+    for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
         # Ablation layer autoencoder tensors.
         ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
             MODEL_DIR, ablate_layer_idx, ENCODER_FILE, BIASES_FILE, __file__
@@ -166,7 +171,7 @@ else:
         )
 
         cache_dim_indices_per_layer = {}
-        cache_layer_range = layer_range[meta_index + 1 :]
+        cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]
 
         for cache_layer_idx in cache_layer_range:
             # Cache layer autoencoder tensors.
@@ -248,6 +253,7 @@ else:
     # Compute differential downstream ablation effects.
     # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
     activation_diffs = {}
+    print(activation_diffs.keys())
 
     for i in ablate_range:
         for j in base_activations[i].keys():
@@ -257,11 +263,7 @@ else:
                     - ablated_activations[i][j][k].sum(axis=1).squeeze()
                 )
 
-    # `rasp=False` is quite ugly; I'll want to factor that out by giving both
-    # the rasp and full-scale models common output shapes with some squeezing.
-    # Then, `graph_causal_effects` can be a single common call outside the
-    # if/else.
-    graph_causal_effects(activation_diffs, rasp=False).draw(
+    graph_causal_effects(activation_diffs).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
     )

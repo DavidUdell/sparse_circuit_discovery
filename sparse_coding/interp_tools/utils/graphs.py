@@ -4,7 +4,7 @@
 from pygraphviz import AGraph
 
 
-def graph_causal_effects(activations: dict, rasp=True) -> AGraph:
+def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
     """Graph the causal effects of ablations."""
 
     graph = AGraph(directed=True)
