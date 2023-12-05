@@ -256,7 +256,6 @@ else:
     for i in ablate_range:
         for j in base_activations[i].keys():
             for k in base_activations[i][j].keys():
-                print(base_activations[i][j][k].sum(axis=1))
                 activation_diffs[i, j, k] = (
                     base_activations[i][j][k].sum(axis=1).squeeze()
                     - ablated_activations[i][j][k].sum(axis=1).squeeze()

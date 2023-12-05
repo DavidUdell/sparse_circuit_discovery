@@ -52,7 +52,7 @@ def hooks_lifecycle(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    input[0],
+                    output[0],
                     encoder.to(model.device),
                     bias=biases.to(model.device),
                 )
@@ -63,13 +63,12 @@ def hooks_lifecycle(
             # Zero out the activation at dim_idx.
             projected_acts[:, :, dim_idx] = 0.0
             # Project back to activation space.
-            input = projected_acts.to(model.device) - biases.to(model.device)
-            input = t.einsum(
-                "bij, jk -> bik",
+            output = projected_acts.to(model.device)
+            output = t.nn.functional.linear(  # pylint: disable=not-callable
                 projected_acts.to(model.device),
-                encoder.to(model.device),
+                encoder.T.to(model.device),
             )
-            input = (input,)
+            output = (output,)
 
         return ablate_hook
 
@@ -99,6 +98,7 @@ def hooks_lifecycle(
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=False
             )
+
             # Cache the activations.
             for downstream_dim in cache_dims:
                 extant_data = cache[ablation_layer_idx][ablated_dim_idx][
@@ -108,7 +108,12 @@ def hooks_lifecycle(
                 if isinstance(extant_data, defaultdict):
                     cache[ablation_layer_idx][ablated_dim_idx][
                         downstream_dim
-                    ] = (projected_acts[:, :, downstream_dim].detach().cpu())
+                    ] = (
+                        projected_acts[:, :, downstream_dim]
+                        .unsqueeze(-1)
+                        .detach()
+                        .cpu()
+                    )
                 # We concat if there's an existing tensor.
                 elif isinstance(extant_data, t.Tensor):
                     cache[ablation_layer_idx][ablated_dim_idx][
@@ -117,6 +122,7 @@ def hooks_lifecycle(
                         (
                             extant_data,
                             projected_acts[:, :, downstream_dim]
+                            .unsqueeze(-1)
                             .detach()
                             .cpu(),
                         ),
@@ -131,9 +137,7 @@ def hooks_lifecycle(
 
     if ablate_layer_idx == model_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
-    downstream_range: range = range(
-        ablate_layer_idx + 1, model_layer_range[-1] + 1
-    )
+    cache_range: range = range(ablate_layer_idx + 1, model_layer_range[-1] + 1)
     # Just the Pythia layer syntax, for now.
     if ablate_during_run:
         ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]
@@ -144,14 +148,14 @@ def hooks_lifecycle(
         )
 
     cache_hook_handles = {}
-    for meta_index, layer_index in enumerate(downstream_range):
-        cache_encoder, cache_bias = tensors_per_layer[layer_index]
-        cache_hook_handles[meta_index] = model.gpt_neox.layers[
-            layer_index
+    for cache_layer_idx in cache_range:
+        cache_encoder, cache_bias = tensors_per_layer[cache_layer_idx]
+        cache_hook_handles[cache_layer_idx] = model.gpt_neox.layers[
+            cache_layer_idx
         ].register_forward_hook(
             cache_hook_fac(
                 ablate_dim_idx,
-                cache_dim_indices[layer_index],
+                cache_dim_indices[cache_layer_idx],
                 ablate_layer_idx,
                 cache_encoder,
                 cache_bias,
