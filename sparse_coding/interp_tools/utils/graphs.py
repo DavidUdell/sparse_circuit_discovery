@@ -33,13 +33,16 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
             ablated_dim,
             downstream_dim,
         ) in activations.keys():
-            # I need to be saving the downstream layer too. This works for now.
+            # I need to be saving the downstream layer index too. But this
+            # works for now.
             graph.add_node(f"neuron_{ablation_layer_idx}.{ablated_dim}")
             graph.add_node(f"neuron_{ablation_layer_idx + 1}.{downstream_dim}")
 
         # Plot effect edges.
         for (
-            (ablation_layer_idx, ablated_dim, downstream_dim)
+            ablation_layer_idx,
+            ablated_dim,
+            downstream_dim,
         ), effect in activations.items():
             if effect.item() == 0:
                 continue

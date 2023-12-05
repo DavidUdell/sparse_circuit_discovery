@@ -13,7 +13,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.hooks import (
-    rasp_ablations_hook_fac,
+    rasp_ablate_hook_fac,
     hooks_lifecycle,
 )
 from sparse_coding.utils.interface import (
@@ -81,7 +81,7 @@ if MODEL_DIR == "rasp":
         for neuron_idx in range(transformer_lens_model.cfg.d_model):
             transformer_lens_model.add_perma_hook(
                 "blocks.0.hook_resid_pre",
-                rasp_ablations_hook_fac(neuron_idx),
+                rasp_ablate_hook_fac(neuron_idx),
             )
 
             (  # pylint: disable=unpacking-non-sequence
@@ -214,7 +214,7 @@ else:
                 model,
                 tensors_per_layer,
                 base_activations,
-                run_with_ablations=False,
+                ablate_during_run=False,
             ):
                 multiple_choice_task(
                     dataset,
@@ -237,7 +237,7 @@ else:
                 model,
                 tensors_per_layer,
                 ablated_activations,
-                run_with_ablations=True,
+                ablate_during_run=True,
             ):
                 multiple_choice_task(
                     dataset,
@@ -250,15 +250,14 @@ else:
                     return_outputs=False,
                 )
 
-    # Compute differential downstream ablation effects.
-    # dict[ablation_layer_idx][ablated_dim_idx][downstream_dim]
+    # Compute differential downstream ablation effects. Data indices:
+    # [ablation_layer_idx][ablated_dim_idx][downstream_dim]
     activation_diffs = {}
-    print(activation_diffs.keys())
-
     for i in ablate_range:
         for j in base_activations[i].keys():
             for k in base_activations[i][j].keys():
-                activation_diffs[(i, j, k)] = (
+                print(base_activations[i][j][k].sum(axis=1))
+                activation_diffs[i, j, k] = (
                     base_activations[i][j][k].sum(axis=1).squeeze()
                     - ablated_activations[i][j][k].sum(axis=1).squeeze()
                 )

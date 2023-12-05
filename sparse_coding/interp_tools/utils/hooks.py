@@ -7,11 +7,11 @@ from contextlib import contextmanager
 import torch as t
 
 
-def rasp_ablations_hook_fac(neuron_index: int):
+def rasp_ablate_hook_fac(neuron_index: int):
     """Factory for rasp ablations hooks, working at a neuron idx."""
 
     # All `transformer_lens` hook functions must have this interface.
-    def ablations_hook(  # pylint: disable=unused-argument
+    def ablate_hook(  # pylint: disable=unused-argument
         acts_tensor: t.Tensor, hook
     ) -> t.Tensor:
         """Zero out a particular neuron's activations."""
@@ -20,19 +20,19 @@ def rasp_ablations_hook_fac(neuron_index: int):
 
         return acts_tensor
 
-    return ablations_hook
+    return ablate_hook
 
 
 @contextmanager
 def hooks_lifecycle(
-    ablation_layer_idx: int,
+    ablate_layer_idx: int,
     ablate_dim_idx: int,
-    full_layer_range: range,
+    model_layer_range: range,
     cache_dim_indices: dict[int, list[int]],
     model,
     tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
-    run_with_ablations: bool = True,
+    ablate_during_run: bool = True,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -41,10 +41,10 @@ def hooks_lifecycle(
     effects.
     """
 
-    def encoder_hook_fac(dim_idx: int, encoder: t.Tensor, biases: t.Tensor):
+    def ablate_hook_fac(dim_idx: int, encoder: t.Tensor, biases: t.Tensor):
         """Create hooks that zero a projected neuron and project it back."""
 
-        def ablations_hook(  # pylint: disable=unused-argument, redefined-builtin
+        def ablate_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
         ) -> None:
             """Project activation vectors; ablate them; project them back."""
@@ -71,9 +71,9 @@ def hooks_lifecycle(
             )
             input = (input,)
 
-        return ablations_hook
+        return ablate_hook
 
-    def caching_hook_fac(
+    def cache_hook_fac(
         ablated_dim_idx: int,
         cache_dims: list[int],
         ablation_layer_idx: int,
@@ -83,7 +83,7 @@ def hooks_lifecycle(
     ):
         """Create hooks that cache the projected activations."""
 
-        def caching_hook(  # pylint: disable=unused-argument, redefined-builtin
+        def cache_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
         ) -> None:
             """Cache projected activations."""
@@ -127,35 +127,34 @@ def hooks_lifecycle(
                         f"Unexpected data type in cache: {type(extant_data)}"
                     )
 
-        return caching_hook
+        return cache_hook
 
-    if ablation_layer_idx == full_layer_range[-1]:
+    if ablate_layer_idx == model_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
-
     downstream_range: range = range(
-        ablation_layer_idx + 1, full_layer_range[-1] + 1
+        ablate_layer_idx + 1, model_layer_range[-1] + 1
     )
-    # Just Pythia layer syntax, for now.
-    if run_with_ablations:
-        encoder, bias = tensors_per_layer[ablation_layer_idx]
-        encoder_hook_handle = model.gpt_neox.layers[
-            ablation_layer_idx
+    # Just the Pythia layer syntax, for now.
+    if ablate_during_run:
+        ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]
+        ablate_hook_handle = model.gpt_neox.layers[
+            ablate_layer_idx
         ].register_forward_hook(
-            encoder_hook_fac(ablate_dim_idx, encoder, bias)
+            ablate_hook_fac(ablate_dim_idx, ablate_encoder, ablate_bias)
         )
 
-    caching_hook_handles = {}
+    cache_hook_handles = {}
     for meta_index, layer_index in enumerate(downstream_range):
-        encoder, bias = tensors_per_layer[layer_index]
-        caching_hook_handles[meta_index] = model.gpt_neox.layers[
+        cache_encoder, cache_bias = tensors_per_layer[layer_index]
+        cache_hook_handles[meta_index] = model.gpt_neox.layers[
             layer_index
         ].register_forward_hook(
-            caching_hook_fac(
+            cache_hook_fac(
                 ablate_dim_idx,
                 cache_dim_indices[layer_index],
-                ablation_layer_idx,
-                encoder,
-                bias,
+                ablate_layer_idx,
+                cache_encoder,
+                cache_bias,
                 activations_dict,
             )
         )
@@ -163,7 +162,7 @@ def hooks_lifecycle(
     try:
         yield
     finally:
-        if run_with_ablations:
-            encoder_hook_handle.remove()
-        for handle in caching_hook_handles.values():
+        if ablate_during_run:
+            ablate_hook_handle.remove()
+        for handle in cache_hook_handles.values():
             handle.remove()
