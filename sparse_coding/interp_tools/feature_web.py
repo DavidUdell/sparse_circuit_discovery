@@ -42,6 +42,7 @@ BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
+NUM_ABLATION_DIMS_PLOTTED = config.get("NUM_ABLATION_DIMS_PLOTTED", None)
 SEED = config.get("SEED")
 
 # %%
@@ -262,12 +263,27 @@ else:
                     - ablated_activations[i][j][k].sum(axis=1).squeeze()
                 )
 
+    # Check that there was any effect.
     HOOK_EFFECTS_CHECKSUM = 0.0
     for i, j, k in activation_diffs:
         HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
     assert (
         HOOK_EFFECTS_CHECKSUM != 0.0
     ), "Ablate hook effects sum to exactly zero."
+
+    # To keep graphs from getting unwieldly.
+    if NUM_ABLATION_DIMS_PLOTTED is not None:
+        neurons_plotted = []
+        for i, j, _ in activation_diffs:
+            if (i, j) not in neurons_plotted:
+                neurons_plotted.append((i, j))
+            if len(neurons_plotted) == NUM_ABLATION_DIMS_PLOTTED:
+                activation_diffs = {
+                    (i, j, k): activation_diffs[(i, j, k)]
+                    for i, j, k in activation_diffs
+                    if (i, j) in neurons_plotted
+                }
+                break
 
     graph_causal_effects(activation_diffs).draw(
         save_paths(__file__, "feature_web.svg"),
