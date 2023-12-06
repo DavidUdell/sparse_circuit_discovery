@@ -35,7 +35,7 @@ SEED: 0
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6
-# Note that`feature_web` will also use the complement of this value.
+# Note that`feature_web` will later use the complement of this value.
 NUM_QUESTIONS_EVALED: 800
 
 # Stable Dev Constants for `train_autoencoder.py`
