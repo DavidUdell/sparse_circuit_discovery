@@ -12,7 +12,7 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
     if rasp:
         # Plot neuron nodes.
         for layer_idx, neuron_idx in activations.keys():
-            graph.add_node(f"neuron_{layer_idx}.{neuron_idx}")
+            graph.add_node(f"({layer_idx}.{neuron_idx})")
 
         # Plot effect edges.
         for (layer_idx, neuron_idx), effects_vector in activations.items():
@@ -21,8 +21,8 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
                     if effect.item() == 0:
                         continue
                     graph.add_edge(
-                        f"neuron_0.{neuron_idx}",
-                        f"neuron_1.{downstream_neuron_idx}",
+                        f"(0.{neuron_idx})",
+                        f"(1.{downstream_neuron_idx})",
                         label=str(effect.item()),
                     )
 
@@ -35,8 +35,8 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
         ) in activations.keys():
             # I need to be saving the downstream layer index too. But this
             # works for now.
-            graph.add_node(f"neuron_{ablation_layer_idx}.{ablated_dim}")
-            graph.add_node(f"neuron_{ablation_layer_idx + 1}.{downstream_dim}")
+            graph.add_node(f"({ablation_layer_idx}.{ablated_dim})")
+            graph.add_node(f"({ablation_layer_idx + 1}.{downstream_dim})")
 
         # Plot effect edges.
         for (
@@ -44,13 +44,19 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
             ablated_dim,
             downstream_dim,
         ), effect in activations.items():
-            print(effect.item())
-            if effect.item() == 0:
+            # Skip negative links for now.
+            if effect.item() <= 0.0:
                 continue
             graph.add_edge(
-                f"neuron_{ablation_layer_idx}.{ablated_dim}",
-                f"neuron_{ablation_layer_idx + 1}.{downstream_dim}",
-                label=str(effect.item()),
+                f"({ablation_layer_idx}.{ablated_dim})",
+                f"({ablation_layer_idx + 1}.{downstream_dim})",
+                label=str(round(effect.item(), 2)),
             )
+
+        # Remove unlinked nodes.
+        for node in graph.nodes():
+            if len(graph.edges(node)) == 0:
+                graph.remove_node(node)
+                print(f"Removed isolated neuron {node} from causal graph.")
 
     return graph
