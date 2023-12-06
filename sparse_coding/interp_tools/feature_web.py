@@ -250,8 +250,8 @@ else:
                     return_outputs=False,
                 )
 
-    # Compute differential downstream ablation effects. Data indices:
-    # [ablation_layer_idx][ablated_dim_idx][downstream_dim]
+    # Compute differential downstream ablation effects. Recursive defaultdict
+    # indices: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
     activation_diffs = {}
     for i in ablate_range:
         for j in base_activations[i].keys():
@@ -260,6 +260,13 @@ else:
                     base_activations[i][j][k].sum(axis=1).squeeze()
                     - ablated_activations[i][j][k].sum(axis=1).squeeze()
                 )
+
+    HOOK_EFFECTS_CHECKSUM = 0.0
+    for i, j, k in activation_diffs:
+        HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+    assert (
+        HOOK_EFFECTS_CHECKSUM != 0.0
+    ), "Ablate hook effects sum to exactly zero."
 
     graph_causal_effects(activation_diffs).draw(
         save_paths(__file__, "feature_web.png"),

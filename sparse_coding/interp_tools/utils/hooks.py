@@ -70,7 +70,7 @@ def hooks_lifecycle(
                     encoder.T.to(model.device),
                 )
             )
-
+            # We must preserve the attention data in `output[1]`.
             return (
                 ablated_activations,
                 output[1],
