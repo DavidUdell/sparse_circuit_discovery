@@ -50,7 +50,7 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
             graph.add_edge(
                 f"({ablation_layer_idx}.{ablated_dim})",
                 f"({ablation_layer_idx + 1}.{downstream_dim})",
-                label=str(round(effect.item(), 2)),
+                label=str(round(effect.item(), 1)),
             )
 
         # Remove unlinked nodes.
