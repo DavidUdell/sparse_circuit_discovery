@@ -40,7 +40,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
-NUM_QUESTIONS_EVALED = config.get("NUM_QUESTIONS_EVALED", 800)
+NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 SEED = config.get("SEED")
 
@@ -139,7 +139,8 @@ else:
         size=len(dataset["validation"]["question"]),
         replace=False,
     )
-    validation_indices: list = dataset_indices[NUM_QUESTIONS_EVALED:].tolist()
+    starting_index: int = len(dataset_indices) - NUM_QUESTIONS_INTERPED
+    validation_indices: list = dataset_indices[starting_index:].tolist()
 
     def recursive_defaultdict():
         """Recursively create a defaultdict."""
