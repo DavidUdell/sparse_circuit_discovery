@@ -5,7 +5,7 @@
 # .csv data
 *.csv
 
-# Graph .png files
+# Causal graph files
 *.png
 
 # `Lightning` training logging
