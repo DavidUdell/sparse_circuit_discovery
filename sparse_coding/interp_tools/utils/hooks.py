@@ -57,18 +57,24 @@ def hooks_lifecycle(
                     bias=biases.to(model.device),
                 )
             )
+            projected_acts = projected_acts_unrec.to(model.device)
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=False
             )
             # Zero out the activation at dim_idx.
             projected_acts[:, :, dim_idx] = 0.0
             # Project back to activation space.
-            output = projected_acts.to(model.device)
-            output = t.nn.functional.linear(  # pylint: disable=not-callable
-                projected_acts.to(model.device),
-                encoder.T.to(model.device),
+            ablated_activations = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    projected_acts,
+                    encoder.T.to(model.device),
+                )
             )
-            output = (output,)
+
+            return (
+                ablated_activations,
+                output[1],
+            )
 
         return ablate_hook
 
