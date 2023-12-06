@@ -44,6 +44,7 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
             ablated_dim,
             downstream_dim,
         ), effect in activations.items():
+            print(effect.item())
             if effect.item() == 0:
                 continue
             graph.add_edge(
