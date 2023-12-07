@@ -44,8 +44,8 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
             ablated_dim,
             downstream_dim,
         ), effect in activations.items():
-            # Skip negative links for now.
-            if effect.item() <= 0.0:
+            # Skip positive links for now.
+            if effect.item() >= 0.0:
                 continue
             graph.add_edge(
                 f"({ablation_layer_idx}.{ablated_dim})",
