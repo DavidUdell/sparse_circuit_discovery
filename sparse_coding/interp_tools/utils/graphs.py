@@ -77,10 +77,8 @@ def graph_causal_effects(
             ablated_dim,
             downstream_dim,
         ), effect in activations.items():
-            # Skip positive links for now.
-            if effect.item() >= 0.0:
+            if effect.item() == 0:
                 continue
-
             graph.add_edge(
                 dedent(
                     f"""
