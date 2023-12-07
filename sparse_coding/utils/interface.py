@@ -346,7 +346,7 @@ def load_layer_feature_labels(
 
         for row in reader:
             if int(row[0]) == feature_idx:
-                return row[1:]
+                return row[1]
 
         raise ValueError(
             dedent(

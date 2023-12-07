@@ -273,7 +273,12 @@ else:
         HOOK_EFFECTS_CHECKSUM != 0.0
     ), "Ablate hook effects sum to exactly zero."
 
-    graph_causal_effects(activation_diffs).draw(
+    graph_causal_effects(
+        activation_diffs,
+        MODEL_DIR,
+        TOP_K_INFO_FILE,
+        __file__,
+    ).draw(
         save_paths(__file__, "feature_web.svg"),
         format="svg",
         prog="dot",
