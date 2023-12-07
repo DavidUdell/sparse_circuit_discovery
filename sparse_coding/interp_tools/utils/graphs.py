@@ -37,6 +37,16 @@ def graph_causal_effects(
                     )
 
     else:
+
+        def label_appendable(layer_idx, neuron_idx):
+            return load_layer_feature_labels(
+                model_dir,
+                layer_idx,
+                neuron_idx,
+                top_k_info_file,
+                base_file,
+            )
+
         # Plot neuron nodes.
         for (
             ablation_layer_idx,
@@ -45,15 +55,6 @@ def graph_causal_effects(
         ) in activations.keys():
             # I need to be saving the downstream layer index too. But this
             # works for now.
-            def label_appendable(layer_idx, neuron_idx):
-                return load_layer_feature_labels(
-                    model_dir,
-                    layer_idx,
-                    neuron_idx,
-                    top_k_info_file,
-                    base_file,
-                )
-
             graph.add_node(
                 dedent(
                     f"""
@@ -65,8 +66,8 @@ def graph_causal_effects(
             graph.add_node(
                 dedent(
                     f"""
-                    ({ablation_layer_idx + 1}.{downstream_dim}:
-                    {label_appendable(ablation_layer_idx + 1, downstream_dim)})
+                    ({ablation_layer_idx + 1}.{downstream_dim}):
+                    {label_appendable(ablation_layer_idx + 1, downstream_dim)}
                     """
                 )
             )
@@ -89,10 +90,11 @@ def graph_causal_effects(
                 ),
                 dedent(
                     f"""
-                    ({ablation_layer_idx + 1}.{downstream_dim}:
-                    {label_appendable(ablation_layer_idx + 1, downstream_dim)})
+                    ({ablation_layer_idx + 1}.{downstream_dim}):
+                    {label_appendable(ablation_layer_idx + 1, downstream_dim)}
                     """
                 ),
+                label=str(round(effect.item())),
             )
 
         # Assert no repeat edges.
@@ -103,6 +105,6 @@ def graph_causal_effects(
         for node in graph.nodes():
             if len(graph.edges(node)) == 0:
                 graph.remove_node(node)
-                print(f"Removed isolated neuron {node} from causal graph.")
+                print(f"Removed isolated neuron {node} from causal graph.\n")
 
     return graph

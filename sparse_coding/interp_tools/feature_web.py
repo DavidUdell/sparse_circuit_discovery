@@ -115,7 +115,9 @@ if MODEL_DIR == "rasp":
     # Then, `graph_causal_effects` can be a single common call outside the
     # if/else.
 
-    graph_causal_effects(activation_diffs, rasp=True).draw(
+    graph_causal_effects(
+        activation_diffs, MODEL_DIR, TOP_K_INFO_FILE, __file__, rasp=True
+    ).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
     )
