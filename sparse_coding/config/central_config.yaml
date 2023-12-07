@@ -51,5 +51,5 @@ TOP_K: 6
 # Stable Dev Constants for `feature_web.py`
 # _Leave out entries_ for None: None values here are interpreted as the string
 # "None"
-NUM_QUESTIONS_INTERPED: 50
-NUM_ABLATION_DIMS_PLOTTED: 20
+NUM_QUESTIONS_INTERPED: 200
+NUM_ABLATION_DIMS_PLOTTED: 1

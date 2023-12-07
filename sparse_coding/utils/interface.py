@@ -286,7 +286,7 @@ def load_layer_feature_indices(
     """
     Return the meaningful feature indices for a model layer.
 
-    `base_file should be __file__ in the calling module.
+    `base_file` should be `__file__` in the calling module.
     """
 
     with open(
@@ -311,3 +311,48 @@ def load_layer_feature_indices(
             indices.append(int(row[0]))
 
     return indices
+
+
+def load_layer_feature_labels(
+    model_dir: str,
+    layer_idx: int,
+    feature_idx: int,
+    top_k_info_file: str,
+    base_file: str,
+) -> list[str]:
+    """
+    Return the top-k input token labels for an encoder layer feature.
+
+    `base_file` should be `__file__` in the calling module.
+    """
+
+    with open(
+        save_paths(
+            base_file,
+            (
+                sanitize_model_name(model_dir)
+                + "/"
+                + str(layer_idx)
+                + "/"
+                + top_k_info_file
+            ),
+        ),
+        mode="r",
+        encoding="utf-8",
+    ) as file:
+        reader = csv.reader(file)
+        # Skip the header.
+        next(reader)
+
+        for row in reader:
+            if int(row[0]) == feature_idx:
+                return row[1:]
+
+        raise ValueError(
+            dedent(
+                f"""
+                Feature index {feature_idx} not found in layer {layer_idx}
+                autoencoder.
+                """
+            )
+        )

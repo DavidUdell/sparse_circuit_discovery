@@ -1,10 +1,20 @@
 """Graph the causal effects of ablations."""
 
 
+from textwrap import dedent
+
 from pygraphviz import AGraph
 
+from sparse_coding.utils.interface import load_layer_feature_labels
 
-def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
+
+def graph_causal_effects(
+    activations: dict,
+    model_dir: str,
+    top_k_info_file: str,
+    base_file: str,
+    rasp=False,
+) -> AGraph:
     """Graph the causal effects of ablations."""
 
     graph = AGraph(directed=True)
@@ -35,9 +45,31 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
         ) in activations.keys():
             # I need to be saving the downstream layer index too. But this
             # works for now.
-            graph.add_node(f"({ablation_layer_idx}.{ablated_dim})")
-            graph.add_node(f"({ablation_layer_idx + 1}.{downstream_dim})")
+            def label_appendable(layer_idx, neuron_idx):
+                return load_layer_feature_labels(
+                    model_dir,
+                    layer_idx,
+                    neuron_idx,
+                    top_k_info_file,
+                    base_file,
+                )
 
+            graph.add_node(
+                dedent(
+                    f"""
+                    ({ablation_layer_idx}.{ablated_dim}):
+                    {label_appendable(ablation_layer_idx, ablated_dim)}
+                    """
+                )
+            )
+            graph.add_node(
+                dedent(
+                    f"""
+                    ({ablation_layer_idx + 1}.{downstream_dim}:
+                    {label_appendable(ablation_layer_idx + 1, downstream_dim)})
+                    """
+                )
+            )
         # Plot effect edges.
         for (
             ablation_layer_idx,
@@ -47,11 +79,25 @@ def graph_causal_effects(activations: dict, rasp=False) -> AGraph:
             # Skip positive links for now.
             if effect.item() >= 0.0:
                 continue
+
             graph.add_edge(
-                f"({ablation_layer_idx}.{ablated_dim})",
-                f"({ablation_layer_idx + 1}.{downstream_dim})",
-                label=str(round(effect.item(), 1)),
+                dedent(
+                    f"""
+                    ({ablation_layer_idx}.{ablated_dim}):
+                    {label_appendable(ablation_layer_idx, ablated_dim)}
+                    """
+                ),
+                dedent(
+                    f"""
+                    ({ablation_layer_idx + 1}.{downstream_dim}:
+                    {label_appendable(ablation_layer_idx + 1, downstream_dim)})
+                    """
+                ),
             )
+
+        # Assert no repeat edges.
+        edges = graph.edges()
+        assert len(edges) == len(set(edges)), "Repeat edges in graph."
 
         # Remove unlinked nodes.
         for node in graph.nodes():

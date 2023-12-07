@@ -171,6 +171,8 @@ else:
             __file__,
             ablate_dim_indices,
         )
+        if NUM_ABLATION_DIMS_PLOTTED is not None:
+            ablate_dim_indices = ablate_dim_indices[:NUM_ABLATION_DIMS_PLOTTED]
 
         cache_dim_indices_per_layer = {}
         cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]
@@ -270,20 +272,6 @@ else:
     assert (
         HOOK_EFFECTS_CHECKSUM != 0.0
     ), "Ablate hook effects sum to exactly zero."
-
-    # To keep graphs from getting unwieldly.
-    if NUM_ABLATION_DIMS_PLOTTED is not None:
-        neurons_plotted = []
-        for i, j, _ in activation_diffs:
-            if (i, j) not in neurons_plotted:
-                neurons_plotted.append((i, j))
-            if len(neurons_plotted) == NUM_ABLATION_DIMS_PLOTTED:
-                activation_diffs = {
-                    (i, j, k): activation_diffs[(i, j, k)]
-                    for i, j, k in activation_diffs
-                    if (i, j) in neurons_plotted
-                }
-                break
 
     graph_causal_effects(activation_diffs).draw(
         save_paths(__file__, "feature_web.svg"),
