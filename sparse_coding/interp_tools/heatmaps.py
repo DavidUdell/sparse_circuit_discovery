@@ -47,7 +47,7 @@ PROJECTION_DIM = int(EMBEDDING_DIM * PROJECTION_FACTOR)
 
 # %%
 # Reproducibility.
-t.manual_seed(SEED)
+_ = t.manual_seed(SEED)
 np.random.seed(SEED)
 
 # %%

@@ -10,7 +10,7 @@ setup(
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="David Udell",
-    version="0.0.2",
+    version="0.1.2",
     license="MIT",
     packages=find_packages(),
     install_requires=[
@@ -26,6 +26,10 @@ setup(
         "pytest",
         "circuitsvis",
         "prettytable",
-        "openai",
+        "einops",
+        "pygraphviz",
+        "transformer_lens",
+        "tqdm",
+        "tracr @ git+https://github.com/google-deepmind/tracr.git",
     ],
 )

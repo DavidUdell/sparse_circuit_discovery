@@ -72,7 +72,6 @@ def test_per_input_token_effects(  # pylint: disable=redefined-outer-name
     question_token_ids, feature_activations = mock_data
 
     dims_in_batch = 200
-    large_model_mode = False
 
     mock_effects = per_input_token_effects(
         question_token_ids,
@@ -81,7 +80,6 @@ def test_per_input_token_effects(  # pylint: disable=redefined-outer-name
         tokenizer,
         accelerator,
         dims_in_batch,
-        large_model_mode,
     )
 
     try:

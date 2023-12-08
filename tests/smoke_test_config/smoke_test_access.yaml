@@ -1,0 +1,3 @@
+# This is never used during the smoke test, but its existence is still checked.
+# Leave this file in place.
+HF_ACCESS_TOKEN: ""

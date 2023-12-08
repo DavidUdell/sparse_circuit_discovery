@@ -21,43 +21,45 @@ The Docker image is especially good for pulling to a remote server.
 
 ## Usage
 To train and interpret a sparse autoencoder, go to
-`sparse_coding/act_config.yaml`. In that YAML, set your
+`sparse_coding/config/central_config.yaml`. There, set your
 
-1. HuggingFace Transformers model
-repository (`MODEL_DIR`),
-2. layer to collect model activations at
-(`ACTS_LAYER`), and
-3. autoencoder training hyperparameters (`LAMBDA_L1`,
+1. HuggingFace model
+repo (`MODEL_DIR`),
+2. layer indexes to collect activation data from
+(`ACT_LAYERS_SLICE`), and
+3. autoencoder training hyperparameters values (`LAMBDA_L1`,
 `LEARNING_RATE`, `PROJECTION_FACTOR`).
 
-To help get you started, here are decent starting values for a few HuggingFace models:
+Acceptable starting values for a range of models are:
 
-|`MODEL_DIR`|`ACTS_LAYER`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
+|`MODEL_DIR`|`ACT_LAYERS_SLICE`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
 |---|:---:|:---:|:---:|:---:|
-|EleutherAI/pythia-70m | 2 | 1.0e-2 | 1.0e-2 | 10 |
-|meta-llama/Llama-2-7b-hf | 13 | 1.0 | 1.0e-3 | 10 |
-|meta-llama/Llama-2-70b-hf | 32 | 3.0 | 1.0e-3 | 10 |
+|EleutherAI/pythia-70m | "2:3" | 1.0e-2 | 1.0e-2 | 10 |
+|meta-llama/Llama-2-7b-hf | "13:14" | 1.0 | 1.0e-3 | 10 |
+|meta-llama/Llama-2-70b-hf | "32:33" | 3.0 | 1.0e-3 | 10 |
 
-Once you've set your YAML values, run the activations data collection, autoencoder
-training, and autoencoder interpretation scripts in sequence:
+Once you've saved the YAML, run the main interpretability pipeline with:
 ```
 cd sparse_coding
 
-python3 acts_collect.py
-
-python3 autoencoder.py
-
-python3 feature_tokens.py
+python3 pipe.py
 ```
-A highly interpretable sparse autoencoder will have an L^0 value of 20-100 at
-convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` hyperparameters
-to achieve this value.
 
-Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`.
+### Notes:
+- A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
+  convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
+h  yperparameters to get this L^0.
 
-If you're trying to access a gated HuggingFace model repo, you'll have to
-provide a corresponding HuggingFace access token in
-`sparse_coding/act_access.yaml`.
+- Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`.
+  This solves device issues with `accelerate` on too-small models.
+
+- Try to run this on CUDA 12.2 or better. I have ever had env variable bugs on
+  CUDA 12.0; I haven't looked into this in great detail, but I notice this fix
+  works.
+
+- If you're trying to access a gated HuggingFace model repo, you'll have to
+  provide the needed HuggingFace access token in
+  `sparse_coding/act_access.yaml`. The script will create this YAML if needed.
 
 ## Project Status
-Project is currently extremely WIP. Current version is 0.0.2.
+Project is currently a WIP. Current version: 0.1.2.

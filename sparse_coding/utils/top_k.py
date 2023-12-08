@@ -1,13 +1,13 @@
 """Functions for processing autoencoders into top-k tokens."""
 
 
-import textwrap
 from collections import defaultdict
 from math import ceil
 
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoTokenizer
+from tqdm.auto import tqdm
 
 
 # `per_input_token_effects` is a linchpin interpretability function. I break up
@@ -20,13 +20,11 @@ def per_input_token_effects(
     tokenizer: AutoTokenizer,
     accelerator: Accelerator,
     dims_per_batch: int,
-    large_model_mode: bool,
 ) -> defaultdict[int, defaultdict[str, float]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
     # Begin pre-processing. Calulate the number of dimensional batches to run.
-    print("Starting pre-processing...")
     num_dim_batches: int = batching_setup(dims_per_batch, encoder)
 
     # Initialize the effects dictionary.
@@ -34,10 +32,9 @@ def per_input_token_effects(
 
     # Pre-process `token_ids_by_q`.
     flat_input_token_ids, unique_input_token_ids = pre_process_input_token_ids(
-        token_ids_by_q, encoder, accelerator, large_model_mode
+        token_ids_by_q, encoder, accelerator
     )
 
-    print("Pre-processing complete!")
     effect_scalar_by_dim_by_input_token = batches_loop(
         num_dim_batches,
         dims_per_batch,
@@ -48,7 +45,6 @@ def per_input_token_effects(
         effect_scalar_by_dim_by_input_token,
         unique_input_token_ids,
         flat_input_token_ids,
-        large_model_mode,
     )
 
     return effect_scalar_by_dim_by_input_token
@@ -56,12 +52,15 @@ def per_input_token_effects(
 
 # Helper functions for `per_token_effects`.
 def modal_tensor_acceleration(
-    tensor: t.Tensor, encoder, accelerator: Accelerator, large_model_mode: bool
+    tensor: t.Tensor, encoder, accelerator: Accelerator
 ) -> t.Tensor:
-    """Accelerate a tensor; manually move it where the accelerator fails."""
-    if large_model_mode is False:
+    """Accelerate a tensor; directly move it where the accelerator fails."""
+
+    try:
+        tensor = accelerator.prepare(tensor)
+    except RuntimeError:
         tensor = tensor.to(encoder.encoder_layer.weight.device)
-    tensor = accelerator.prepare(tensor)
+        tensor = accelerator.prepare(tensor)
 
     return tensor
 
@@ -71,7 +70,6 @@ def batching_setup(dims_per_batch: int, encoder) -> int:
     num_dim_batches: int = ceil(
         encoder.encoder_layer.weight.shape[0] / dims_per_batch
     )
-    print(f"Total number of batches to be run: {num_dim_batches}")
 
     return num_dim_batches
 
@@ -82,8 +80,10 @@ def defaultdict_factory():
 
 
 def pre_process_input_token_ids(
-    token_ids_by_q, encoder, accelerator, large_model_mode
-):
+        token_ids_by_q,
+        encoder,
+        accelerator: Accelerator,
+    ):
     """Pre-process the `token_ids_by_q`."""
 
     # Flatten the input token ids.
@@ -99,7 +99,7 @@ def pre_process_input_token_ids(
     # Tensorize and accelerate `flat_input_token_ids`.
     flat_input_token_ids = t.tensor(flat_input_token_ids)
     flat_input_token_ids = modal_tensor_acceleration(
-        flat_input_token_ids, encoder, accelerator, large_model_mode
+        flat_input_token_ids, encoder, accelerator
     )
 
     return flat_input_token_ids, unique_input_token_ids
@@ -115,15 +115,16 @@ def batches_loop(
     effect_scalar_by_dim_by_input_token,
     unique_input_token_ids,
     flat_input_token_ids,
-    large_model_mode: bool,
 ) -> defaultdict[int, defaultdict[str, float]]:
     """Loop over the batches while printing current progress."""
 
     starting_dim_index, ending_dim_index = 0, 0
+    features_progress_bar = tqdm(
+        total=encoder.encoder_layer.weight.shape[0],
+        desc="Feature dims progress",
+    )
 
     for batch in range(num_dim_batches):
-        print(f"Starting batch {batch+1} of {num_dim_batches}...")
-
         ending_dim_index += dims_per_batch
         if ending_dim_index > encoder.encoder_layer.weight.shape[0]:
             ending_dim_index = encoder.encoder_layer.weight.shape[0]
@@ -143,7 +144,6 @@ def batches_loop(
                 accelerator,
                 starting_dim_index,
                 ending_dim_index,
-                large_model_mode,
             )
         )
 
@@ -174,17 +174,12 @@ def batches_loop(
                     starting_dim_index + dim_in_batch
                 ][input_token_string] = averaged_activation_per_dim.item()
 
-        print(
-            textwrap.dedent(
-                f"""
-                Batch {batch+1} complete: data for encoder dims indices
-                {starting_dim_index} through {ending_dim_index-1} appended!
-                """
-            )
-        )
-
+        # Manually closed, because there isn't a natural iterable for tqdm.
+        features_progress_bar.update(ending_dim_index - starting_dim_index)
         # Update `starting_dim_index` for the next batch.
         starting_dim_index = ending_dim_index
+
+    features_progress_bar.close()
 
     return effect_scalar_by_dim_by_input_token
 
@@ -196,7 +191,6 @@ def pre_process_encoder_activations_by_batch(
     accelerator,
     starting_dim_index,
     ending_dim_index,
-    large_model_mode,
 ) -> t.Tensor:
     """Pre-process the `encoder_activations_by_q` for each batch."""
     batched_dims_from_encoder_activations: list = []
@@ -221,7 +215,6 @@ def pre_process_encoder_activations_by_batch(
         batched_dims_from_encoder_activations,
         encoder,
         accelerator,
-        large_model_mode,
     )
 
     return batched_dims_from_encoder_activations
