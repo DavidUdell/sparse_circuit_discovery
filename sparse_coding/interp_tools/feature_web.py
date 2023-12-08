@@ -42,7 +42,7 @@ BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
-NUM_ABLATION_DIMS_PLOTTED = config.get("NUM_ABLATION_DIMS_PLOTTED", None)
+ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
 SEED = config.get("SEED")
 
 # %%
@@ -173,8 +173,15 @@ else:
             __file__,
             ablate_dim_indices,
         )
-        if NUM_ABLATION_DIMS_PLOTTED is not None:
-            ablate_dim_indices = ablate_dim_indices[:NUM_ABLATION_DIMS_PLOTTED]
+
+        if ABLATION_DIM_INDICES_PLOTTED is not None:
+            for i in ABLATION_DIM_INDICES_PLOTTED:
+                assert i in ablate_dim_indices, dedent(
+                    f"""Index {i} not in layer {ablate_layer_idx} feature
+                     indices."""
+                )
+            ablate_dim_indices = []
+            ablate_dim_indices.extend(ABLATION_DIM_INDICES_PLOTTED)
 
         cache_dim_indices_per_layer = {}
         cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]
@@ -275,8 +282,11 @@ else:
         HOOK_EFFECTS_CHECKSUM != 0.0
     ), "Ablate hook effects sum to exactly zero."
 
+    sorted_diffs = dict(
+        sorted(activation_diffs.items(), key=lambda x: x[1].item())
+    )
     graph_causal_effects(
-        activation_diffs,
+        sorted_diffs,
         MODEL_DIR,
         TOP_K_INFO_FILE,
         __file__,

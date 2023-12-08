@@ -52,4 +52,4 @@ TOP_K: 6
 # _Leave out entries_ for None: None values here are interpreted as the string
 # "None"
 NUM_QUESTIONS_INTERPED: 200
-NUM_ABLATION_DIMS_PLOTTED: 2
+ABLATION_DIM_INDICES_PLOTTED: [4248]

@@ -8,6 +8,15 @@ from pygraphviz import AGraph
 from sparse_coding.utils.interface import load_layer_feature_labels
 
 
+def color_range_from_scalars(activations: dict) -> tuple[float, float]:
+    """Get the range of values in the activations dict."""
+
+    min_scalar = min([value.item() for value in activations.values()])
+    max_scalar = max([value.item() for value in activations.values()])
+
+    return min_scalar, max_scalar
+
+
 def graph_causal_effects(
     activations: dict,
     model_dir: str,
@@ -31,8 +40,8 @@ def graph_causal_effects(
                     if effect.item() == 0:
                         continue
                     graph.add_edge(
-                        f"(0.{neuron_idx})",
-                        f"(1.{downstream_neuron_idx})",
+                        f"0.{neuron_idx}",
+                        f"1.{downstream_neuron_idx}",
                         label=str(effect.item()),
                     )
 
@@ -58,7 +67,7 @@ def graph_causal_effects(
             graph.add_node(
                 dedent(
                     f"""
-                    ({ablation_layer_idx}.{ablated_dim}):
+                    {ablation_layer_idx}.{ablated_dim}:
                     {label_appendable(ablation_layer_idx, ablated_dim)}
                     """
                 )
@@ -66,11 +75,13 @@ def graph_causal_effects(
             graph.add_node(
                 dedent(
                     f"""
-                    ({ablation_layer_idx + 1}.{downstream_dim}):
+                    {ablation_layer_idx + 1}.{downstream_dim}:
                     {label_appendable(ablation_layer_idx + 1, downstream_dim)}
                     """
                 )
             )
+
+        min_scalar, max_scalar = color_range_from_scalars(activations)
         # Plot effect edges.
         for (
             ablation_layer_idx,
@@ -79,20 +90,30 @@ def graph_causal_effects(
         ), effect in activations.items():
             if effect.item() == 0:
                 continue
+            normed_effect = (effect.item() - min_scalar) / (
+                max_scalar - min_scalar
+            )
+            rgb_color = f"""
+                #{int(255 * normed_effect):02x}00{int(255*(1 - normed_effect)):02x}
+            """.replace(
+                " ", ""
+            ).replace(
+                "\n", ""
+            )
             graph.add_edge(
                 dedent(
                     f"""
-                    ({ablation_layer_idx}.{ablated_dim}):
+                    {ablation_layer_idx}.{ablated_dim}:
                     {label_appendable(ablation_layer_idx, ablated_dim)}
                     """
                 ),
                 dedent(
                     f"""
-                    ({ablation_layer_idx + 1}.{downstream_dim}):
+                    {ablation_layer_idx + 1}.{downstream_dim}:
                     {label_appendable(ablation_layer_idx + 1, downstream_dim)}
                     """
                 ),
-                label=str(round(effect.item())),
+                color=rgb_color,
             )
 
         # Assert no repeat edges.
