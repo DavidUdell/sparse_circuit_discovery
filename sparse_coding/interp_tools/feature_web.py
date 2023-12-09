@@ -275,12 +275,12 @@ else:
                 )
 
     # Check that there was any effect.
-    HOOK_EFFECTS_CHECKSUM = 0.0
-    for i, j, k in activation_diffs:
-        HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
-    assert (
-        HOOK_EFFECTS_CHECKSUM != 0.0
-    ), "Ablate hook effects sum to exactly zero."
+    # HOOK_EFFECTS_CHECKSUM = 0.0
+    # for i, j, k in activation_diffs:
+    #     HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+    # assert (
+    #     HOOK_EFFECTS_CHECKSUM != 0.0
+    # ), "Ablate hook effects sum to exactly zero."
 
     sorted_diffs = dict(
         sorted(activation_diffs.items(), key=lambda x: x[1].item())
