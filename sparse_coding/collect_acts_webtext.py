@@ -59,7 +59,9 @@ tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-        MODEL_DIR, token=HF_ACCESS_TOKEN
+        MODEL_DIR,
+        token=HF_ACCESS_TOKEN,
+        output_hidden_states=True,
     )
 model = accelerator.prepare(model)
 model.eval()
