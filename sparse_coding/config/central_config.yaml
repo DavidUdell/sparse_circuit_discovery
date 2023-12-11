@@ -38,7 +38,7 @@ NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 50
 
 # Stable Dev Constants for `train_autoencoder.py`
-LOG_EVERY_N_STEPS: 5
+LOG_EVERY_N_STEPS: 1
 EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
