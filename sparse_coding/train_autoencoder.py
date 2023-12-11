@@ -7,6 +7,8 @@ is your learned dictionary.
 """
 
 
+import warnings
+
 import numpy as np
 import torch as t
 import lightning as L
@@ -145,10 +147,12 @@ unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 # %%
 # Loop over the layer_idx values in the model slice.
-hf_model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR,
-    token=HF_ACCESS_TOKEN,
-)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    hf_model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR,
+        token=HF_ACCESS_TOKEN,
+    )
 seq_layer_indices: range = slice_to_seq(hf_model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:

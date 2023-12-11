@@ -6,6 +6,7 @@ Requires a HF access token to get `Llama-2`'s tokenizer.
 """
 
 
+import warnings
 import csv
 from collections import defaultdict
 from math import isnan
@@ -170,10 +171,12 @@ def populate_table(
 
 # %%
 # Loop over all the sliced model layers.
-model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR,
-    token=HF_ACCESS_TOKEN,
-)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR,
+        token=HF_ACCESS_TOKEN,
+    )
 seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:

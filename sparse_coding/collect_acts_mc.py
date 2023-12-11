@@ -11,6 +11,8 @@ access token for the `Llama-2` models.
 """
 
 
+import warnings
+
 import numpy as np
 import torch as t
 import transformers
@@ -72,13 +74,14 @@ accelerator: Accelerator = Accelerator()
 # through the vanilla HF API. We'll have to write and register out own hook
 # factory to extract MLP output activations, though; for whatever reason, the
 # HF API doesn't expose those to us.
-model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR,
-    device_map="auto",
-    token=HF_ACCESS_TOKEN,
-    output_hidden_states=True,
-)
-
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR,
+        device_map="auto",
+        token=HF_ACCESS_TOKEN,
+        output_hidden_states=True,
+    )
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,

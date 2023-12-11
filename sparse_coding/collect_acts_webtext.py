@@ -2,6 +2,9 @@
 """Collect model activations during inference on `openwebtext`."""
 
 
+import gc
+import warnings
+
 import numpy as np
 import torch as t
 import transformers
@@ -49,11 +52,15 @@ np.random.seed(SEED)
 t.set_grad_enabled(False)
 accelerator: Accelerator = Accelerator()
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
-    MODEL_DIR, use_fast=True, token=HF_ACCESS_TOKEN
+    MODEL_DIR,
+    use_fast=True,
+    token=HF_ACCESS_TOKEN,
 )
-model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR, token=HF_ACCESS_TOKEN
-)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR, token=HF_ACCESS_TOKEN
+    )
 model = accelerator.prepare(model)
 model.eval()
 
@@ -62,26 +69,21 @@ validate_slice(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset.
-dataset: list[str] = load_dataset(
-    "Elriggs/openwebtext-100k", split="train"
-)["text"]
+dataset: list[str] = load_dataset("Elriggs/openwebtext-100k", split="train")[
+    "text"
+]
 
 # %%
 # Tokenization and inference.
 for idx, batch in enumerate(dataset):
-    inputs = tokenizer(batch, return_tensors="pt")
-    # try:
-    #     inputs = accelerator.prepare(inputs)
-    #     outputs = model(**inputs)
-    #     del outputs
-    #     t.cuda.empty_cache()
-    # except RuntimeError:
-    inputs = inputs.to(model.device)
-    inputs = accelerator.prepare(inputs)
-    outputs = model(**inputs)
-
-    del inputs
-    del outputs
-    t.cuda.empty_cache()
-    accelerator.clear()
-    print(f"Batch {idx} of {len(dataset)}", end="\r")
+    try:
+        inputs = tokenizer(
+            batch, return_tensors="pt", truncation=True, max_length=10000
+        ).to(model.device)
+        outputs = model(**inputs)
+    except RuntimeError:
+        gc.collect()
+        inputs = tokenizer(
+            batch, return_tensors="pt", truncation=True, max_length=10000
+        ).to(model.device)
+        outputs = model(**inputs)

@@ -4,6 +4,7 @@
 
 from collections import defaultdict
 from textwrap import dedent
+import warnings
 
 import numpy as np
 import torch as t
@@ -123,10 +124,12 @@ if MODEL_DIR == "rasp":
     )
 
 else:
-    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-        MODEL_DIR,
-        token=HF_ACCESS_TOKEN,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+            MODEL_DIR,
+            token=HF_ACCESS_TOKEN,
+        )
     tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
     accelerator = Accelerator()
     model = accelerator.prepare(model)
