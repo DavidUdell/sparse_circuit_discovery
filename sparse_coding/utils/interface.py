@@ -2,6 +2,7 @@
 
 
 import csv
+import gc
 import os
 from pathlib import Path
 from textwrap import dedent
@@ -366,11 +367,10 @@ def pad_activations(
     complement_length: int = max_length - tensor.size(1)
     padding: t.Tensor = t.zeros(
         tensor.size(0), complement_length, tensor.size(2)
-    )
+    ).to(tensor.device)
+    padding = accelerator.prepare(padding)
     try:
-        padding: t.Tensor = accelerator.prepare(padding)
         return t.cat([tensor, padding], dim=1)
     except RuntimeError:
-        padding: t.Tensor = padding.to(tensor.device)
-        padding: t.Tensor = accelerator.prepare(padding)
+        gc.collect()
         return t.cat([tensor, padding], dim=1)

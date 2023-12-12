@@ -41,7 +41,7 @@ MODEL_DIR = config.get("MODEL_DIR")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
-NUM_BATCHES_EVALED = config.get("NUM_BATCHES_EVALED", 2000)
+NUM_BATCHES_EVALED = config.get("NUM_BATCHES_EVALED", 1000)
 SEED = config.get("SEED")
 
 # %%
@@ -87,24 +87,54 @@ train_indices: np.ndarray = all_indices[:NUM_BATCHES_EVALED]
 # Tokenization and inference. The taut constraint here is how much memory you
 # put into `activations`.
 activations: list[t.Tensor] = []
-prompts_ids: list[int] = []
+prompt_ids_tensors: list[t.Tensor] = []
 for idx, batch in enumerate(dataset_array[train_indices].tolist()):
     try:
         inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=10000
+            batch, return_tensors="pt", truncation=True, max_length=4000
         ).to(model.device)
         outputs = model(**inputs)
         activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-        prompts_ids.append(inputs["input_ids"].squeeze().tolist())
+        prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
     except RuntimeError:
         # Manually clear memory and try again.
         gc.collect()
         inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=10000
+            batch, return_tensors="pt", truncation=True, max_length=4000
         ).to(model.device)
         outputs = model(**inputs)
         activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-        prompts_ids.append(inputs["input_ids"].squeeze().tolist())
+        prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
 
 # %%
 # Save the prompt ids and activations.
+prompt_ids_array: np.ndarray = np.array(prompt_ids_tensors, dtype=object)
+np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
+
+# Single layer case lacks outer tuple; this solves that.
+if isinstance(activations, list) and isinstance(activations[0], t.Tensor):
+    activations: list[tuple[t.Tensor]] = [(tensor,) for tensor in activations]
+# Tensors are of classic shape: (batch, seq, hidden)
+
+max_seq_length: int = max(
+    tensor.size(1) for layers_tuple in activations for tensor in layers_tuple
+)
+
+for abs_idx, layer_idx in enumerate(acts_layers_range):
+    layer_activations: list[t.Tensor] = [
+        pad_activations(
+            accelerator.prepare(layers_tuple[abs_idx]),
+            max_seq_length,
+            accelerator,
+        )
+        for layers_tuple in activations
+    ]
+    layer_activations: t.Tensor = t.cat(layer_activations, dim=0)
+
+    cache_layer_tensor(
+        layer_activations,
+        layer_idx,
+        ACTS_DATA_FILE,
+        __file__,
+        MODEL_DIR,
+    )
