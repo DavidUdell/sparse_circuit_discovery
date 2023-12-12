@@ -40,6 +40,7 @@ MODEL_DIR = config.get("MODEL_DIR")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
+NUM_BATCHES_EVALED = config.get("NUM_BATCHES_EVALED", 2000)
 SEED = config.get("SEED")
 
 # %%
@@ -66,26 +67,40 @@ with warnings.catch_warnings():
 model = accelerator.prepare(model)
 model.eval()
 
-# Validate slice against model.
 validate_slice(model, ACTS_LAYERS_SLICE)
+acts_layers_range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset.
 dataset: list[str] = load_dataset("Elriggs/openwebtext-100k", split="train")[
     "text"
 ]
+dataset_array: np.ndarray = np.array(dataset)
+
+all_indices: np.ndarray = np.random.choice(
+    len(dataset_array), size=len(dataset_array), replace=False
+)
+train_indices: np.ndarray = all_indices[:NUM_BATCHES_EVALED]
 
 # %%
-# Tokenization and inference.
-for idx, batch in enumerate(dataset):
+# Tokenization and inference. The taut constraint here is how much memory you
+# put into `activations`.
+activations: list[t.Tensor] = []
+prompts_ids: list[int] = []
+for idx, batch in enumerate(dataset_array[train_indices].tolist()):
     try:
         inputs = tokenizer(
             batch, return_tensors="pt", truncation=True, max_length=10000
         ).to(model.device)
         outputs = model(**inputs)
+        activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
+        prompts_ids.append(inputs["input_ids"].squeeze().tolist())
     except RuntimeError:
+        # Manually clear memory and try again.
         gc.collect()
         inputs = tokenizer(
             batch, return_tensors="pt", truncation=True, max_length=10000
         ).to(model.device)
         outputs = model(**inputs)
+        activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
+        prompts_ids.append(inputs["input_ids"].squeeze().tolist())

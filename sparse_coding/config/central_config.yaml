@@ -31,11 +31,14 @@ ACCUMULATE_GRAD_BATCHES: 4
 SEED: 0
 
 
-# Stable Dev Constants for `collect_acts.py`
+# Stable Dev Constants for `collect_acts_mc.py`
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 50
+
+# Stable Dev Constants for `collect_acts_webtext.py`
+NUM_BATCHES_EVALED: 2000
 
 # Stable Dev Constants for `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
