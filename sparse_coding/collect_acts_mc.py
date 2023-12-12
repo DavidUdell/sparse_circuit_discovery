@@ -32,6 +32,7 @@ from sparse_coding.utils.interface import (
     slice_to_seq,
     load_yaml_constants,
     save_paths,
+    pad_activations,
 )
 from sparse_coding.utils.tasks import multiple_choice_task
 
@@ -145,23 +146,6 @@ np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 
 
 # %%
-# Functionality to pad out activations for saving.
-def pad_activations(tensor, length) -> t.Tensor:
-    """Pad activation tensors to a certain stream-dim length."""
-
-    padding_size: int = length - tensor.size(1)
-    padding: t.Tensor = t.zeros(tensor.size(0), padding_size, tensor.size(2))
-
-    try:
-        padding: t.Tensor = accelerator.prepare(padding)
-        return t.cat([tensor, padding], dim=1)
-    except RuntimeError:
-        padding: t.Tensor = padding.to(tensor.device)
-        padding: t.Tensor = accelerator.prepare(padding)
-        return t.cat([tensor, padding], dim=1)
-
-
-# %%
 # Save activations.
 seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
@@ -176,7 +160,7 @@ max_seq_len: int = max(
 for abs_idx, layer_idx in enumerate(seq_layer_indices):
     # Pad activations to the widest activation stream-dim.
     padded_activations: list[t.Tensor] = [
-        pad_activations(layers_tuple[abs_idx], max_seq_len)
+        pad_activations(layers_tuple[abs_idx], max_seq_len, accelerator)
         for layers_tuple in activations
     ]
     concat_activations: t.Tensor = t.cat(

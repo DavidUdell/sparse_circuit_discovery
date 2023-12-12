@@ -24,6 +24,7 @@ from sparse_coding.utils.interface import (
     slice_to_seq,
     load_yaml_constants,
     save_paths,
+    pad_activations,
 )
 
 
@@ -104,3 +105,6 @@ for idx, batch in enumerate(dataset_array[train_indices].tolist()):
         outputs = model(**inputs)
         activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
         prompts_ids.append(inputs["input_ids"].squeeze().tolist())
+
+# %%
+# Save the prompt ids and activations.

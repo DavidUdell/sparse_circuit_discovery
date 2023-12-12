@@ -356,3 +356,21 @@ def load_layer_feature_labels(
                 """
             )
         )
+
+
+def pad_activations(
+    tensor: t.Tensor, max_length: int, accelerator
+) -> t.Tensor:
+    """Pad activation tensors to a given sequence length."""
+
+    complement_length: int = max_length - tensor.size(1)
+    padding: t.Tensor = t.zeros(
+        tensor.size(0), complement_length, tensor.size(2)
+    )
+    try:
+        padding: t.Tensor = accelerator.prepare(padding)
+        return t.cat([tensor, padding], dim=1)
+    except RuntimeError:
+        padding: t.Tensor = padding.to(tensor.device)
+        padding: t.Tensor = accelerator.prepare(padding)
+        return t.cat([tensor, padding], dim=1)
