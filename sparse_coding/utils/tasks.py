@@ -106,13 +106,13 @@ def multiple_choice_task(
         prompts_ids.append(input_ids)
 
         # `accelerate` parallelization can fail with small models.
-        # try:
-        #     input_ids = accelerator.prepare(input_ids)
-        #     outputs = model(input_ids)
-        # except RuntimeError:
-        input_ids = input_ids.to(model.device)
-        input_ids = accelerator.prepare(input_ids)
-        outputs = model(input_ids)
+        try:
+            input_ids = accelerator.prepare(input_ids)
+            outputs = model(input_ids)
+        except RuntimeError:
+            input_ids = input_ids.to(model.device)
+            input_ids = accelerator.prepare(input_ids)
+            outputs = model(input_ids)
 
         if not return_outputs:
             continue

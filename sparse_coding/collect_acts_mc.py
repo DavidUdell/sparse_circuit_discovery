@@ -11,6 +11,8 @@ access token for the `Llama-2` models.
 """
 
 
+import warnings
+
 import numpy as np
 import torch as t
 import transformers
@@ -30,6 +32,7 @@ from sparse_coding.utils.interface import (
     slice_to_seq,
     load_yaml_constants,
     save_paths,
+    pad_activations,
 )
 from sparse_coding.utils.tasks import multiple_choice_task
 
@@ -72,13 +75,14 @@ accelerator: Accelerator = Accelerator()
 # through the vanilla HF API. We'll have to write and register out own hook
 # factory to extract MLP output activations, though; for whatever reason, the
 # HF API doesn't expose those to us.
-model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR,
-    device_map="auto",
-    token=HF_ACCESS_TOKEN,
-    output_hidden_states=True,
-)
-
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR,
+        device_map="auto",
+        token=HF_ACCESS_TOKEN,
+        output_hidden_states=True,
+    )
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,
@@ -139,24 +143,8 @@ for question_ids in prompts_ids:
     prompt_ids_list.append(question_ids.tolist())
 prompt_ids_array: np.ndarray = np.array(prompt_ids_list, dtype=object)
 np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
-
-
-# %%
-# Functionality to pad out activations for saving.
-def pad_activations(tensor, length) -> t.Tensor:
-    """Pad activation tensors to a certain stream-dim length."""
-
-    padding_size: int = length - tensor.size(1)
-    padding: t.Tensor = t.zeros(tensor.size(0), padding_size, tensor.size(2))
-
-    try:
-        padding: t.Tensor = accelerator.prepare(padding)
-        return t.cat([tensor, padding], dim=1)
-    except RuntimeError:
-        padding: t.Tensor = padding.to(tensor.device)
-        padding: t.Tensor = accelerator.prepare(padding)
-        return t.cat([tensor, padding], dim=1)
-
+# array of (x, 1)
+# Each element along x is a list of ints, of seq len.
 
 # %%
 # Save activations.
@@ -173,7 +161,7 @@ max_seq_len: int = max(
 for abs_idx, layer_idx in enumerate(seq_layer_indices):
     # Pad activations to the widest activation stream-dim.
     padded_activations: list[t.Tensor] = [
-        pad_activations(layers_tuple[abs_idx], max_seq_len)
+        pad_activations(layers_tuple[abs_idx], max_seq_len, accelerator)
         for layers_tuple in activations
     ]
     concat_activations: t.Tensor = t.cat(

@@ -1,6 +1,6 @@
 # Smoke Test Model
 MODEL_DIR: "EleutherAI/pythia-70m"
-ACTS_LAYERS_SLICE: "0:2"
+ACTS_LAYERS_SLICE: "1:3"
 
 # Encoder Size
 PROJECTION_FACTOR: 1
@@ -23,19 +23,25 @@ ACCUMULATE_GRAD_BATCHES: 1
 SEED: 0
 
 
-# Smoke Test Constants (`acts_collect.py`)
+# Smoke Test Constants (`acts_collect_mc.py`)
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6
-NUM_QUESTIONS_EVALED: 10
+NUM_QUESTIONS_EVALED: 7
 
-# Smoke Test Constants (`autoencoder.py`)
-LOG_EVERY_N_STEPS: 5
-EPOCHS: 1
+# Smoke Test Constants (`train_autoencoder.py`)
+LOG_EVERY_N_STEPS: 1
+EPOCHS: 2
 SYNC_DIST_LOGGING: True
 
-# Smoke Test Constants (`feature_tokens.py`)
+# Smoke Test Constants (`top_tokens.py`)
 # _Leave out entries_ for None: None values will be interpreted as "None"
 # strings.
-DIMS_IN_BATCH: 200
+DIMS_IN_BATCH: 500
 TOP_K: 6
+
+# Smoke Test Constants (`feature_web.py`)
+# _Leave out entries_ for None: None values here are interpreted as the string
+# "None"
+NUM_QUESTIONS_INTERPED: 1
+ABLATION_DIM_INDICES_PLOTTED: [1]
