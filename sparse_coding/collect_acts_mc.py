@@ -143,7 +143,8 @@ for question_ids in prompts_ids:
     prompt_ids_list.append(question_ids.tolist())
 prompt_ids_array: np.ndarray = np.array(prompt_ids_list, dtype=object)
 np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
-
+# array of (x, 1)
+# Each element along x is a list of ints, of seq len.
 
 # %%
 # Save activations.

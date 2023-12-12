@@ -108,8 +108,13 @@ for idx, batch in enumerate(dataset_array[train_indices].tolist()):
 
 # %%
 # Save the prompt ids and activations.
-prompt_ids_array: np.ndarray = np.array(prompt_ids_tensors, dtype=object)
+prompt_ids_lists = []
+for tensor in prompt_ids_tensors:
+    prompt_ids_lists.append([tensor.tolist()])
+prompt_ids_array: np.ndarray = np.array(prompt_ids_lists, dtype=object)
 np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
+# array of (x, 1)
+# Each element along x is a list of ints, of seq len.
 
 # Single layer case lacks outer tuple; this solves that.
 if isinstance(activations, list) and isinstance(activations[0], t.Tensor):
