@@ -90,11 +90,15 @@ def graph_causal_effects(
         ), effect in activations.items():
             if effect.item() == 0:
                 continue
+            # Ablation effects minus base effects, mapped to [0, 1]. Positive
+            # values mean the ablation increased the activation downstream and
+            # are blue. Negative values mean the ablation decreased the
+            # downstream activation and are red.
             normed_effect = (effect.item() - min_scalar) / (
                 max_scalar - min_scalar
             )
             rgb_color = f"""
-                #{int(255 * normed_effect):02x}00{int(255*(1 - normed_effect)):02x}
+                #{int(255 * (1 - normed_effect)):02x}00{int(255*normed_effect):02x}
             """.replace(
                 " ", ""
             ).replace(

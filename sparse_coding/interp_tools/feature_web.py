@@ -41,7 +41,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
-NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
+NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
 SEED = config.get("SEED")
@@ -145,7 +145,7 @@ else:
         size=len(dataset["validation"]["question"]),
         replace=False,
     )
-    starting_index: int = len(dataset_indices) - NUM_QUESTIONS_INTERPED
+    starting_index: int = len(dataset_indices) - NUM_SEQUENCES_INTERPED
     validation_indices: list = dataset_indices[starting_index:].tolist()
 
     def recursive_defaultdict():
@@ -266,27 +266,27 @@ else:
                     return_outputs=False,
                 )
 
-    # Compute differential downstream ablation effects. Recursive defaultdict
-    # indices: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
+    # Compute ablated effects minus base effects. Recursive defaultdict indices
+    # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
     activation_diffs = {}
     for i in ablate_range:
         for j in base_activations[i].keys():
             for k in base_activations[i][j].keys():
                 activation_diffs[i, j, k] = (
-                    base_activations[i][j][k].sum(axis=1).squeeze()
-                    - ablated_activations[i][j][k].sum(axis=1).squeeze()
+                ablated_activations[i][j][k].sum(axis=1).squeeze()
+                - base_activations[i][j][k].sum(axis=1).squeeze()
                 )
 
-    # Check that there was any effect.
-    # HOOK_EFFECTS_CHECKSUM = 0.0
-    # for i, j, k in activation_diffs:
-    #     HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
-    # assert (
-    #     HOOK_EFFECTS_CHECKSUM != 0.0
-    # ), "Ablate hook effects sum to exactly zero."
+    # Check that there was any overall effect.
+    HOOK_EFFECTS_CHECKSUM = 0.0
+    for i, j, k in activation_diffs:
+        HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+    assert (
+        HOOK_EFFECTS_CHECKSUM != 0.0
+    ), "Ablate hook effects sum to exactly zero."
 
     sorted_diffs = dict(
-        sorted(activation_diffs.items(), key=lambda x: x[1].item())
+        sorted(activation_diffs.items(), key=lambda x: x[-1].item())
     )
     graph_causal_effects(
         sorted_diffs,
