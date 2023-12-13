@@ -5,7 +5,7 @@ from runpy import run_module
 
 
 for script in [
-    "collect_acts_mc",
+    "collect_acts_webtext",
     "train_autoencoder",
     "interp_tools.top_tokens",
     "interp_tools.feature_web",

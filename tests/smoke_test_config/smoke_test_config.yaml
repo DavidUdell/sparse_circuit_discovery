@@ -5,7 +5,7 @@ ACTS_LAYERS_SLICE: "1:3"
 # Encoder Size
 PROJECTION_FACTOR: 1
 
-# Smoke Test Data Files
+# Smoke Test Save Files
 PROMPT_IDS_FILE: "smoke_test_activations_prompt_ids.npy"
 ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
 ENCODER_FILE: "smoke_test_learned_encoder.pt"
@@ -23,11 +23,15 @@ ACCUMULATE_GRAD_BATCHES: 1
 SEED: 0
 
 
-# Smoke Test Constants (`acts_collect_mc.py`)
+# Smoke Test Constants (`collect_acts_mc.py`)
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 7
+
+# Smoke Text Constants (`collect_acts_webtext.py`)
+NUM_SEQUENCES_EVALED: 7
+MAX_SEQ_LEN: 100
 
 # Smoke Test Constants (`train_autoencoder.py`)
 LOG_EVERY_N_STEPS: 1

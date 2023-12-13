@@ -98,7 +98,7 @@ def test_smoke_sparse_coding(
 ):  # pylint: disable=redefined-outer-name, unused-argument
     """Run the submodule scripts in sequence."""
     for script in [
-        "collect_acts_mc",
+        "collect_acts_webtext",
         "train_autoencoder",
         "interp_tools.top_tokens",
         "interp_tools.feature_web",
