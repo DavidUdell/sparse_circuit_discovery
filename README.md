@@ -48,7 +48,7 @@ python3 pipe.py
 ### Notes:
 - A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
   convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
-h  yperparameters to get this L^0.
+  hyperparameters to get this L^0.
 
 - Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`.
   This solves device issues with `accelerate` on too-small models.
