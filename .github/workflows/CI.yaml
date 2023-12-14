@@ -32,7 +32,7 @@ jobs:
         pip install -e .
     - name: Lint with pylint
       run: |
-        pylint .
+        pylint sparse_coding/ tests/
     - name: Test with pytest
       run: |
         cd tests
