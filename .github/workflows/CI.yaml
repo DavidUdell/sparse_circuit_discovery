@@ -36,10 +36,11 @@ jobs:
         pylint sparse_coding/ tests/
         PYLINT_EXIT_CODE=$?
 
-        if [ $PYLINT_EXIT_CODE -ne 1 ]; then
+        if [ $PYLINT_EXIT_CODE -eq 1 ]; then
+          exit 1
+        else
           exit 0
         fi
-        exit 1
     - name: Test with pytest
       run: |
         cd tests
