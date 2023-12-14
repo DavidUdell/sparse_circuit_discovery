@@ -32,9 +32,14 @@ jobs:
         pip install -e .
     - name: Lint with pylint
       run: |
-        # Exit codes besides 1 will be converted to 0. We'll only fail on exit
-        # code 1. (These are lesser linter warnings, not full errors.)
-        (pylint sparse_coding/ tests/ || [ $? -eq 1 ]) && exit 1
+        # We only want to fail on the full error exit code (1).
+        pylint sparse_coding/ tests/
+        PYLINT_EXIT_CODE=$?
+
+        if [ $PYLINT_EXIT_CODE -ne 1 ]; then
+          exit 0
+        fi
+        exit 1
     - name: Test with pytest
       run: |
         cd tests
