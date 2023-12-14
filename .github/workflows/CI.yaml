@@ -1,0 +1,41 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Basic CI; testing and linting
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y graphviz graphviz-dev
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint
+        pip install -e .
+    - name: Lint with pylint
+      run: |
+        # We only want to fail on the full error exit code (1).
+        pylint --exit-zero sparse_coding/ tests/
+
+    - name: Test with pytest
+      run: |
+        cd tests
+        pytest
