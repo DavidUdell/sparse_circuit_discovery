@@ -47,9 +47,6 @@ Once you've saved `central_config.yaml`, run the main interpretability pipeline 
   convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
   hyperparameters to get this L^0.
 
-- Small models like Pythia 70M should be run with `LARGE_MODEL_MODE: False`.
-  This solves device issues with `accelerate` on too-small models.
-
 - Try to run this on CUDA 12.2 or better. I have ever had env variable bugs on
   CUDA 12.0; I haven't looked into this in great detail, but I notice this fix
   works.
@@ -59,4 +56,4 @@ Once you've saved `central_config.yaml`, run the main interpretability pipeline 
   `sparse_coding/act_access.yaml`. The script will create this YAML if needed.
 
 ## Project Status
-Project is currently a WIP. Current version: 0.1.2.
+Project is currently a WIP. Current version: 0.1.3.
