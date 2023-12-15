@@ -1,5 +1,18 @@
 # %%
-"""Ablate autoencoder dimensions during inference and graph causal effects."""
+"""
+Scale autoencoder dimensions during `truthful_qa` and graph causal effects.
+
+`feature_web_mc` in particular tries a model agains the multiple-choice task on
+`truthful_qa`, where the model is teed up to answer a m/c question with widely
+believed but false choices. The base task is compared to the task in which
+autoencoder activations dimensions are surgically scaled during inference, at
+the crucial last sequence position, where the model is answering. Results are
+plotted as a causal graph, using cached data from the scripts in `pipe.py`.
+
+Run the script with "rasp" as the model directory in `central_config.yaml` to
+see the rasp toy model validation. You'll need to set a HF access token if
+needed.
+"""
 
 
 from collections import defaultdict
