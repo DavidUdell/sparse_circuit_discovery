@@ -230,49 +230,29 @@ else:
         ):
             np.random.seed(SEED)
             # Base run.
-            with hooks_lifecycle(
-                ablate_layer_idx,
-                ablate_dim_idx,
-                layer_range,
-                cache_dim_indices_per_layer,
+            multiple_choice_task(
+                dataset,
+                validation_indices,
                 model,
-                tensors_per_layer,
-                base_activations,
-                ablate_during_run=False,
-            ):
-                multiple_choice_task(
-                    dataset,
-                    validation_indices,
-                    model,
-                    tokenizer,
-                    accelerator,
-                    NUM_SHOT,
-                    ACTS_LAYERS_SLICE,
-                    return_outputs=False,
-                )
+                tokenizer,
+                accelerator,
+                NUM_SHOT,
+                ACTS_LAYERS_SLICE,
+                black_box_evals=False,
+            )
 
             np.random.seed(SEED)
             # Ablated run.
-            with hooks_lifecycle(
-                ablate_layer_idx,
-                ablate_dim_idx,
-                layer_range,
-                cache_dim_indices_per_layer,
+            multiple_choice_task(
+                dataset,
+                validation_indices,
                 model,
-                tensors_per_layer,
-                ablated_activations,
-                ablate_during_run=True,
-            ):
-                multiple_choice_task(
-                    dataset,
-                    validation_indices,
-                    model,
-                    tokenizer,
-                    accelerator,
-                    NUM_SHOT,
-                    ACTS_LAYERS_SLICE,
-                    return_outputs=False,
-                )
+                tokenizer,
+                accelerator,
+                NUM_SHOT,
+                ACTS_LAYERS_SLICE,
+                black_box_evals=False,
+            )
 
     # Compute ablated effects minus base effects. Recursive defaultdict indices
     # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]

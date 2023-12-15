@@ -32,7 +32,7 @@ def hooks_lifecycle(
     model,
     tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
-    ablate_during_run: bool = True,
+    cache_hooks_only: bool = False,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -146,7 +146,7 @@ def hooks_lifecycle(
         raise ValueError("Cannot ablate and cache from the last layer.")
     cache_range: range = range(ablate_layer_idx + 1, model_layer_range[-1] + 1)
     # Just the Pythia layer syntax, for now.
-    if ablate_during_run:
+    if not cache_hooks_only:
         ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]
         ablate_hook_handle = model.gpt_neox.layers[
             ablate_layer_idx
@@ -173,7 +173,7 @@ def hooks_lifecycle(
     try:
         yield
     finally:
-        if ablate_during_run:
+        if not cache_hooks_only:
             ablate_hook_handle.remove()
         for handle in cache_hook_handles.values():
             handle.remove()
