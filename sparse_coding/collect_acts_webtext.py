@@ -45,9 +45,6 @@ NUM_SEQUENCES_EVALED = config.get("NUM_SEQUENCES_EVALED", 1000)
 MAX_SEQ_LEN = config.get("MAX_SEQ_LEN", 1000)
 SEED = config.get("SEED")
 
-warnings.warn(f"Number of sequences evaled: {NUM_SEQUENCES_EVALED}")
-warnings.warn(f"Max sequence length: {MAX_SEQ_LEN}")
-
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
@@ -77,22 +74,26 @@ acts_layers_range = slice_to_seq(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset.
-dataset: list[str] = load_dataset("Elriggs/openwebtext-100k", split="train")[
-    "text"
-]
-dataset_array: np.ndarray = np.array(dataset)
-
-all_indices: np.ndarray = np.random.choice(
-    len(dataset_array), size=len(dataset_array), replace=False
+dataset: list[list[str]] = load_dataset(
+    "Elriggs/openwebtext-100k",
+    split="train"
+    )["text"]
+dataset_indices: np.ndarray = np.random.choice(
+    len(dataset), size=len(dataset), replace=False
 )
-train_indices: np.ndarray = all_indices[:NUM_SEQUENCES_EVALED]
+train_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_EVALED]
+
+# Poor man's fancy indexing.
+training_set: list[list[int]] = [
+    dataset[i] for i in train_indices.tolist()
+]
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
 # put into `activations`.
 activations: list[t.Tensor] = []
 prompt_ids_tensors: list[t.Tensor] = []
-for idx, batch in enumerate(dataset_array[train_indices].tolist()):
+for idx, batch in enumerate(training_set):
     try:
         inputs = tokenizer(
             batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
