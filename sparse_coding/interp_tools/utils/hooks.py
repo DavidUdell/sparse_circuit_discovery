@@ -61,9 +61,11 @@ def hooks_lifecycle(
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=False
             )
-            # Ablate the activation at dim_idx. Modify this line to scale in
-            # different ways.
-            projected_acts[:, :, dim_idx] = projected_acts[:, :, dim_idx] * 0.0
+            # Ablate the activation at dim_idx. Modify here to scale in
+            # different ways besides ablation.
+            projected_acts[:, -1, dim_idx] = (
+                projected_acts[:, -1, dim_idx] * 0.0
+            )
             # Project back to activation space.
             ablated_activations = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
