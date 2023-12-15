@@ -34,16 +34,13 @@ Acceptable starting values for a range of models are:
 
 |`MODEL_DIR`|`ACT_LAYERS_SLICE`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
 |---|:---:|:---:|:---:|:---:|
-|EleutherAI/pythia-70m | "2:3" | 1.0e-2 | 1.0e-2 | 10 |
-|meta-llama/Llama-2-7b-hf | "13:14" | 1.0 | 1.0e-3 | 10 |
-|meta-llama/Llama-2-70b-hf | "32:33" | 3.0 | 1.0e-3 | 10 |
+|EleutherAI/pythia-70m | "1:3" | 1e-2 | 3e-3 | 10 |
+|meta-llama/Llama-2-7b-hf | "12:14" | 1 | 1e-3 | 10 |
+|meta-llama/Llama-2-70b-hf | "31:33" | 3 | 1e-3 | 10 |
 
-Once you've saved the YAML, run the main interpretability pipeline with:
-```
-cd sparse_coding
+Once you've saved `central_config.yaml`, run the main interpretability pipeline with:
 
-python3 pipe.py
-```
+`cd sparse_coding && python3 pipe.py`
 
 ### Notes:
 - A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
