@@ -52,8 +52,10 @@ SYNC_DIST_LOGGING: True
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# Stable Dev Constants (`feature_web.py`)
+# Stable Dev Constants (`feature_web_mc.py`)
 # _Leave out entries_ for None: None values here are interpreted as the string
 # "None"
-NUM_SEQUENCES_INTERPED: 500
+# Note that NUM_QUESTIONS_INTERPED is drawn from the other end of the same
+# indices as NUM_QUESTIONS_EVALED, in `collect_acts_mc.py`.
+NUM_QUESTIONS_INTERPED: 500
 ABLATION_DIM_INDICES_PLOTTED: [8]

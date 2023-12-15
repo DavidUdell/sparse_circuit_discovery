@@ -41,7 +41,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
-NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED", 50)
+NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
 SEED = config.get("SEED")
@@ -111,11 +111,6 @@ if MODEL_DIR == "rasp":
         )
 
     # Plot and save effects.
-    # `rasp=True` is quite ugly; I'll want to factor that out by giving both
-    # the rasp and full-scale models common output shapes with some squeezing.
-    # Then, `graph_causal_effects` can be a single common call outside the
-    # if/else.
-
     graph_causal_effects(
         activation_diffs, MODEL_DIR, TOP_K_INFO_FILE, __file__, rasp=True
     ).draw(
@@ -145,7 +140,7 @@ else:
         size=len(dataset["validation"]["question"]),
         replace=False,
     )
-    starting_index: int = len(dataset_indices) - NUM_SEQUENCES_INTERPED
+    starting_index: int = len(dataset_indices) - NUM_QUESTIONS_INTERPED
     validation_indices: list = dataset_indices[starting_index:].tolist()
 
     def recursive_defaultdict():
