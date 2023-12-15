@@ -45,6 +45,9 @@ NUM_SEQUENCES_EVALED = config.get("NUM_SEQUENCES_EVALED", 1000)
 MAX_SEQ_LEN = config.get("MAX_SEQ_LEN", 1000)
 SEED = config.get("SEED")
 
+warnings.warn(f"Number of sequences evaled: {NUM_SEQUENCES_EVALED}")
+warnings.warn(f"Max sequence length: {MAX_SEQ_LEN}")
+
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
