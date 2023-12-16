@@ -27,6 +27,11 @@ TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
+# Ablation Graphs
+# Leave out entries for None: None values here are interpreted as the string
+# "None"
+ABLATION_DIM_INDICES_PLOTTED: [4699]
+
 # Reproducibility
 SEED: 0
 
@@ -47,15 +52,19 @@ EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
 # Stable Dev Constants (`top_tokens.py`)
-# _Leave out entries_ for None: None values here are interpreted as the string
+# Leave out entries for None: None values here are interpreted as the string
 # "None"
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
 # Stable Dev Constants (`feature_web_mc.py`)
-# _Leave out entries_ for None: None values here are interpreted as the string
-# "None"
-# Note that NUM_QUESTIONS_INTERPED is drawn from the other end of the same
-# indices as NUM_QUESTIONS_EVALED, in `collect_acts_mc.py`.
+# Leave out entries for None: None values here are interpreted as the string
+# "None". Note that NUM_QUESTIONS_INTERPED is drawn from the other end of the
+# same indices as NUM_QUESTIONS_EVALED in `collect_acts_mc.py`.
 NUM_QUESTIONS_INTERPED: 500
-ABLATION_DIM_INDICES_PLOTTED: [4699]
+
+# Stable Dev Constants (`feature_web_webtext.py`)
+# NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
+# NUM_SEQUENCES_EVALED in `collect_acts_webtext.py`.
+NUM_SEQUENCES_INTERPED: 500
+MAX_SEQ_INTERPED_LEN: 500
