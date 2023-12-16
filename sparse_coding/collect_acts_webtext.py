@@ -21,7 +21,7 @@ from sparse_coding.utils.interface import (
     parse_slice,
     validate_slice,
     cache_layer_tensor,
-    slice_to_seq,
+    slice_to_range,
     load_yaml_constants,
     save_paths,
     pad_activations,
@@ -70,14 +70,14 @@ model = accelerator.prepare(model)
 model.eval()
 
 validate_slice(model, ACTS_LAYERS_SLICE)
-acts_layers_range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset.
 dataset: list[list[str]] = load_dataset(
     "Elriggs/openwebtext-100k",
     split="train"
-    )["text"]
+)["text"]
 dataset_indices: np.ndarray = np.random.choice(
     len(dataset), size=len(dataset), replace=False
 )
@@ -85,7 +85,7 @@ train_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_EVALED]
 
 # Poor man's fancy indexing.
 training_set: list[list[int]] = [
-    dataset[i] for i in train_indices.tolist()
+    dataset[i] for i in train_indices
 ]
 
 # %%

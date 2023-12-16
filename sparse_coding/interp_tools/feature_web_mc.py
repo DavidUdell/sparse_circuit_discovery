@@ -33,14 +33,14 @@ from sparse_coding.interp_tools.utils.hooks import (
 )
 from sparse_coding.utils.interface import (
     parse_slice,
-    slice_to_seq,
+    slice_to_range,
     load_yaml_constants,
     save_paths,
     sanitize_model_name,
     load_layer_tensors,
     load_layer_feature_indices,
 )
-from sparse_coding.utils.tasks import multiple_choice_task
+from sparse_coding.utils.tasks import multiple_choice_task, recursive_defaultdict
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
 from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
@@ -145,7 +145,7 @@ else:
     model = accelerator.prepare(model)
     model.eval()
 
-    layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+    layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
     ablate_range: range = layer_range[:-1]
 
     # Load the complementary validation dataset subset.
@@ -157,10 +157,6 @@ else:
     )
     starting_index: int = len(dataset_indices) - NUM_QUESTIONS_INTERPED
     validation_indices: list = dataset_indices[starting_index:].tolist()
-
-    def recursive_defaultdict():
-        """Recursively create a defaultdict."""
-        return defaultdict(recursive_defaultdict)
 
     base_activations = defaultdict(recursive_defaultdict)
     ablated_activations = defaultdict(recursive_defaultdict)

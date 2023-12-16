@@ -28,7 +28,7 @@ from transformers import (
 from sparse_coding.utils import top_k
 from sparse_coding.utils.interface import (
     parse_slice,
-    slice_to_seq,
+    slice_to_range,
     load_input_token_ids,
     sanitize_model_name,
     load_yaml_constants,
@@ -177,7 +177,7 @@ with warnings.catch_warnings():
         MODEL_DIR,
         token=HF_ACCESS_TOKEN,
     )
-seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+seq_layer_indices: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:
     ENCODER_PATH = save_paths(
