@@ -303,7 +303,10 @@ else:
         TOP_K_INFO_FILE,
         __file__,
     ).draw(
-        save_paths(__file__, f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"),
+        save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"
+        ),
         format="svg",
         prog="dot",
     )
