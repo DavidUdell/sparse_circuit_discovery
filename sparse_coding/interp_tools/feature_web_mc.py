@@ -40,7 +40,10 @@ from sparse_coding.utils.interface import (
     load_layer_tensors,
     load_layer_feature_indices,
 )
-from sparse_coding.utils.tasks import multiple_choice_task, recursive_defaultdict
+from sparse_coding.utils.tasks import (
+    multiple_choice_task,
+    recursive_defaultdict,
+)
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
 from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects

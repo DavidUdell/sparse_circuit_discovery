@@ -68,9 +68,11 @@ model.eval()
 
 layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 ablate_layer_range: range = layer_range[:-1]
+cache_layer_range: range = layer_range[1:]
 
 # %%
-# Load the complementary `openwebtext` dataset subset, relative to `collect_acts_webtext`.
+# Load the complementary `openwebtext` dataset subset, relative to
+# `collect_acts_webtext`.
 dataset: list[list[str]] = load_dataset(
     "Elriggs/openwebtext-100k",
     split="train",
@@ -87,3 +89,58 @@ eval_set: list[list[str]] = [
 # Run interp.
 base_activations = defaultdict(recursive_defaultdict)
 ablated_activaitons = defaultdict(recursive_defaultdict)
+
+for ablate_layer_idx in ablate_layer_range:
+    for cache_layer_idx in cache_layer_range:
+        cache_layer_encoder, cache_layer_bias = load_layer_tensors(
+            MODEL_DIR,
+            cache_layer_idx,
+            ENCODER_FILE,
+            BIASES_FILE,
+            __file__,
+        )
+        tensors_per_layer = {
+            cache_layer_idx: (
+                cache_layer_encoder,
+                cache_layer_bias,
+            ),
+        }
+        cache_dim_indices = load_layer_feature_indices(
+            MODEL_DIR,
+            cache_layer_idx,
+            TOP_K_INFO_FILE,
+            __file__,
+            [],
+        )
+        np.random.seed(SEED)
+        # Base run, to determine top activating sequence positions.
+        with hooks_lifecycle(ablate_layer_idx,
+                            None,
+                            layer_range,
+                            cache_dim_indices,
+                            model,
+                            tensors_per_layer,
+                            base_activations,
+                            ablate_during_run=False):
+            # TODO: Model task goes here.
+
+# Pare down to each dimension's top activating sequence position.
+for i in base_activations:
+    for j in base_activations[i]:
+        base_activations[i][j] = np.argmax(base_activations[i][j])
+
+for ablate_layer_idx in ablate_layer_range:
+    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
+        MODEL_DIR,
+        ablate_layer_idx,
+        ENCODER_FILE,
+        BIASES_FILE,
+        __file__,
+    )
+    ablate_dim_indices = load_layer_feature_indices(
+        MODEL_DIR,
+        ablate_layer_idx,
+        TOP_K_INFO_FILE,
+        __file__,
+        [],
+    )
