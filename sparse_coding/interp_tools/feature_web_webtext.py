@@ -10,8 +10,9 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
-from collections import defaultdict
+import gc
 import warnings
+from collections import defaultdict
 
 import numpy as np
 import torch as t
@@ -88,7 +89,6 @@ eval_set: list[list[str]] = [
 # %%
 # Run interp.
 base_activations = defaultdict(recursive_defaultdict)
-ablated_activaitons = defaultdict(recursive_defaultdict)
 
 for ablate_layer_idx in ablate_layer_range:
     for cache_layer_idx in cache_layer_range:
@@ -105,13 +105,16 @@ for ablate_layer_idx in ablate_layer_range:
                 cache_layer_bias,
             ),
         }
-        cache_dim_indices = load_layer_feature_indices(
+        cache_dims = load_layer_feature_indices(
             MODEL_DIR,
             cache_layer_idx,
             TOP_K_INFO_FILE,
             __file__,
             [],
         )
+        cache_dim_indices: dict[int, list[int]] = {
+            cache_layer_idx: cache_dims,
+        }
         np.random.seed(SEED)
         # Base run, to determine top activating sequence positions.
         with hooks_lifecycle(ablate_layer_idx,
@@ -122,13 +125,38 @@ for ablate_layer_idx in ablate_layer_range:
                             tensors_per_layer,
                             base_activations,
                             ablate_during_run=False):
-            # TODO: Model task goes here.
+            for sequence in tqdm(eval_set):
+                try:
+                    inputs = tokenizer(
+                        sequence,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=MAX_SEQ_INTERPED_LEN,
+                    ).to(model.device)
+                    model(**inputs)
+                except RuntimeError:
+                    # Manually clear memory and retry.
+                    gc.collect()
+                    inputs = tokenizer(
+                        sequence,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=MAX_SEQ_INTERPED_LEN,
+                    ).to(model.device)
+                    model(**inputs)
 
 # Pare down to each dimension's top activating sequence position.
+favorite_sequence_positions = {}
 for i in base_activations:
     for j in base_activations[i]:
-        base_activations[i][j] = np.argmax(base_activations[i][j])
+        for k in base_activations[i][j]:
+            favorite_sequence_positions[(i, j, k)] = np.argmax(
+                base_activations[i][j][k]
+            )
+            print(base_activations[i][j][k].shape)
 
+# Now run ablations at favorite sequence positions.
+ablated_activations = defaultdict(recursive_defaultdict)
 for ablate_layer_idx in ablate_layer_range:
     ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
         MODEL_DIR,
@@ -144,3 +172,59 @@ for ablate_layer_idx in ablate_layer_range:
         __file__,
         [],
     )
+    for cache_layer_idx in cache_layer_range:
+        cache_layer_encoder, cache_layer_bias = load_layer_tensors(
+            MODEL_DIR,
+            cache_layer_idx,
+            ENCODER_FILE,
+            BIASES_FILE,
+            __file__,
+        )
+        tensors_per_layer: dict[int, tuple[t.Tensor]] = {
+            ablate_layer_idx: (
+                ablate_layer_encoder,
+                ablate_layer_bias,
+            ),
+            cache_layer_idx: (
+                cache_layer_encoder,
+                cache_layer_bias,
+            ),
+        }
+        cache_dims = load_layer_feature_indices(
+            MODEL_DIR,
+            cache_layer_idx,
+            TOP_K_INFO_FILE,
+            __file__,
+            [],
+        )
+        np.random.seed(SEED)
+        # Base run, to determine top activating sequence positions.
+        with hooks_lifecycle(ablate_layer_idx,
+                            None,
+                            layer_range,
+                            cache_dims,
+                            model,
+                            tensors_per_layer,
+                            ablated_activations,
+                            ablate_during_run=True):
+            for idx, sequence in enumerate(tqdm(eval_set)):
+                try:
+                    sequence = tokenizer(
+                        sequence,
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=True,
+                        max_length=MAX_SEQ_INTERPED_LEN,
+                    ).to(model.device)
+                    model(**sequence)
+                except RuntimeError:
+                    # Manually clear memory and retry.
+                    gc.collect()
+                    sequence = tokenizer(
+                        sequence,
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=True,
+                        max_length=MAX_SEQ_INTERPED_LEN,
+                    ).to(model.device)
+                    model(**sequence)
