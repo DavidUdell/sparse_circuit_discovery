@@ -48,16 +48,13 @@ def graph_causal_effects(
     else:
 
         def label_appendable(layer_idx, neuron_idx):
-            try:
-                return load_layer_feature_labels(
-                    model_dir,
-                    layer_idx,
-                    neuron_idx,
-                    top_k_info_file,
-                    base_file,
-                )
-            except ValueError:
-                return [""]
+            return load_layer_feature_labels(
+                model_dir,
+                layer_idx,
+                neuron_idx,
+                top_k_info_file,
+                base_file,
+            )
 
         # Plot neuron nodes.
         for (
