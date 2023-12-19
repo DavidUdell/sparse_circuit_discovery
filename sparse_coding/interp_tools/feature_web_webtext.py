@@ -126,7 +126,7 @@ for ablate_layer_idx in ablate_layer_range:
                             tensors_per_layer,
                             base_activations,
                             ablate_during_run=False):
-            for sequence in tqdm(eval_set):
+            for sequence in eval_set:
                 try:
                     inputs = tokenizer(
                         sequence,
@@ -179,7 +179,7 @@ for ablate_layer_idx in ablate_layer_range:
         __file__,
         [],
     )
-    for ablate_dim in ablate_dim_indices:
+    for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
         for cache_layer_idx in cache_layer_range:
             cache_layer_encoder, cache_layer_bias = load_layer_tensors(
                 MODEL_DIR,
