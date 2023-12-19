@@ -257,7 +257,7 @@ activation_diffs = {}
 for i in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
     for j in ablated_activations[i].keys():
         for k in ablated_activations[i][j].keys():
-            activation_diffs[i, j.item(), k] = (
+            activation_diffs[i, j, k] = (
                 ablated_activations[i][j][k].sum(axis=1).squeeze()
                 - base_activations[i][None][k].sum(axis=1).squeeze()
             )
