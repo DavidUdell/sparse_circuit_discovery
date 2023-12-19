@@ -81,13 +81,14 @@ dataset: list[list[str]] = load_dataset(
 dataset_indices: np.ndarray = np.random.choice(
     len(dataset), size=len(dataset), replace=False
 )
-eval_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_INTERPED:-1]
+STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
+eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
 eval_set: list[list[str]] = [
     dataset[i] for i in eval_indices
 ]
 
 # %%
-# Run interp.
+# Collect base case data.
 base_activations = defaultdict(recursive_defaultdict)
 
 for ablate_layer_idx in ablate_layer_range:
@@ -145,17 +146,23 @@ for ablate_layer_idx in ablate_layer_range:
                     ).to(model.device)
                     model(**inputs)
 
+# %%
 # Pare down to each dimension's top activating sequence position.
+# base_activation indices:
+# [ablation_layer_idx][ablated_dim_idx][downstream_dim]
 favorite_sequence_positions = {}
+
 for i in base_activations:
     for j in base_activations[i]:
         for k in base_activations[i][j]:
             favorite_sequence_positions[(i, j, k)] = np.argmax(
                 base_activations[i][j][k]
             )
-            print(base_activations[i][j][k].shape)
+# favorite_sequence_position indices are now (ablate_layer_idx, None,
+# cache_dim)
 
-# Now run ablations at favorite sequence positions.
+# %%
+# Run ablations at favorite sequence positions.
 ablated_activations = defaultdict(recursive_defaultdict)
 for ablate_layer_idx in ablate_layer_range:
     ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
@@ -172,59 +179,109 @@ for ablate_layer_idx in ablate_layer_range:
         __file__,
         [],
     )
-    for cache_layer_idx in cache_layer_range:
-        cache_layer_encoder, cache_layer_bias = load_layer_tensors(
-            MODEL_DIR,
-            cache_layer_idx,
-            ENCODER_FILE,
-            BIASES_FILE,
-            __file__,
-        )
-        tensors_per_layer: dict[int, tuple[t.Tensor]] = {
-            ablate_layer_idx: (
-                ablate_layer_encoder,
-                ablate_layer_bias,
-            ),
-            cache_layer_idx: (
-                cache_layer_encoder,
-                cache_layer_bias,
-            ),
-        }
-        cache_dims = load_layer_feature_indices(
-            MODEL_DIR,
-            cache_layer_idx,
-            TOP_K_INFO_FILE,
-            __file__,
-            [],
-        )
-        np.random.seed(SEED)
-        # Base run, to determine top activating sequence positions.
-        with hooks_lifecycle(ablate_layer_idx,
-                            None,
-                            layer_range,
-                            cache_dims,
-                            model,
-                            tensors_per_layer,
-                            ablated_activations,
-                            ablate_during_run=True):
-            for idx, sequence in enumerate(tqdm(eval_set)):
-                try:
-                    sequence = tokenizer(
-                        sequence,
-                        return_tensors="pt",
-                        padding=True,
-                        truncation=True,
-                        max_length=MAX_SEQ_INTERPED_LEN,
-                    ).to(model.device)
-                    model(**sequence)
-                except RuntimeError:
-                    # Manually clear memory and retry.
-                    gc.collect()
-                    sequence = tokenizer(
-                        sequence,
-                        return_tensors="pt",
-                        padding=True,
-                        truncation=True,
-                        max_length=MAX_SEQ_INTERPED_LEN,
-                    ).to(model.device)
-                    model(**sequence)
+    for ablate_dim in ablate_dim_indices:
+        for cache_layer_idx in cache_layer_range:
+            cache_layer_encoder, cache_layer_bias = load_layer_tensors(
+                MODEL_DIR,
+                cache_layer_idx,
+                ENCODER_FILE,
+                BIASES_FILE,
+                __file__,
+            )
+            tensors_per_layer: dict[int, tuple[t.Tensor]] = {
+                ablate_layer_idx: (
+                    ablate_layer_encoder,
+                    ablate_layer_bias,
+                ),
+                cache_layer_idx: (
+                    cache_layer_encoder,
+                    cache_layer_bias,
+                ),
+            }
+            cache_dims = load_layer_feature_indices(
+                MODEL_DIR,
+                cache_layer_idx,
+                TOP_K_INFO_FILE,
+                __file__,
+                [],
+            )
+            cache_dim_indices: dict[int, list[int]] = {
+                cache_layer_idx: cache_dims,
+            }
+            for cache_dim in cache_dims:
+                np.random.seed(SEED)
+                # Ablation run at top activating sequence positions.
+                with hooks_lifecycle(ablate_layer_idx,
+                                    ablate_dim,
+                                    layer_range,
+                                    cache_dim_indices,
+                                    model,
+                                    tensors_per_layer,
+                                    ablated_activations,
+                                    ablate_during_run=True):
+                    top_seq_position = favorite_sequence_positions[
+                        ablate_layer_idx,
+                        None,
+                        cache_dim
+                    ]
+                    # top_seq_position is on flattened eval_set.
+                    for flat_idx, seq in enumerate(eval_set):
+                        if len(seq) < top_seq_position:
+                            top_seq_position = top_seq_position - len(seq)
+                            continue
+                        top_stream = eval_set[flat_idx][top_seq_position]
+                        break
+                    try:
+                        sequence = tokenizer(
+                            top_stream,
+                            return_tensors="pt",
+                            truncation=True,
+                            max_length=MAX_SEQ_INTERPED_LEN,
+                        ).to(model.device)
+                        model(**sequence)
+                    except RuntimeError:
+                        # Manually clear memory and retry.
+                        gc.collect()
+                        sequence = tokenizer(
+                            top_stream,
+                            return_tensors="pt",
+                            truncation=True,
+                            max_length=MAX_SEQ_INTERPED_LEN,
+                        ).to(model.device)
+                        model(**sequence)
+
+# %%
+# Compute ablated effects minus base effects. Recursive defaultdict indices
+# are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
+activation_diffs = {}
+for i in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
+    for j in ablated_activations[i].keys():
+        for k in ablated_activations[i][j].keys():
+            activation_diffs[i, j.item(), k] = (
+                ablated_activations[i][j][k].sum(axis=1).squeeze()
+                - base_activations[i][None][k].sum(axis=1).squeeze()
+            )
+# Check that there was any overall effect.
+HOOK_EFFECTS_CHECKSUM = 0.0
+for i, j, k in activation_diffs:
+    HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+assert (
+    HOOK_EFFECTS_CHECKSUM != 0.0
+), "Ablate hook effects sum to exactly zero."
+
+sorted_diffs = dict(
+    sorted(activation_diffs.items(), key=lambda x: x[-1].item())
+)
+graph_causal_effects(
+    sorted_diffs,
+    MODEL_DIR,
+    TOP_K_INFO_FILE,
+    __file__,
+).draw(
+    save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"
+    ),
+    format="svg",
+    prog="dot",
+)
