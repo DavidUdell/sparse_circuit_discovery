@@ -43,8 +43,8 @@ NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 50
 
 # Stable Dev Constants (`collect_acts_webtext.py`)
-NUM_SEQUENCES_EVALED: 500
-MAX_SEQ_LEN: 500
+NUM_SEQUENCES_EVALED: 5000
+MAX_SEQ_LEN: 1000
 
 # Stable Dev Constants (`train_autoencoder.py`)
 LOG_EVERY_N_STEPS: 1
@@ -66,5 +66,5 @@ NUM_QUESTIONS_INTERPED: 500
 # Stable Dev Constants (`feature_web_webtext.py`)
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts_webtext.py`.
-NUM_SEQUENCES_INTERPED: 100
-MAX_SEQ_INTERPED_LEN: 100
+NUM_SEQUENCES_INTERPED: 5000
+MAX_SEQ_INTERPED_LEN: 1000
