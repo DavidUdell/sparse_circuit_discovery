@@ -22,6 +22,11 @@ ACCUMULATE_GRAD_BATCHES: 1
 # Reproducibility
 SEED: 0
 
+# Causal Graphs
+# Leave out entries for None: None values here are interpreted as the string
+# "None"
+ABLATION_DIM_INDICES_PLOTTED: [1]
+
 
 # Smoke Test Constants (`collect_acts_mc.py`)
 MAX_NEW_TOKENS: 1
@@ -44,8 +49,11 @@ SYNC_DIST_LOGGING: True
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# Smoke Test Constants (`feature_web.py`)
+# Smoke Test Constants (`feature_web_mc.py`)
 # _Leave out entries_ for None: None values here are interpreted as the string
 # "None"
 NUM_QUESTIONS_INTERPED: 1
-ABLATION_DIM_INDICES_PLOTTED: [1]
+
+# Smoke Test Constants (`feature_web_webtext.py`)
+NUM_SEQUENCES_INTERPED: 1
+MAX_SEQ_INTERPED_LEN: 10

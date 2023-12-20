@@ -13,6 +13,7 @@ You may need to have logged a HF access token, if applicable.
 import gc
 import warnings
 from collections import defaultdict
+from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -83,9 +84,7 @@ dataset_indices: np.ndarray = np.random.choice(
 )
 STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
-eval_set: list[list[str]] = [
-    dataset[i] for i in eval_indices
-]
+eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
 # Collect base case data.
@@ -118,14 +117,16 @@ for ablate_layer_idx in ablate_layer_range:
         }
         np.random.seed(SEED)
         # Base run, to determine top activating sequence positions.
-        with hooks_lifecycle(ablate_layer_idx,
-                            None,
-                            layer_range,
-                            cache_dim_indices,
-                            model,
-                            tensors_per_layer,
-                            base_activations,
-                            ablate_during_run=False):
+        with hooks_lifecycle(
+            ablate_layer_idx,
+            None,
+            layer_range,
+            cache_dim_indices,
+            model,
+            tensors_per_layer,
+            base_activations,
+            ablate_during_run=False,
+        ):
             for sequence in eval_set:
                 try:
                     inputs = tokenizer(
@@ -179,6 +180,14 @@ for ablate_layer_idx in ablate_layer_range:
         __file__,
         [],
     )
+    # Optionally pare down to a target subset of ablate dims.
+    if ABLATION_DIM_INDICES_PLOTTED is not None:
+        for i in ABLATION_DIM_INDICES_PLOTTED:
+            assert i in ablate_dim_indices, dedent(
+                f"Index {i} not in `ablate_dim_indices`."
+            )
+        ablate_dim_indices = ABLATION_DIM_INDICES_PLOTTED
+
     for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
         for cache_layer_idx in cache_layer_range:
             cache_layer_encoder, cache_layer_bias = load_layer_tensors(
@@ -211,18 +220,18 @@ for ablate_layer_idx in ablate_layer_range:
             for cache_dim in cache_dims:
                 np.random.seed(SEED)
                 # Ablation run at top activating sequence positions.
-                with hooks_lifecycle(ablate_layer_idx,
-                                    ablate_dim,
-                                    layer_range,
-                                    cache_dim_indices,
-                                    model,
-                                    tensors_per_layer,
-                                    ablated_activations,
-                                    ablate_during_run=True):
+                with hooks_lifecycle(
+                    ablate_layer_idx,
+                    ablate_dim,
+                    layer_range,
+                    cache_dim_indices,
+                    model,
+                    tensors_per_layer,
+                    ablated_activations,
+                    ablate_during_run=True,
+                ):
                     top_seq_position = favorite_sequence_positions[
-                        ablate_layer_idx,
-                        None,
-                        cache_dim
+                        ablate_layer_idx, None, cache_dim
                     ]
                     # top_seq_position is on flattened eval_set.
                     for flat_idx, seq in enumerate(eval_set):
@@ -254,7 +263,9 @@ for ablate_layer_idx in ablate_layer_range:
 # Compute ablated effects minus base effects. Recursive defaultdict indices
 # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
 activation_diffs = {}
-for i in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
+for (
+    i
+) in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
     for j in ablated_activations[i].keys():
         for k in ablated_activations[i][j].keys():
             activation_diffs[i, j, k] = (
@@ -265,9 +276,7 @@ for i in ablated_activations.keys():  # pylint: disable=consider-using-dict-item
 HOOK_EFFECTS_CHECKSUM = 0.0
 for i, j, k in activation_diffs:
     HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
-assert (
-    HOOK_EFFECTS_CHECKSUM != 0.0
-), "Ablate hook effects sum to exactly zero."
+assert HOOK_EFFECTS_CHECKSUM != 0.0, "Ablate hook effects sum to exactly zero."
 
 sorted_diffs = dict(
     sorted(activation_diffs.items(), key=lambda x: x[-1].item())
@@ -278,10 +287,7 @@ graph_causal_effects(
     TOP_K_INFO_FILE,
     __file__,
 ).draw(
-    save_paths(
-        __file__,
-        f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"
-    ),
+    save_paths(__file__, f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"),
     format="svg",
     prog="dot",
 )

@@ -88,6 +88,7 @@ def graph_causal_effects(
             ablated_dim,
             downstream_dim,
         ), effect in activations.items():
+            print(effect.item())
             if effect.item() == 0:
                 continue
             # Blue means the intervention increased downstream firing, while
@@ -99,10 +100,10 @@ def graph_causal_effects(
             elif effect.item() < 0.0:
                 red = 255
                 blue = 0
-            alpha = int(255 *
-                abs(effect.item()) / (
-                max(abs(max_scalar), abs(min_scalar))
-                )
+            alpha = int(
+                255
+                * abs(effect.item())
+                / (max(abs(max_scalar), abs(min_scalar)))
             )
             rgba_color = f"#{red:02x}00{blue:02x}{alpha:02x}"
 

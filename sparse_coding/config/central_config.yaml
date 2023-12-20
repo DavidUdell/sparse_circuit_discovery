@@ -27,10 +27,10 @@ TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
-# Ablation Graphs
+# Causal Graphs
 # Leave out entries for None: None values here are interpreted as the string
 # "None"
-ABLATION_DIM_INDICES_PLOTTED: [4699]
+ABLATION_DIM_INDICES_PLOTTED: [1123]
 
 # Reproducibility
 SEED: 0
@@ -66,5 +66,5 @@ NUM_QUESTIONS_INTERPED: 500
 # Stable Dev Constants (`feature_web_webtext.py`)
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts_webtext.py`.
-NUM_SEQUENCES_INTERPED: 10
-MAX_SEQ_INTERPED_LEN: 10
+NUM_SEQUENCES_INTERPED: 100
+MAX_SEQ_INTERPED_LEN: 100

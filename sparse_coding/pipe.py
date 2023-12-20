@@ -8,7 +8,7 @@ for script in [
     "collect_acts_webtext",
     "train_autoencoder",
     "interp_tools.top_tokens",
-    "interp_tools.feature_web_mc",
+    "interp_tools.feature_web_webtext",
 ]:
     try:
         run_module(f"sparse_coding.{script}")
