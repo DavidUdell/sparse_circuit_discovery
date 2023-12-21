@@ -228,7 +228,7 @@ for ablate_layer_idx in ablate_layer_range:
                     model,
                     tensors_per_layer,
                     ablated_activations,
-                    ablate_during_run=True,
+                    ablate_during_run=False,
                 ):
                     top_seq_position = favorite_sequence_positions[
                         ablate_layer_idx, None, cache_dim
@@ -268,6 +268,13 @@ for (
 ) in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
     for j in ablated_activations[i].keys():
         for k in ablated_activations[i][j].keys():
+            assert (
+                ablated_activations[i][j][k].shape
+                == base_activations[i][None][k].shape
+            ), dedent(
+                f"Shape mismatch between ablated and base activations for "
+                f"ablate layer {i}, ablate dim {j}, and downstream dim {k}."
+            )
             activation_diffs[i, j, k] = (
                 ablated_activations[i][j][k].sum(axis=1).squeeze()
                 - base_activations[i][None][k].sum(axis=1).squeeze()
