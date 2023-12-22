@@ -88,7 +88,7 @@ eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
 # Collect base case data.
-base_activations = defaultdict(recursive_defaultdict)
+base_activations_all_positions = defaultdict(recursive_defaultdict)
 
 for ablate_layer_idx in ablate_layer_range:
     for cache_layer_idx in cache_layer_range:
@@ -124,7 +124,7 @@ for ablate_layer_idx in ablate_layer_range:
             cache_dim_indices,
             model,
             tensors_per_layer,
-            base_activations,
+            base_activations_all_positions,
             ablate_during_run=False,
         ):
             for sequence in eval_set:
@@ -153,11 +153,11 @@ for ablate_layer_idx in ablate_layer_range:
 # [ablation_layer_idx][ablated_dim_idx][downstream_dim]
 favorite_sequence_positions = {}
 
-for i in base_activations:
-    for j in base_activations[i]:
-        for k in base_activations[i][j]:
+for i in base_activations_all_positions:
+    for j in base_activations_all_positions[i]:
+        for k in base_activations_all_positions[i][j]:
             favorite_sequence_positions[(i, j, k)] = np.argmax(
-                base_activations[i][j][k]
+                base_activations_all_positions[i][j][k]
             )
 # favorite_sequence_position indices are now (ablate_layer_idx, None,
 # cache_dim)
@@ -165,6 +165,8 @@ for i in base_activations:
 # %%
 # Run ablations at favorite sequence positions.
 ablated_activations = defaultdict(recursive_defaultdict)
+base_activations_select = defaultdict(recursive_defaultdict)
+
 for ablate_layer_idx in ablate_layer_range:
     ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
         MODEL_DIR,
@@ -220,6 +222,24 @@ for ablate_layer_idx in ablate_layer_range:
             for cache_dim in cache_dims:
                 np.random.seed(SEED)
                 # Ablation run at top activating sequence positions.
+                top_seq_position = favorite_sequence_positions[
+                    ablate_layer_idx, None, cache_dim
+                ]
+                abs_top_seq_position = top_seq_position
+                # top_seq_position is on flattened eval_set.
+                for sequence_idx, position_idx in enumerate(eval_set):
+                    if len(position_idx) < top_seq_position:
+                        top_seq_position = top_seq_position - len(position_idx)
+                        continue
+
+                    dim_token_stream = eval_set[sequence_idx][top_seq_position]
+                    base_activations_select[
+                        ablate_layer_idx][ablate_dim][cache_dim
+                    ] = base_activations_all_positions[
+                            ablate_layer_idx][None][cache_dim
+                        ][:, abs_top_seq_position, :]
+                    break
+
                 with hooks_lifecycle(
                     ablate_layer_idx,
                     ablate_dim,
@@ -228,21 +248,11 @@ for ablate_layer_idx in ablate_layer_range:
                     model,
                     tensors_per_layer,
                     ablated_activations,
-                    ablate_during_run=False,
+                    ablate_during_run=False,  # Set to True.
                 ):
-                    top_seq_position = favorite_sequence_positions[
-                        ablate_layer_idx, None, cache_dim
-                    ]
-                    # top_seq_position is on flattened eval_set.
-                    for flat_idx, seq in enumerate(eval_set):
-                        if len(seq) < top_seq_position:
-                            top_seq_position = top_seq_position - len(seq)
-                            continue
-                        top_stream = eval_set[flat_idx][top_seq_position]
-                        break
                     try:
                         sequence = tokenizer(
-                            top_stream,
+                            dim_token_stream,
                             return_tensors="pt",
                             truncation=True,
                             max_length=MAX_SEQ_INTERPED_LEN,
@@ -252,7 +262,7 @@ for ablate_layer_idx in ablate_layer_range:
                         # Manually clear memory and retry.
                         gc.collect()
                         sequence = tokenizer(
-                            top_stream,
+                            dim_token_stream,
                             return_tensors="pt",
                             truncation=True,
                             max_length=MAX_SEQ_INTERPED_LEN,
@@ -270,14 +280,14 @@ for (
         for k in ablated_activations[i][j].keys():
             assert (
                 ablated_activations[i][j][k].shape
-                == base_activations[i][None][k].shape
+                == base_activations_select[i][j][k].shape
             ), dedent(
                 f"Shape mismatch between ablated and base activations for "
                 f"ablate layer {i}, ablate dim {j}, and downstream dim {k}."
             )
             activation_diffs[i, j, k] = (
                 ablated_activations[i][j][k].sum(axis=1).squeeze()
-                - base_activations[i][None][k].sum(axis=1).squeeze()
+                - base_activations_select[i][j][k].sum(axis=1).squeeze()
             )
 # Check that there was any overall effect.
 HOOK_EFFECTS_CHECKSUM = 0.0

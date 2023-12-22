@@ -30,7 +30,7 @@ ACCUMULATE_GRAD_BATCHES: 4
 # Causal Graphs
 # Leave out entries for None: None values here are interpreted as the string
 # "None"
-ABLATION_DIM_INDICES_PLOTTED: [2933]
+ABLATION_DIM_INDICES_PLOTTED: [1025]
 
 # Reproducibility
 SEED: 0
@@ -43,7 +43,7 @@ NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 50
 
 # Stable Dev Constants (`collect_acts_webtext.py`)
-NUM_SEQUENCES_EVALED: 1000
+NUM_SEQUENCES_EVALED: 1500
 MAX_SEQ_LEN: 1000
 
 # Stable Dev Constants (`train_autoencoder.py`)

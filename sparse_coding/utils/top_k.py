@@ -121,7 +121,7 @@ def batches_loop(
     starting_dim_index, ending_dim_index = 0, 0
     features_progress_bar = tqdm(
         total=encoder.encoder_layer.weight.shape[0],
-        desc="Feature dims progress",
+        desc="Dims Labeled Progress",
     )
 
     for batch in range(num_dim_batches):
