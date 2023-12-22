@@ -222,7 +222,6 @@ for ablate_layer_idx in ablate_layer_range:
 
             # Set up for ablations at select positions.
             for cache_dim in cache_dims:
-                np.random.seed(SEED)
                 # Ablation run at top activating sequence positions.
                 top_seq_position = favorite_sequence_positions[
                     ablate_layer_idx, None, cache_dim
@@ -239,10 +238,11 @@ for ablate_layer_idx in ablate_layer_range:
                         ablate_layer_idx][ablate_dim][cache_dim
                     ] = base_activations_all_positions[
                             ablate_layer_idx][None][cache_dim
-                        ][:, abs_top_seq_position, :]
+                        ][:, abs_top_seq_position, :].unsqueeze(-1)
                     break
 
             # Run ablations.
+            np.random.seed(SEED)
             with hooks_lifecycle(
                 ablate_layer_idx,
                 ablate_dim,
@@ -251,7 +251,7 @@ for ablate_layer_idx in ablate_layer_range:
                 model,
                 tensors_per_layer,
                 ablated_activations,
-                ablate_during_run=False,  # Set to True.
+                ablate_during_run=False,  # Set to True after values match.
             ):
                 try:
                     sequence = tokenizer(
