@@ -219,6 +219,8 @@ for ablate_layer_idx in ablate_layer_range:
             cache_dim_indices: dict[int, list[int]] = {
                 cache_layer_idx: cache_dims,
             }
+
+            # Set up for ablations at select positions.
             for cache_dim in cache_dims:
                 np.random.seed(SEED)
                 # Ablation run at top activating sequence positions.
@@ -232,7 +234,7 @@ for ablate_layer_idx in ablate_layer_range:
                         top_seq_position = top_seq_position - len(position_idx)
                         continue
 
-                    dim_token_stream = eval_set[sequence_idx][top_seq_position]
+                    top_token_stream = eval_set[sequence_idx][top_seq_position]
                     base_activations_select[
                         ablate_layer_idx][ablate_dim][cache_dim
                     ] = base_activations_all_positions[
@@ -240,34 +242,35 @@ for ablate_layer_idx in ablate_layer_range:
                         ][:, abs_top_seq_position, :]
                     break
 
-                with hooks_lifecycle(
-                    ablate_layer_idx,
-                    ablate_dim,
-                    layer_range,
-                    cache_dim_indices,
-                    model,
-                    tensors_per_layer,
-                    ablated_activations,
-                    ablate_during_run=False,  # Set to True.
-                ):
-                    try:
-                        sequence = tokenizer(
-                            dim_token_stream,
-                            return_tensors="pt",
-                            truncation=True,
-                            max_length=MAX_SEQ_INTERPED_LEN,
-                        ).to(model.device)
-                        model(**sequence)
-                    except RuntimeError:
-                        # Manually clear memory and retry.
-                        gc.collect()
-                        sequence = tokenizer(
-                            dim_token_stream,
-                            return_tensors="pt",
-                            truncation=True,
-                            max_length=MAX_SEQ_INTERPED_LEN,
-                        ).to(model.device)
-                        model(**sequence)
+            # Run ablations.
+            with hooks_lifecycle(
+                ablate_layer_idx,
+                ablate_dim,
+                layer_range,
+                cache_dim_indices,
+                model,
+                tensors_per_layer,
+                ablated_activations,
+                ablate_during_run=False,  # Set to True.
+            ):
+                try:
+                    sequence = tokenizer(
+                        top_token_stream,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=MAX_SEQ_INTERPED_LEN,
+                    ).to(model.device)
+                    model(**sequence)
+                except RuntimeError:
+                    # Manually clear memory and retry.
+                    gc.collect()
+                    sequence = tokenizer(
+                        top_token_stream,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=MAX_SEQ_INTERPED_LEN,
+                    ).to(model.device)
+                    model(**sequence)
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
@@ -278,17 +281,22 @@ for (
 ) in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
     for j in ablated_activations[i].keys():
         for k in ablated_activations[i][j].keys():
+
             assert (
                 ablated_activations[i][j][k].shape
                 == base_activations_select[i][j][k].shape
             ), dedent(
                 f"Shape mismatch between ablated and base activations for "
-                f"ablate layer {i}, ablate dim {j}, and downstream dim {k}."
+                f"ablate layer {i}, ablate dim {j}, and downstream dim {k}; "
+                f"ablated shape is {ablated_activations[i][j][k].shape} "
+                f"and base shape is {base_activations_select[i][j][k].shape}."
             )
+
             activation_diffs[i, j, k] = (
                 ablated_activations[i][j][k].sum(axis=1).squeeze()
                 - base_activations_select[i][j][k].sum(axis=1).squeeze()
             )
+
 # Check that there was any overall effect.
 HOOK_EFFECTS_CHECKSUM = 0.0
 for i, j, k in activation_diffs:
