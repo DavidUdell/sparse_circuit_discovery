@@ -285,11 +285,13 @@ for (
             assert (
                 ablated_activations[i][j][k].shape
                 == base_activations_select[i][j][k].shape
+                == (1, 1, 1)
             ), dedent(
                 f"Shape mismatch between ablated and base activations for "
                 f"ablate layer {i}, ablate dim {j}, and downstream dim {k}; "
                 f"ablated shape is {ablated_activations[i][j][k].shape} "
-                f"and base shape is {base_activations_select[i][j][k].shape}."
+                f"and base shape is {base_activations_select[i][j][k].shape}. "
+                f"Both should have been (1, 1, 1)."
             )
 
             activation_diffs[i, j, k] = (
