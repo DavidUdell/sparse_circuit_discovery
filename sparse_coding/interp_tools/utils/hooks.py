@@ -24,7 +24,7 @@ def rasp_ablate_hook_fac(neuron_index: int):
 
 
 @contextmanager
-def hooks_lifecycle(
+def hooks_manager(
     ablate_layer_idx: int,
     ablate_dim_idx: int,
     model_layer_range: range,

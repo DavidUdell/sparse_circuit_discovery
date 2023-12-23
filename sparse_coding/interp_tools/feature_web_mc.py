@@ -29,7 +29,7 @@ from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.hooks import (
     rasp_ablate_hook_fac,
-    hooks_lifecycle,
+    hooks_manager,
 )
 from sparse_coding.utils.interface import (
     parse_slice,
@@ -231,7 +231,7 @@ else:
         ):
             np.random.seed(SEED)
             # Base run.
-            with hooks_lifecycle(
+            with hooks_manager(
                 ablate_layer_idx,
                 ablate_dim_idx,
                 layer_range,
@@ -254,7 +254,7 @@ else:
 
             np.random.seed(SEED)
             # Ablated run.
-            with hooks_lifecycle(
+            with hooks_manager(
                 ablate_layer_idx,
                 ablate_dim_idx,
                 layer_range,

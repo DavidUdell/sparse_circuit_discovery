@@ -23,7 +23,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
-from sparse_coding.interp_tools.utils.hooks import hooks_lifecycle
+from sparse_coding.interp_tools.utils.hooks import hooks_manager
 from sparse_coding.utils.interface import (
     parse_slice,
     slice_to_range,
@@ -117,7 +117,7 @@ for ablate_layer_idx in ablate_layer_range:
     # Base run, to determine top activating sequence positions. I'm
     # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
     # layer, by using its interface in a hacky way.
-    with hooks_lifecycle(
+    with hooks_manager(
         ablate_layer_idx - 1,
         None,
         [ablate_layer_idx],
@@ -246,7 +246,7 @@ for ablate_layer_idx in ablate_layer_range:
             max_length=MAX_SEQ_INTERPED_LEN,
         ).to(model.device)
 
-        with hooks_lifecycle(
+        with hooks_manager(
             ablate_layer_idx,
             ablate_dim,
             layer_range,
@@ -263,7 +263,7 @@ for ablate_layer_idx in ablate_layer_range:
                 gc.collect()
                 model(**top_input)
 
-        with hooks_lifecycle(
+        with hooks_manager(
             ablate_layer_idx,
             ablate_dim,
             layer_range,
