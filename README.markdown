@@ -10,13 +10,13 @@ Automatic circuit discovery in large language models, using sparse coding.
 
 ## Installation
 To manually install, just run these commands in the shell:
-```
-git clone https://github.com/DavidUdell/sparse_circuit_discovery
 
-cd sparse_circuit_discovery
+`git clone https://github.com/DavidUdell/sparse_circuit_discovery`
 
-pip install --editable sparse_circuit_discovery
-```
+`cd sparse_circuit_discovery`
+
+`pip install --editable sparse_circuit_discovery`
+
 _Alternatively,_ I have a Docker image [hosted on
 DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery). The
 Docker image is especially good for pulling to a remote server.
@@ -34,16 +34,19 @@ repo (`MODEL_DIR`),
 
 Acceptable starting values for a range of models are:
 
-|`MODEL_DIR`|`ACT_LAYERS_SLICE`|`LAMBDA_L1`|`LEARNING_RATE`| `PROJECTION_FACTOR`|
-|---|:---:|:---:|:---:|:---:|
-|EleutherAI/pythia-70m | "1:3" | 1e-2 | 3e-3 | 10 |
-|meta-llama/Llama-2-7b-hf | "12:14" | 1 | 1e-3 | 10 |
-|meta-llama/Llama-2-70b-hf | "31:33" | 3 | 1e-3 | 10 |
+|`MODEL_DIR`|EleutherAI/pythia-70m|meta-llama/Llama-2-7b-hf|meta-llama/Llama-2-70b-hf|
+|:---:|:---:|:---:|:---:|
+|`ACTS_LAYERS_SLICE`| "1:3" | "12:14" | "31:33" |
+|`LAMBDA_L1` | 1e-2 | 1 | 3 |
+|`LEARNING_RATE` | 3e-3 | 1e-3 | 1e-3 |
+|`PROJECTION_FACTOR` | 10 | 10 | 10 |
 
 Once you've saved `central_config.yaml`, run the main interpretability pipeline
 with:
 
-`cd sparse_coding && python3 pipe.py`
+`cd sparse_coding`
+
+`python3 pipe.py`
 
 ### Notes:
 - A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
