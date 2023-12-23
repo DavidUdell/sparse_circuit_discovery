@@ -49,13 +49,12 @@ Once you've saved `central_config.yaml`, run the main interpretability pipeline 
   convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
   hyperparameters to get this L^0.
 
-- Try to run this on CUDA 12.2 or better. I have ever had env variable bugs on
-  CUDA 12.0; I haven't looked into this in great detail, but I notice this fix
-  works.
-
 - If you're trying to access a gated HuggingFace model repo, you'll have to
   provide the needed HuggingFace access token in
   `sparse_coding/act_access.yaml`. The script will create this YAML if needed.
+
+- Try to run this with CUDA Toolkit 12.2 or better, if you're encountering
+  cryptic env variable bugs with CUDA Toolkit 12.0/older.
 
 ## Project Status
 Project is currently a WIP. Current version: 0.1.3.
