@@ -220,9 +220,10 @@ for ablate_layer_idx in ablate_layer_range:
                 cache_layer_idx: cache_dims,
             }
 
-        # Ablation run at top activating sequence positions.
+        # Ablation run at top activating sequence positions. We use the -1
+        # index from the initial top position collection.
         top_seq_position = favorite_sequence_positions[
-            ablate_layer_idx, None, ablate_dim
+            ablate_layer_idx - 1, None, ablate_dim
         ]
         per_seq_position = top_seq_position
         # top_seq_position is on flattened eval_set.
