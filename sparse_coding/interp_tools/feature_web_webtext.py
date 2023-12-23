@@ -271,7 +271,7 @@ for ablate_layer_idx in ablate_layer_range:
             model,
             per_layer_autoencoders,
             ablated_activations,
-            ablate_during_run=True,
+            ablate_during_run=False,
         ):
             _ = t.manual_seed(SEED)
             try:
@@ -307,7 +307,7 @@ for i in ablated_activations:
 EFFECTS_CHECKSUM = 0.0
 for i, j, k in act_diffs:
     EFFECTS_CHECKSUM += act_diffs[i, j, k].sum().item()
-assert EFFECTS_CHECKSUM == 0.0, "Ablate hook effects sum to exactly zero."
+assert EFFECTS_CHECKSUM != 0.0, "Ablate hook effects sum to exactly zero."
 
 sorted_diffs = dict(sorted(act_diffs.items(), key=lambda x: x[-1].item()))
 
