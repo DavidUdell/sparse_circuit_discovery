@@ -115,7 +115,6 @@ for ablate_layer_idx in ablate_layer_range:
         cache_dim_indices: dict[int, list[int]] = {
             cache_layer_idx: cache_dims,
         }
-        np.random.seed(SEED)
         # Base run, to determine top activating sequence positions.
         with hooks_lifecycle(
             ablate_layer_idx,
@@ -128,6 +127,7 @@ for ablate_layer_idx in ablate_layer_range:
             ablate_during_run=False,
         ):
             for sequence in eval_set:
+                _ = t.manual_seed(SEED)
                 try:
                     inputs = tokenizer(
                         sequence,
@@ -232,17 +232,22 @@ for ablate_layer_idx in ablate_layer_range:
                     if len(position_idx) < top_seq_position:
                         top_seq_position = top_seq_position - len(position_idx)
                         continue
-
-                    top_token_stream = eval_set[sequence_idx][top_seq_position]
-                    base_activations_select[
-                        ablate_layer_idx][ablate_dim][cache_dim
-                    ] = base_activations_all_positions[
-                            ablate_layer_idx][None][cache_dim
-                        ][:, abs_top_seq_position, :].unsqueeze(-1)
+                    # +1 to include the token at the top activating position.
+                    seq_truncated_top_token = eval_set[sequence_idx][
+                        : top_seq_position + 1
+                    ]
+                    base_activations_select[ablate_layer_idx][ablate_dim][
+                        cache_dim
+                    ] = base_activations_all_positions[ablate_layer_idx][None][
+                        cache_dim
+                    ][
+                        :, abs_top_seq_position, :
+                    ].unsqueeze(
+                        -1
+                    )
                     break
 
             # Run ablations.
-            np.random.seed(SEED)
             with hooks_lifecycle(
                 ablate_layer_idx,
                 ablate_dim,
@@ -253,9 +258,10 @@ for ablate_layer_idx in ablate_layer_range:
                 ablated_activations,
                 ablate_during_run=False,  # Set to True after values match.
             ):
+                _ = t.manual_seed(SEED)
                 try:
                     sequence = tokenizer(
-                        top_token_stream,
+                        seq_truncated_top_token,
                         return_tensors="pt",
                         truncation=True,
                         max_length=MAX_SEQ_INTERPED_LEN,
@@ -265,7 +271,7 @@ for ablate_layer_idx in ablate_layer_range:
                     # Manually clear memory and retry.
                     gc.collect()
                     sequence = tokenizer(
-                        top_token_stream,
+                        seq_truncated_top_token,
                         return_tensors="pt",
                         truncation=True,
                         max_length=MAX_SEQ_INTERPED_LEN,
@@ -281,22 +287,23 @@ for (
 ) in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
     for j in ablated_activations[i].keys():
         for k in ablated_activations[i][j].keys():
-
             assert (
-                ablated_activations[i][j][k].shape
+                ablated_activations[i][j][k][:, -1, :].unsqueeze(1).shape
                 == base_activations_select[i][j][k].shape
                 == (1, 1, 1)
             ), dedent(
-                f"Shape mismatch between ablated and base activations for "
-                f"ablate layer {i}, ablate dim {j}, and downstream dim {k}; "
-                f"ablated shape is {ablated_activations[i][j][k].shape} "
-                f"and base shape is {base_activations_select[i][j][k].shape}. "
-                f"Both should have been (1, 1, 1)."
+                f"""
+                Shape mismatch between ablated and base activations for ablate
+                layer {i}, ablate dim {j}, and downstream dim {k}; ablate shape
+                {ablated_activations[i][j][k][:,-1,:].unsqueeze(1).shape} and
+                base shape {base_activations_select[i][j][k].shape}. Both
+                should have been (1, 1, 1).
+                """
             )
-
+            # Just making them explicitly match shapes before squeezing.
             activation_diffs[i, j, k] = (
-                ablated_activations[i][j][k].sum(axis=1).squeeze()
-                - base_activations_select[i][j][k].sum(axis=1).squeeze()
+                ablated_activations[i][j][k][:, -1, :].unsqueeze(1).squeeze()
+                - base_activations_select[i][j][k].squeeze()
             )
 
 # Check that there was any overall effect.
