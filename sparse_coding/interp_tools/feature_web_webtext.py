@@ -111,38 +111,37 @@ for ablate_layer_idx in ablate_layer_range:
         __file__,
         [],
     )
-    for dim in ablate_dims:
-        base_cache_dim_index: dict[int, list[int]] = {
-            ablate_layer_idx: [dim],
-        }
-        # Base run, to determine top activating sequence positions. I'm
-        # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
-        # layer, by using its interface in a hacky way.
-        with hooks_lifecycle(
-            ablate_layer_idx - 1,
-            None,
-            [ablate_layer_idx],
-            base_cache_dim_index,
-            model,
-            ablation_layer_autoencoder,
-            base_activations_all_positions,
-            ablate_during_run=False,
-        ):
-            for sequence in eval_set:
-                _ = t.manual_seed(SEED)
-                inputs = tokenizer(
-                    sequence,
-                    return_tensors="pt",
-                    truncation=True,
-                    max_length=MAX_SEQ_INTERPED_LEN,
-                ).to(model.device)
+    base_cache_dim_index: dict[int, list[int]] = {
+        ablate_layer_idx: ablate_dims
+    }
+    # Base run, to determine top activating sequence positions. I'm
+    # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
+    # layer, by using its interface in a hacky way.
+    with hooks_lifecycle(
+        ablate_layer_idx - 1,
+        None,
+        [ablate_layer_idx],
+        base_cache_dim_index,
+        model,
+        ablation_layer_autoencoder,
+        base_activations_all_positions,
+        ablate_during_run=False,
+    ):
+        for sequence in eval_set:
+            _ = t.manual_seed(SEED)
+            inputs = tokenizer(
+                sequence,
+                return_tensors="pt",
+                truncation=True,
+                max_length=MAX_SEQ_INTERPED_LEN,
+            ).to(model.device)
 
-                try:
-                    model(**inputs)
-                except RuntimeError:
-                    # Manually clear memory and retry.
-                    gc.collect()
-                    model(**inputs)
+            try:
+                model(**inputs)
+            except RuntimeError:
+                # Manually clear memory and retry.
+                gc.collect()
+                model(**inputs)
 
 # %%
 # Pare down to each dimension's top activating sequence position.
