@@ -53,8 +53,8 @@ Once you've saved `central_config.yaml`, run the main interpretability pipeline 
   provide the needed HuggingFace access token in
   `sparse_coding/act_access.yaml`. The script will create this YAML if needed.
 
-- Try to run this with CUDA Toolkit 12.2 or better, if you're encountering
-  cryptic env variable bugs with CUDA Toolkit 12.0/older.
+- If you're encountering cryptic env variable bugs, ensure CUDA Toolkit 12.2 or
+  newer is running.
 
 ## Project Status
 Project is currently a WIP. Current version: 0.1.3.
