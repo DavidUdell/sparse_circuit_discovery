@@ -174,7 +174,7 @@ for ablate_layer_idx in ablate_layer_range:
         BIASES_FILE,
         __file__,
     )
-    base_cache_dim_index = load_layer_feature_indices(
+    ablate_dim_indices = load_layer_feature_indices(
         MODEL_DIR,
         ablate_layer_idx,
         TOP_K_INFO_FILE,
@@ -184,14 +184,14 @@ for ablate_layer_idx in ablate_layer_range:
     # Optionally pare down to a target subset of ablate dims.
     if ABLATION_DIM_INDICES_PLOTTED is not None:
         for i in ABLATION_DIM_INDICES_PLOTTED:
-            assert i in base_cache_dim_index, dedent(
+            assert i in ablate_dim_indices, dedent(
                 f"Index {i} not in `ablate_dim_indices`."
             )
-        base_cache_dim_index = ABLATION_DIM_INDICES_PLOTTED
+        ablate_dim_indices = ABLATION_DIM_INDICES_PLOTTED
 
-    for ablate_dim in tqdm(
-        base_cache_dim_index, desc="Dim Ablations Progress"
-    ):
+    for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
+        # This inner loop is all setup; it doesn't loop over the forward
+        # passes.
         for cache_layer_idx in cache_layer_range:
             ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
                 MODEL_DIR,
@@ -200,7 +200,7 @@ for ablate_layer_idx in ablate_layer_range:
                 BIASES_FILE,
                 __file__,
             )
-            ablation_layer_autoencoder: dict[int, tuple[t.Tensor]] = {
+            per_layer_autoencoders: dict[int, tuple[t.Tensor]] = {
                 ablate_layer_idx: (
                     ablate_layer_encoder,
                     ablate_layer_bias,
@@ -221,106 +221,96 @@ for ablate_layer_idx in ablate_layer_range:
                 cache_layer_idx: cache_dims,
             }
 
-            # Set up for ablations at select positions.
-            for cache_dim in cache_dims:
-                # Ablation run at top activating sequence positions.
-                top_seq_position = favorite_sequence_positions[
-                    ablate_layer_idx, None, cache_dim
-                ]
-                abs_top_seq_position = top_seq_position
-                # top_seq_position is on flattened eval_set.
-                for sequence_idx, token_sequence in enumerate(eval_set):
-                    if len(token_sequence) < top_seq_position:
-                        top_seq_position = top_seq_position - len(
-                            token_sequence
-                        )
-                        continue
-                    # +1 to include the token at the top activating position.
-                    seq_truncated_top_token = eval_set[sequence_idx][
-                        : top_seq_position + 1
-                    ]
+        # Ablation run at top activating sequence positions.
+        top_seq_position = favorite_sequence_positions[
+            ablate_layer_idx, None, ablate_dim
+        ]
+        per_seq_position = top_seq_position
+        # top_seq_position is on flattened eval_set.
+        for sequence_idx, seq in enumerate(eval_set):
+            if len(seq) < per_seq_position:
+                per_seq_position = per_seq_position - len(seq)
+                continue
+            # +1 to include the token at the top activating position.
+            truncated_seq = eval_set[sequence_idx][: per_seq_position + 1]
+            break
 
-                    # Before we run ablations, cache the corresponding base
-                    # activations to match the ablated activations.
-                    base_activations_top_positions[ablate_layer_idx][
-                        ablate_dim
-                    ][cache_dim] = base_activations_all_positions[
-                        ablate_layer_idx
-                    ][
-                        None
-                    ][
-                        cache_dim
-                    ][
-                        :, abs_top_seq_position, :
-                    ].unsqueeze(
-                        -1
-                    )
+        # This is a conventional use of hooks_lifecycle, but we're only passing
+        # in as input to the model the top activating sequence, truncated. We
+        # run one ablated and once not.
 
-                    break
+        top_input = tokenizer(
+            truncated_seq,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_INTERPED_LEN,
+        ).to(model.device)
 
-            # Run ablations.
-            with hooks_lifecycle(
-                ablate_layer_idx,
-                ablate_dim,
-                layer_range,
-                base_cache_dim_index,
-                model,
-                ablation_layer_autoencoder,
-                ablated_activations,
-                ablate_during_run=False,  # Set to True after values match.
-            ):
-                _ = t.manual_seed(SEED)
-                sequence = tokenizer(
-                    seq_truncated_top_token,
-                    return_tensors="pt",
-                    truncation=True,
-                    max_length=MAX_SEQ_INTERPED_LEN,
-                ).to(model.device)
+        with hooks_lifecycle(
+            ablate_layer_idx,
+            ablate_dim,
+            layer_range,
+            base_cache_dim_index,
+            model,
+            per_layer_autoencoders,
+            base_activations_top_positions,
+            ablate_during_run=False,
+        ):
+            _ = t.manual_seed(SEED)
+            try:
+                model(**top_input)
+            except RuntimeError:
+                gc.collect()
+                model(**top_input)
 
-                try:
-                    model(**sequence)
-                except RuntimeError:
-                    # Manually clear memory and retry.
-                    gc.collect()
-                    model(**sequence)
+        with hooks_lifecycle(
+            ablate_layer_idx,
+            ablate_dim,
+            layer_range,
+            base_cache_dim_index,
+            model,
+            per_layer_autoencoders,
+            ablated_activations,
+            ablate_during_run=True,
+        ):
+            _ = t.manual_seed(SEED)
+            try:
+                model(**top_input)
+            except RuntimeError:
+                gc.collect()
+                model(**top_input)
 
 # %%
-# Compute ablated effects minus base effects. Recursive defaultdict indices
-# are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
-activation_diffs = {}
-for (
-    i
-) in ablated_activations.keys():  # pylint: disable=consider-using-dict-items
-    for j in ablated_activations[i].keys():
-        for k in ablated_activations[i][j].keys():
-            assert (
-                ablated_activations[i][j][k][:, -1, :].unsqueeze(1).shape
-                == base_activations_top_positions[i][j][k].shape
-                == (1, 1, 1)
-            ), dedent(
+# Compute diffs. Recursive defaultdict indices are:
+# [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
+act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
+for i in ablated_activations:
+    for j in ablated_activations[i]:
+        for k in ablated_activations[i][j]:
+            ablate_vec = ablated_activations[i][j][k][:, -1, :].unsqueeze(1)
+            base_vec = base_activations_top_positions[i][j][k][
+                :, -1, :
+            ].unsqueeze(1)
+
+            assert ablate_vec.shape == base_vec.shape == (1, 1, 1), dedent(
                 f"""
-                Shape mismatch between ablated and base activations for ablate
-                layer {i}, ablate dim {j}, and downstream dim {k}; ablate shape
-                {ablated_activations[i][j][k][:,-1,:].unsqueeze(1).shape} and
-                base shape {base_activations_top_positions[i][j][k].shape}.
-                Both should have been (1, 1, 1).
+                Shape mismatch between ablated and base vectors for ablate
+                layer {i}, ablate dim {j}, and cache dim {k}; ablate shape
+                {ablate_vec.shape} and base shape {base_vec.shape}. Both
+                should have been (1, 1, 1).
                 """
             )
-            # Just making them explicitly match shapes before squeezing.
-            activation_diffs[i, j, k] = (
-                ablated_activations[i][j][k][:, -1, :].unsqueeze(1).squeeze()
-                - base_activations_top_positions[i][j][k].squeeze()
-            )
 
-# Check that there was any overall effect.
-HOOK_EFFECTS_CHECKSUM = 0.0
-for i, j, k in activation_diffs:
-    HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
-assert HOOK_EFFECTS_CHECKSUM == 0.0, "Ablate hook effects sum to exactly zero."
+            act_diffs[i, j, k] = ablate_vec.squeeze() - base_vec.squeeze()
 
-sorted_diffs = dict(
-    sorted(activation_diffs.items(), key=lambda x: x[-1].item())
-)
+# There should be any overall effect.
+EFFECTS_CHECKSUM = 0.0
+for i, j, k in act_diffs:
+    EFFECTS_CHECKSUM += act_diffs[i, j, k].sum().item()
+assert EFFECTS_CHECKSUM == 0.0, "Ablate hook effects sum to exactly zero."
+
+sorted_diffs = dict(sorted(act_diffs.items(), key=lambda x: x[-1].item()))
+
 graph_causal_effects(
     sorted_diffs,
     MODEL_DIR,
