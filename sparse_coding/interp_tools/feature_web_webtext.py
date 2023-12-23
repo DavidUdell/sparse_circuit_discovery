@@ -271,7 +271,7 @@ for ablate_layer_idx in ablate_layer_range:
             model,
             per_layer_autoencoders,
             ablated_activations,
-            ablate_during_run=False,
+            ablate_during_run=True,
         ):
             _ = t.manual_seed(SEED)
             try:
