@@ -6,7 +6,7 @@
 *.csv
 
 # Causal graph files
-*.png
+feature_web.png
 *.svg
 
 # `Lightning` training logging

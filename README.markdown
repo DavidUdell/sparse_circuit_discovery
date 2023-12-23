@@ -1,4 +1,6 @@
 # Sparse Circuit Discovery
+![Feature graph](header.png)
+
 Automatic circuit discovery in large language models, using sparse coding.
 
 ## Table of Contents
