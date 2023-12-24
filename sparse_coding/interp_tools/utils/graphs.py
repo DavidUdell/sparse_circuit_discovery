@@ -88,7 +88,6 @@ def graph_causal_effects(
             ablated_dim,
             downstream_dim,
         ), effect in activations.items():
-            print(effect.item())
             if effect.item() == 0:
                 continue
             # Blue means the intervention increased downstream firing, while
