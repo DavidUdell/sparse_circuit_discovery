@@ -330,7 +330,10 @@ for i in ablated_activations:
             # would be the last position of each sequence.
             act_diffs[i, j, k] = t.zeros_like(ablate_vec)
             for x in truncated_seq_lens:
-                act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
+                # len -1 for the final position index.
+                act_diffs[i, j, k] += (
+                    ablate_vec[:, x - 1, :] - base_vec[:, x - 1, :]
+                )
             act_diffs[i, j, k] = act_diffs[i, j, k].sum()
 
 # There should be any overall effect.
