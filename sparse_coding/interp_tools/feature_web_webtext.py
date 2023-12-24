@@ -237,6 +237,7 @@ for ablate_layer_idx in ablate_layer_range:
             ablate_layer_idx - 1, None, ablate_dim
         ]
         truncated_seqs = []
+        truncated_seq_lens = []
         for per_seq_position in per_seq_positions:
             per_seq_position = per_seq_position.sum().item()
             # per_seq_position is on flattened eval_set.
@@ -247,6 +248,7 @@ for ablate_layer_idx in ablate_layer_range:
                 # +1 to include the token at the top activating position.
                 truncated_seq = eval_set[sequence_idx][: per_seq_position + 1]
                 truncated_seqs.append(truncated_seq)
+                truncated_seq_lens.append(len(truncated_seq))
                 break
 
         # This is a conventional use of hooks_lifecycle, but we're only passing
@@ -309,31 +311,38 @@ act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
 for i in ablated_activations:
     for j in ablated_activations[i]:
         for k in ablated_activations[i][j]:
-            ablate_vec = ablated_activations[i][j][k][:, -1, :].unsqueeze(1)
-            base_vec = base_activations_top_positions[i][j][k][
-                :, -1, :
-            ].unsqueeze(1)
+            print(ablated_activations[i][j][k].shape)
+            print(base_activations_top_positions[i][j][k].shape)
+            ablate_vec = ablated_activations[i][j][k]
+            base_vec = base_activations_top_positions[i][j][k]
 
-            assert ablate_vec.shape == base_vec.shape == (1, 1, 1), dedent(
+            assert (
+                ablate_vec.shape == base_vec.shape == (1, base_vec.size(1), 1)
+            ), dedent(
                 f"""
                 Shape mismatch between ablated and base vectors for ablate
                 layer {i}, ablate dim {j}, and cache dim {k}; ablate shape
-                {ablate_vec.shape} and base shape {base_vec.shape}. Both
-                should have been (1, 1, 1).
+                {ablate_vec.shape} and base shape {base_vec.shape}.
                 """
             )
 
-            act_diffs[i, j, k] = ablate_vec.squeeze() - base_vec.squeeze()
+            # The truncated seqs were all flattened. Now we just want what
+            # would be the last position of each sequence.
+            act_diffs[i, j, k] = t.zeros_like(ablate_vec)
+            for x in truncated_seq_lens:
+                act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
+            act_diffs[i, j, k] = act_diffs[i, j, k].sum()
 
 # There should be any overall effect.
 EFFECTS_CHECKSUM = 0.0
 for i, j, k in act_diffs:
-    EFFECTS_CHECKSUM += act_diffs[i, j, k].sum().item()
+    EFFECTS_CHECKSUM += act_diffs[i, j, k].item()
 assert EFFECTS_CHECKSUM != 0.0, "Ablate hook effects sum to exactly zero."
 
 sorted_diffs = dict(sorted(act_diffs.items()), key=lambda x: abs(x[-1].item()))
 
 if N_EFFECTS is not None:
+    print(len(list(sorted_diffs)))
     select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
 else:
     select_diffs = sorted_diffs
