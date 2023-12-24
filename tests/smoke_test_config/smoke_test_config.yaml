@@ -26,6 +26,9 @@ SEED: 0
 # Leave out entries for None: None values here are interpreted as the string
 # "None"
 ABLATION_DIM_INDICES_PLOTTED: [1]
+# The number of affected features plotted. If None, all affected features
+# plotted.
+N_EFFECTS: 5
 
 
 # Smoke Test Constants (`collect_acts_mc.py`)

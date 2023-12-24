@@ -49,6 +49,7 @@ TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
+N_EFFECTS = config.get("N_EFFECTS")
 SEED = config.get("SEED", 0)
 
 # %%
@@ -144,7 +145,8 @@ for ablate_layer_idx in ablate_layer_range:
                 model(**inputs)
 
 # %%
-# Pare down to each dimension's top activating sequence position.
+# Find each dim's top activation value, and select all positions in the range
+# [activation/2, activation], a la Cunningham et al. 2023.
 # base_activation indices:
 # [ablate_layer_index][None][base_cache_dim_index]
 favorite_sequence_positions = {}
@@ -156,9 +158,18 @@ for i in base_activations_all_positions:
             # The t.argmax here finds the top sequence position for each dict
             # index tuple. # favorite_sequence_position indices are now the
             # tuple (ablate_layer_idx, None, base_cache_dim_index).
-            favorite_sequence_positions[i, j, k] = t.argmax(
-                base_activations_all_positions[i][j][k], dim=1
-            ).squeeze()
+            activations_tensor = base_activations_all_positions[i][j][k]
+
+            favorite_seq_pos = t.argmax(activations_tensor, dim=1).squeeze()
+            max_val = activations_tensor[favorite_seq_pos]
+            min_val = max_val / 2.0
+            mask = (activations_tensor >= min_val) & (
+                activations_tensor <= max_val
+            )
+            top_indices: t.Tensor = t.nonzero(mask)
+
+            favorite_sequence_positions[i, j, k] = top_indices
+
 
 # %%
 # Run ablations at top sequence positions.
@@ -222,30 +233,24 @@ for ablate_layer_idx in ablate_layer_range:
 
         # Ablation run at top activating sequence positions. We use the -1
         # index from the initial top position collection.
-        top_seq_position = favorite_sequence_positions[
+        per_seq_positions = favorite_sequence_positions[
             ablate_layer_idx - 1, None, ablate_dim
         ]
-        per_seq_position = top_seq_position
-        # top_seq_position is on flattened eval_set.
-        for sequence_idx, seq in enumerate(eval_set):
-            if len(seq) < per_seq_position:
-                per_seq_position = per_seq_position - len(seq)
-                continue
-            # +1 to include the token at the top activating position.
-            truncated_seq = eval_set[sequence_idx][: per_seq_position + 1]
-            break
+        truncated_seqs = []
+        for per_seq_position in per_seq_positions:
+            # per_seq_position is on flattened eval_set.
+            for sequence_idx, seq in enumerate(eval_set):
+                if len(seq) < per_seq_positions:
+                    per_seq_positions = per_seq_positions - len(seq)
+                    continue
+                # +1 to include the token at the top activating position.
+                truncated_seq = eval_set[sequence_idx][: per_seq_positions + 1]
+                truncated_seqs.append(truncated_seq)
+                break
 
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
         # run one ablated and once not.
-
-        top_input = tokenizer(
-            truncated_seq,
-            return_tensors="pt",
-            truncation=True,
-            max_length=MAX_SEQ_INTERPED_LEN,
-        ).to(model.device)
-
         with hooks_manager(
             ablate_layer_idx,
             ablate_dim,
@@ -256,12 +261,20 @@ for ablate_layer_idx in ablate_layer_range:
             base_activations_top_positions,
             ablate_during_run=False,
         ):
-            _ = t.manual_seed(SEED)
-            try:
-                model(**top_input)
-            except RuntimeError:
-                gc.collect()
-                model(**top_input)
+            for s in truncated_seqs:
+                top_input = tokenizer(
+                    s,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=MAX_SEQ_INTERPED_LEN,
+                ).to(model.device)
+
+                _ = t.manual_seed(SEED)
+                try:
+                    model(**top_input)
+                except RuntimeError:
+                    gc.collect()
+                    model(**top_input)
 
         with hooks_manager(
             ablate_layer_idx,
@@ -273,12 +286,20 @@ for ablate_layer_idx in ablate_layer_range:
             ablated_activations,
             ablate_during_run=True,
         ):
-            _ = t.manual_seed(SEED)
-            try:
-                model(**top_input)
-            except RuntimeError:
-                gc.collect()
-                model(**top_input)
+            for s in truncated_seqs:
+                top_input = tokenizer(
+                    s,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=MAX_SEQ_INTERPED_LEN,
+                ).to(model.device)
+
+                _ = t.manual_seed(SEED)
+                try:
+                    model(**top_input)
+                except RuntimeError:
+                    gc.collect()
+                    model(**top_input)
 
 # %%
 # Compute diffs. Recursive defaultdict indices are:
@@ -309,7 +330,12 @@ for i, j, k in act_diffs:
     EFFECTS_CHECKSUM += act_diffs[i, j, k].sum().item()
 assert EFFECTS_CHECKSUM != 0.0, "Ablate hook effects sum to exactly zero."
 
-sorted_diffs = dict(sorted(act_diffs.items(), key=lambda x: x[-1].item()))
+sorted_diffs = dict(sorted(abs(act_diffs.items()), key=lambda x: x[-1].item()))
+
+if N_EFFECTS is not None:
+    select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
+else:
+    select_diffs = sorted_diffs
 
 graph_causal_effects(
     sorted_diffs,
