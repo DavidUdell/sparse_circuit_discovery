@@ -238,13 +238,14 @@ for ablate_layer_idx in ablate_layer_range:
         ]
         truncated_seqs = []
         for per_seq_position in per_seq_positions:
+            per_seq_position = per_seq_position.item()
             # per_seq_position is on flattened eval_set.
             for sequence_idx, seq in enumerate(eval_set):
-                if len(seq) < per_seq_positions:
-                    per_seq_positions = per_seq_positions - len(seq)
+                if len(seq) < per_seq_position:
+                    per_seq_position = per_seq_position - len(seq)
                     continue
                 # +1 to include the token at the top activating position.
-                truncated_seq = eval_set[sequence_idx][: per_seq_positions + 1]
+                truncated_seq = eval_set[sequence_idx][: per_seq_position + 1]
                 truncated_seqs.append(truncated_seq)
                 break
 
