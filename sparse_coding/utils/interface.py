@@ -118,7 +118,7 @@ def cache_layer_tensor(
     t.save(layer_tensor, save_subdir_path + f"/{save_append}")
 
 
-def slice_to_seq(model: PreTrainedModel, input_slice: slice) -> range:
+def slice_to_range(model: PreTrainedModel, input_slice: slice) -> range:
     """Build a range corresponding to an input slice."""
 
     if input_slice.start is None:

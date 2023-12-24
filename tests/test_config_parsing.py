@@ -6,7 +6,7 @@ from textwrap import dedent
 from pytest import fixture
 from transformers import AutoModelForCausalLM, PreTrainedModel
 
-from sparse_coding.utils.interface import parse_slice, slice_to_seq
+from sparse_coding.utils.interface import parse_slice, slice_to_range
 
 
 @fixture
@@ -95,9 +95,9 @@ def test_slice_to_seq(mock_slices):  # pylint: disable=redefined-outer-name
     model, _, slices, ranges = mock_slices
 
     for parsed_slice, model_range in zip(slices, ranges):
-        assert slice_to_seq(model, parsed_slice) == model_range, dedent(
+        assert slice_to_range(model, parsed_slice) == model_range, dedent(
             f"""
                 Parsed slice {parsed_slice} should have been interpreted as
-                {model_range}, not {slice_to_seq(model, parsed_slice)}
+                {model_range}, not {slice_to_range(model, parsed_slice)}
                 """
         )

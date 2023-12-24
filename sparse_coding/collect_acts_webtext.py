@@ -21,7 +21,7 @@ from sparse_coding.utils.interface import (
     parse_slice,
     validate_slice,
     cache_layer_tensor,
-    slice_to_seq,
+    slice_to_range,
     load_yaml_constants,
     save_paths,
     pad_activations,
@@ -41,7 +41,8 @@ MODEL_DIR = config.get("MODEL_DIR")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
-NUM_BATCHES_EVALED = config.get("NUM_BATCHES_EVALED", 1000)
+NUM_SEQUENCES_EVALED = config.get("NUM_SEQUENCES_EVALED", 1000)
+MAX_SEQ_LEN = config.get("MAX_SEQ_LEN", 1000)
 SEED = config.get("SEED")
 
 # %%
@@ -69,29 +70,33 @@ model = accelerator.prepare(model)
 model.eval()
 
 validate_slice(model, ACTS_LAYERS_SLICE)
-acts_layers_range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset.
-dataset: list[str] = load_dataset("Elriggs/openwebtext-100k", split="train")[
-    "text"
-]
-dataset_array: np.ndarray = np.array(dataset)
-
-all_indices: np.ndarray = np.random.choice(
-    len(dataset_array), size=len(dataset_array), replace=False
+dataset: list[list[str]] = load_dataset(
+    "Elriggs/openwebtext-100k",
+    split="train"
+)["text"]
+dataset_indices: np.ndarray = np.random.choice(
+    len(dataset), size=len(dataset), replace=False
 )
-train_indices: np.ndarray = all_indices[:NUM_BATCHES_EVALED]
+train_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_EVALED]
+
+# Poor man's fancy indexing.
+training_set: list[list[int]] = [
+    dataset[i] for i in train_indices
+]
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
 # put into `activations`.
 activations: list[t.Tensor] = []
 prompt_ids_tensors: list[t.Tensor] = []
-for idx, batch in enumerate(dataset_array[train_indices].tolist()):
+for idx, batch in enumerate(training_set):
     try:
         inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=4000
+            batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
         ).to(model.device)
         outputs = model(**inputs)
         activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
@@ -100,7 +105,7 @@ for idx, batch in enumerate(dataset_array[train_indices].tolist()):
         # Manually clear memory and try again.
         gc.collect()
         inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=4000
+            batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
         ).to(model.device)
         outputs = model(**inputs)
         activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])

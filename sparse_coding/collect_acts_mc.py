@@ -29,7 +29,7 @@ from sparse_coding.utils.interface import (
     parse_slice,
     validate_slice,
     cache_layer_tensor,
-    slice_to_seq,
+    slice_to_range,
     load_yaml_constants,
     save_paths,
     pad_activations,
@@ -148,7 +148,7 @@ np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 
 # %%
 # Save activations.
-seq_layer_indices: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+seq_layer_indices: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # Deal with the single layer case, since there are no tuples there.
 if isinstance(activations, list) and isinstance(activations[0], t.Tensor):

@@ -22,37 +22,52 @@ TOP_K_INFO_FILE: "token_info.csv"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
-LEARNING_RATE: 1e-2
+LEARNING_RATE: 3e-3
 TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
+
+# Causal Graphs
+# Leave out entries for None: None values here are interpreted as the string
+# "None"
+ABLATION_DIM_INDICES_PLOTTED: [1025]
+# The number of affected features plotted. If None, all affected features
+# plotted.
+N_EFFECTS: 5
 
 # Reproducibility
 SEED: 0
 
 
-# Stable Dev Constants for `collect_acts_mc.py`
+# Stable Dev Constants (`collect_acts_mc.py`)
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6
 NUM_QUESTIONS_EVALED: 50
 
-# Stable Dev Constants for `collect_acts_webtext.py`
-NUM_BATCHES_EVALED: 1000
+# Stable Dev Constants (`collect_acts_webtext.py`)
+NUM_SEQUENCES_EVALED: 1500
+MAX_SEQ_LEN: 1000
 
-# Stable Dev Constants for `train_autoencoder.py`
+# Stable Dev Constants (`train_autoencoder.py`)
 LOG_EVERY_N_STEPS: 1
 EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
-# Stable Dev Constants for `interp_top_tokens.py`
-# _Leave out entries_ for None: None values here are interpreted as the string
+# Stable Dev Constants (`top_tokens.py`)
+# Leave out entries for None: None values here are interpreted as the string
 # "None"
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# Stable Dev Constants for `feature_web.py`
-# _Leave out entries_ for None: None values here are interpreted as the string
-# "None"
-NUM_QUESTIONS_INTERPED: 200
-ABLATION_DIM_INDICES_PLOTTED: [4248]
+# Stable Dev Constants (`feature_web_mc.py`)
+# Leave out entries for None: None values here are interpreted as the string
+# "None". Note that NUM_QUESTIONS_INTERPED is drawn from the other end of the
+# same indices as NUM_QUESTIONS_EVALED in `collect_acts_mc.py`.
+NUM_QUESTIONS_INTERPED: 500
+
+# Stable Dev Constants (`feature_web_webtext.py`)
+# NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
+# NUM_SEQUENCES_EVALED in `collect_acts_webtext.py`.
+NUM_SEQUENCES_INTERPED: 5000
+MAX_SEQ_INTERPED_LEN: 1000

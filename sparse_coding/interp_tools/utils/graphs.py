@@ -90,16 +90,22 @@ def graph_causal_effects(
         ), effect in activations.items():
             if effect.item() == 0:
                 continue
-            normed_effect = (effect.item() - min_scalar) / (
-                max_scalar - min_scalar
+            # Blue means the intervention increased downstream firing, while
+            # red means it decreased firing. Alpha indicates distance from 0.0
+            # effect size.
+            if effect.item() > 0.0:
+                red = 0
+                blue = 255
+            elif effect.item() < 0.0:
+                red = 255
+                blue = 0
+            alpha = int(
+                255
+                * abs(effect.item())
+                / (max(abs(max_scalar), abs(min_scalar)))
             )
-            rgb_color = f"""
-                #{int(255 * normed_effect):02x}00{int(255*(1 - normed_effect)):02x}
-            """.replace(
-                " ", ""
-            ).replace(
-                "\n", ""
-            )
+            rgba_color = f"#{red:02x}00{blue:02x}{alpha:02x}"
+
             graph.add_edge(
                 dedent(
                     f"""
@@ -113,7 +119,7 @@ def graph_causal_effects(
                     {label_appendable(ablation_layer_idx + 1, downstream_dim)}
                     """
                 ),
-                color=rgb_color,
+                color=rgba_color,
             )
 
         # Assert no repeat edges.

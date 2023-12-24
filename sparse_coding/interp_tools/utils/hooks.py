@@ -24,7 +24,7 @@ def rasp_ablate_hook_fac(neuron_index: int):
 
 
 @contextmanager
-def hooks_lifecycle(
+def hooks_manager(
     ablate_layer_idx: int,
     ablate_dim_idx: int,
     model_layer_range: range,
@@ -61,8 +61,11 @@ def hooks_lifecycle(
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=False
             )
-            # Zero out the activation at dim_idx.
-            projected_acts[:, :, dim_idx] = 0.0
+            # Ablate the activation at dim_idx. Modify here to scale in
+            # different ways besides ablation.
+            projected_acts[:, -1, dim_idx] = (
+                projected_acts[:, -1, dim_idx] * 0.0
+            )
             # Project back to activation space.
             ablated_activations = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
@@ -79,12 +82,12 @@ def hooks_lifecycle(
         return ablate_hook
 
     def cache_hook_fac(
-        ablated_dim_idx: int,
+        ablate_dim_idx: int,
         cache_dims: list[int],
-        ablation_layer_idx: int,
+        ablate_layer_idx: int,
         encoder: t.Tensor,
         biases: t.Tensor,
-        cache: defaultdict,
+        cache_dict: defaultdict,
     ):
         """Create hooks that cache the projected activations."""
 
@@ -106,28 +109,28 @@ def hooks_lifecycle(
             )
 
             # Cache the activations.
-            for downstream_dim in cache_dims:
-                extant_data = cache[ablation_layer_idx][ablated_dim_idx][
-                    downstream_dim
+            for cache_dim in cache_dims:
+                extant_data = cache_dict[ablate_layer_idx][ablate_dim_idx][
+                    cache_dim
                 ]
                 # A defaultdict here means no cached data yet.
                 if isinstance(extant_data, defaultdict):
-                    cache[ablation_layer_idx][ablated_dim_idx][
-                        downstream_dim
+                    cache_dict[ablate_layer_idx][ablate_dim_idx][
+                        cache_dim
                     ] = (
-                        projected_acts[:, :, downstream_dim]
+                        projected_acts[:, :, cache_dim]
                         .unsqueeze(-1)
                         .detach()
                         .cpu()
                     )
                 # We concat if there's an existing tensor.
                 elif isinstance(extant_data, t.Tensor):
-                    cache[ablation_layer_idx][ablated_dim_idx][
-                        downstream_dim
+                    cache_dict[ablate_layer_idx][ablate_dim_idx][
+                        cache_dim
                     ] = t.cat(
                         (
                             extant_data,
-                            projected_acts[:, :, downstream_dim]
+                            projected_acts[:, :, cache_dim]
                             .unsqueeze(-1)
                             .detach()
                             .cpu(),

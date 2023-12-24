@@ -99,9 +99,11 @@ def test_smoke_sparse_coding(
     """Run the submodule scripts in sequence."""
     for script in [
         "collect_acts_mc",
+        "collect_acts_webtext",
         "train_autoencoder",
         "interp_tools.top_tokens",
-        "interp_tools.feature_web",
+        "interp_tools.feature_web_mc",
+        "interp_tools.feature_web_webtext",
     ]:
         try:
             run_module(f"sparse_coding.{script}")

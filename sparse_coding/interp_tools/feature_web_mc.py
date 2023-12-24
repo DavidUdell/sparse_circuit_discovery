@@ -1,5 +1,19 @@
 # %%
-"""Ablate autoencoder dimensions during inference and graph causal effects."""
+"""
+Mess with autoencoder activations dims during `truthful_qa` and graph effects.
+
+`feature_web_mc` in particular tries a model agains the multiple-choice task on
+`truthful_qa`, where the model is teed up to answer a m/c question with widely
+believed but false choices. The base task is compared to the task in which
+autoencoder activations dimensions are surgically scaled during inference, at
+the crucial last sequence position, where the model is answering. Results are
+plotted as a causal graph, using cached data from the scripts in `pipe.py`. You
+may either try ablating all feature dimensions or choose a subset by index.
+
+Run the script with "rasp" as the model directory in `central_config.yaml` to
+see the rasp toy model validation. You'll need to set a HF access token if
+needed.
+"""
 
 
 from collections import defaultdict
@@ -15,17 +29,21 @@ from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.hooks import (
     rasp_ablate_hook_fac,
-    hooks_lifecycle,
+    hooks_manager,
 )
 from sparse_coding.utils.interface import (
     parse_slice,
-    slice_to_seq,
+    slice_to_range,
     load_yaml_constants,
     save_paths,
+    sanitize_model_name,
     load_layer_tensors,
     load_layer_feature_indices,
 )
-from sparse_coding.utils.tasks import multiple_choice_task
+from sparse_coding.utils.tasks import (
+    multiple_choice_task,
+    recursive_defaultdict,
+)
 from sparse_coding.rasp.rasp_to_transformer_lens import transformer_lens_model
 from sparse_coding.rasp.rasp_torch_tokenizer import tokenize
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
@@ -111,11 +129,6 @@ if MODEL_DIR == "rasp":
         )
 
     # Plot and save effects.
-    # `rasp=True` is quite ugly; I'll want to factor that out by giving both
-    # the rasp and full-scale models common output shapes with some squeezing.
-    # Then, `graph_causal_effects` can be a single common call outside the
-    # if/else.
-
     graph_causal_effects(
         activation_diffs, MODEL_DIR, TOP_K_INFO_FILE, __file__, rasp=True
     ).draw(
@@ -135,7 +148,7 @@ else:
     model = accelerator.prepare(model)
     model.eval()
 
-    layer_range: range = slice_to_seq(model, ACTS_LAYERS_SLICE)
+    layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
     ablate_range: range = layer_range[:-1]
 
     # Load the complementary validation dataset subset.
@@ -147,10 +160,6 @@ else:
     )
     starting_index: int = len(dataset_indices) - NUM_QUESTIONS_INTERPED
     validation_indices: list = dataset_indices[starting_index:].tolist()
-
-    def recursive_defaultdict():
-        """Recursively create a defaultdict."""
-        return defaultdict(recursive_defaultdict)
 
     base_activations = defaultdict(recursive_defaultdict)
     ablated_activations = defaultdict(recursive_defaultdict)
@@ -222,7 +231,7 @@ else:
         ):
             np.random.seed(SEED)
             # Base run.
-            with hooks_lifecycle(
+            with hooks_manager(
                 ablate_layer_idx,
                 ablate_dim_idx,
                 layer_range,
@@ -245,7 +254,7 @@ else:
 
             np.random.seed(SEED)
             # Ablated run.
-            with hooks_lifecycle(
+            with hooks_manager(
                 ablate_layer_idx,
                 ablate_dim_idx,
                 layer_range,
@@ -266,27 +275,27 @@ else:
                     return_outputs=False,
                 )
 
-    # Compute differential downstream ablation effects. Recursive defaultdict
-    # indices: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
+    # Compute ablated effects minus base effects. Recursive defaultdict indices
+    # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
     activation_diffs = {}
     for i in ablate_range:
         for j in base_activations[i].keys():
             for k in base_activations[i][j].keys():
                 activation_diffs[i, j, k] = (
-                    base_activations[i][j][k].sum(axis=1).squeeze()
-                    - ablated_activations[i][j][k].sum(axis=1).squeeze()
+                    ablated_activations[i][j][k].sum(axis=1).squeeze()
+                    - base_activations[i][j][k].sum(axis=1).squeeze()
                 )
 
-    # Check that there was any effect.
-    # HOOK_EFFECTS_CHECKSUM = 0.0
-    # for i, j, k in activation_diffs:
-    #     HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
-    # assert (
-    #     HOOK_EFFECTS_CHECKSUM != 0.0
-    # ), "Ablate hook effects sum to exactly zero."
+    # Check that there was any overall effect.
+    HOOK_EFFECTS_CHECKSUM = 0.0
+    for i, j, k in activation_diffs:
+        HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+    assert (
+        HOOK_EFFECTS_CHECKSUM != 0.0
+    ), "Ablate hook effects sum to exactly zero."
 
     sorted_diffs = dict(
-        sorted(activation_diffs.items(), key=lambda x: x[1].item())
+        sorted(activation_diffs.items(), key=lambda x: x[-1].item())
     )
     graph_causal_effects(
         sorted_diffs,
@@ -294,7 +303,10 @@ else:
         TOP_K_INFO_FILE,
         __file__,
     ).draw(
-        save_paths(__file__, "feature_web.svg"),
+        save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"
+        ),
         format="svg",
         prog="dot",
     )

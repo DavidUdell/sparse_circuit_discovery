@@ -1,6 +1,8 @@
 """Functions for running model inference tasks."""
 
 
+from collections import defaultdict
+
 import numpy as np
 import torch as t
 from tqdm.auto import tqdm
@@ -131,3 +133,8 @@ def multiple_choice_task(
         activations.append(outputs.hidden_states[acts_layers_slice])
 
     return activations, answers_with_rubric, prompts_ids
+
+
+def recursive_defaultdict():
+    """Recursively create a defaultdict."""
+    return defaultdict(recursive_defaultdict)

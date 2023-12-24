@@ -18,7 +18,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
 from sparse_coding.utils.interface import (
     parse_slice,
-    slice_to_seq,
+    slice_to_range,
     sanitize_model_name,
     cache_layer_tensor,
     load_input_token_ids,
@@ -153,7 +153,7 @@ with warnings.catch_warnings():
         MODEL_DIR,
         token=HF_ACCESS_TOKEN,
     )
-seq_layer_indices: range = slice_to_seq(hf_model, ACTS_LAYERS_SLICE)
+seq_layer_indices: range = slice_to_range(hf_model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:
     # Load, preprocess, and split an activations dataset.
