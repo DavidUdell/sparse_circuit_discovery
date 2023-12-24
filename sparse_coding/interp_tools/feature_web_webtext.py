@@ -161,7 +161,7 @@ for i in base_activations_all_positions:
             activations_tensor = base_activations_all_positions[i][j][k]
 
             favorite_seq_pos = t.argmax(activations_tensor, dim=1).squeeze()
-            max_val = activations_tensor[favorite_seq_pos]
+            max_val = activations_tensor[:, favorite_seq_pos, :].unsqueeze(1)
             min_val = max_val / 2.0
             mask = (activations_tensor >= min_val) & (
                 activations_tensor <= max_val
