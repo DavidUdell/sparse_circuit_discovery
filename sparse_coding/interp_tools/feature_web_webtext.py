@@ -238,7 +238,7 @@ for ablate_layer_idx in ablate_layer_range:
         ]
         truncated_seqs = []
         for per_seq_position in per_seq_positions:
-            per_seq_position = per_seq_position.item()
+            per_seq_position = per_seq_position.squeeze().item()
             # per_seq_position is on flattened eval_set.
             for sequence_idx, seq in enumerate(eval_set):
                 if len(seq) < per_seq_position:
