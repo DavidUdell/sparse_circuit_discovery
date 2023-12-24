@@ -338,7 +338,7 @@ else:
     select_diffs = sorted_diffs
 
 graph_causal_effects(
-    sorted_diffs,
+    select_diffs,
     MODEL_DIR,
     TOP_K_INFO_FILE,
     __file__,
