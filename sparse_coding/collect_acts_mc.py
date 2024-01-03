@@ -16,6 +16,7 @@ import warnings
 import numpy as np
 import torch as t
 import transformers
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import (
@@ -64,6 +65,14 @@ assert (
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log run config to wandb.
+wandb.init(
+    project="sparse_circuit_discovery",
+    entity="davidudell",
+    config=config,
+)
 
 # %%
 # Efficient inference and model parallelization.
@@ -134,7 +143,7 @@ for (
 
 model_accuracy /= len(answers_with_rubric)
 print(f"{MODEL_DIR} accuracy:{round(model_accuracy*100, 2)}%.")
-
+wandb.log({"model_accuracy": model_accuracy})
 
 # %%
 # Save prompt ids.

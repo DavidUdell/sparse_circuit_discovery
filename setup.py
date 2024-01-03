@@ -30,6 +30,7 @@ setup(
         "pygraphviz",
         "transformer_lens",
         "tqdm",
+        "wandb",
         "tracr @ git+https://github.com/google-deepmind/tracr.git",
     ],
 )

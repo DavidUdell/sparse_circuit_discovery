@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 import torch as t
 import transformers
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import (
@@ -49,6 +50,14 @@ SEED = config.get("SEED")
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log run config to wandb.
+wandb.init(
+    project="sparse_circuit_discovery",
+    entity="davidudell",
+    config=config,
+)
 
 # %%
 # Model setup.
