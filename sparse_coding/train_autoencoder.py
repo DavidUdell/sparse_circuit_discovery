@@ -310,7 +310,9 @@ for layer_idx in seq_layer_indices:
     # parallelization.
     model: Autoencoder = Autoencoder()
     logger = L.pytorch.loggers.WandbLogger(
-        project="sparse_circuit_discovery"
+        project="sparse_circuit_discovery",
+        entity="davidudell",
+        config=config,
     )
 
     try:
