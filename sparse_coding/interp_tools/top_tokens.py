@@ -176,6 +176,8 @@ def populate_table(
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerows(csv_rows)
+        wandb.log({top_k_info_path: wandb.Table(data=csv_rows)})
+
 
 
 # %%
@@ -251,7 +253,6 @@ for layer_idx in seq_layer_indices:
         table, truncated_effects, MODEL_DIR, TOP_K_INFO_FILE, layer_idx
     )
     print(table)
-    wandb.log({f"layer_{layer_idx}": wandb.Table(data=table)})
 
     accelerator.free_memory()
 
