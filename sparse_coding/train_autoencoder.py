@@ -309,7 +309,9 @@ for layer_idx in seq_layer_indices:
     # Train the autoencoder. Note that `lightning` does its own
     # parallelization.
     model: Autoencoder = Autoencoder()
-    logger = L.pytorch.loggers.CSVLogger("logs", name="autoencoder")
+    logger = L.pytorch.loggers.WandbLogger(
+        project="sparse_circuit_discovery"
+    )
 
     try:
         train_autoencoder()
