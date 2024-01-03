@@ -194,6 +194,10 @@ for layer_idx in seq_layer_indices:
 
             # Orthogonal initialization.
             t.nn.init.orthogonal_(self.encoder[0].weight.data)
+            # Dead neurons mask.
+            self.dead_neurons_mask = t.zeros(
+                PROJECTION_DIM,dtype=bool
+            ).to("cuda:0")
 
         def forward(self, state):  # pylint: disable=arguments-differ
             """The forward pass of an autoencoder for activations."""
@@ -216,6 +220,13 @@ for layer_idx in seq_layer_indices:
             masked_data = data * data_mask
 
             encoded_state, output_state = self.forward(masked_data)
+
+            # Running count of dead neuron indices.
+            self.dead_neurons_mask |= (encoded_state.sum((0, 1)) == 0.0)
+            dead_neurons_count = self.dead_neurons_mask.sum().item()
+            dead_neurons_frac = dead_neurons_count / PROJECTION_DIM
+            print(f"dead_frac: {round(dead_neurons_frac, 2)}\n")
+            self.log(f"fraction neurons dead", dead_neurons_frac, sync_dist=False)
 
             # The mask excludes the padding tokens from consideration.
             mse_loss = t.nn.functional.mse_loss(output_state, masked_data)
