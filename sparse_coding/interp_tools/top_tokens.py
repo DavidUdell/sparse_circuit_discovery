@@ -16,6 +16,7 @@ import numpy as np
 import prettytable
 import torch as t
 import transformers
+import wandb
 from accelerate import Accelerator
 from transformers import (
     AutoConfig,
@@ -76,6 +77,14 @@ assert (
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project="sparse_circuit_discovery",
+    entity="davidudell",
+    config=config,
+)
 
 # %%
 # We need the original tokenizer.
@@ -242,5 +251,10 @@ for layer_idx in seq_layer_indices:
         table, truncated_effects, MODEL_DIR, TOP_K_INFO_FILE, layer_idx
     )
     print(table)
+    wandb.log({f"layer_{layer_idx}": wandb.Table(data=table)})
 
     accelerator.free_memory()
+
+# %%
+# Finish logging.
+wandb.finish()

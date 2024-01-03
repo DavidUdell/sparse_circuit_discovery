@@ -52,7 +52,7 @@ _ = t.manual_seed(SEED)
 np.random.seed(SEED)
 
 # %%
-# Log run config to wandb.
+# Log config to wandb.
 wandb.init(
     project="sparse_circuit_discovery",
     entity="davidudell",
@@ -158,4 +158,6 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
         MODEL_DIR,
     )
 
+# %%
+# Finish logging.
 wandb.finish()
