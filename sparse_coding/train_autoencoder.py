@@ -195,7 +195,7 @@ for layer_idx in seq_layer_indices:
             # Orthogonal initialization.
             t.nn.init.orthogonal_(self.encoder[0].weight.data)
 
-            self.total_activity = t.zeros(PROJECTION_DIM).to("cuda:0")
+            self.total_activity = t.zeros(PROJECTION_DIM)
 
         def forward(self, state):  # pylint: disable=arguments-differ
             """The forward pass of an autoencoder for activations."""
@@ -220,7 +220,9 @@ for layer_idx in seq_layer_indices:
             encoded_state, output_state = self.forward(masked_data)
 
             pass_activity: t.Tensor = encoded_state.sum((0, 1))
-            self.total_activity += pass_activity
+            self.total_activity += pass_activity.to(
+                self.total_activity.device
+            )
             total_inactive = (self.total_activity == 0.0).sum().item()
 
             pass_frac_inactive = (
