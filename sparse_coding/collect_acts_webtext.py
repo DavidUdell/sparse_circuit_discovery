@@ -157,3 +157,5 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
         __file__,
         MODEL_DIR,
     )
+
+wandb.finish()

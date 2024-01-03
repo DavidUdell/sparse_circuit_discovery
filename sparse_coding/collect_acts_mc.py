@@ -144,6 +144,7 @@ for (
 model_accuracy /= len(answers_with_rubric)
 print(f"{MODEL_DIR} accuracy:{round(model_accuracy*100, 2)}%.")
 wandb.log({"model_accuracy": model_accuracy})
+wandb.finish()
 
 # %%
 # Save prompt ids.
