@@ -306,22 +306,25 @@ else:
     sorted_diffs = dict(
         sorted(activation_diffs.items(), key=lambda x: x[-1].item())
     )
+    save_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
+    )
+
     graph_causal_effects(
         sorted_diffs,
         MODEL_DIR,
         TOP_K_INFO_FILE,
         __file__,
     ).draw(
-        save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"
-        ),
+        save_path,
         format="svg",
         prog="dot",
     )
     # Read the .svg into a `wandb` artifact.
-    with open(f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg", "rb") as f:
-        wandb.log({"feature_web": wandb.Image(f.read())})
+    artifact = wandb.Artifact("feature_web", type="directed_graph")
+    artifact.add_file(save_path)
+    wandb.log_artifact(artifact)
 
 # %%
 # Wrap up logging.

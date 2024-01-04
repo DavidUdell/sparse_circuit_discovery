@@ -262,5 +262,5 @@ for layer_idx in seq_layer_indices:
     accelerator.free_memory()
 
 # %%
-# Finish logging.
+# Wrap up logging.
 wandb.finish()

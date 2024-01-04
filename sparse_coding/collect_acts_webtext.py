@@ -159,5 +159,5 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
     )
 
 # %%
-# Finish logging.
+# Wrap up logging.
 wandb.finish()

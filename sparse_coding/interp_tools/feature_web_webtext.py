@@ -17,6 +17,7 @@ from textwrap import dedent
 
 import numpy as np
 import torch as t
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
@@ -56,6 +57,14 @@ SEED = config.get("SEED", 0)
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project="sparse_circuit_discovery",
+    entity="davidudell",
+    config=config,
+)
 
 # %%
 # Load model, etc.
@@ -337,13 +346,26 @@ if N_EFFECTS is not None:
 else:
     select_diffs = sorted_diffs
 
+save_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
+)
+
 graph_causal_effects(
     select_diffs,
     MODEL_DIR,
     TOP_K_INFO_FILE,
     __file__,
 ).draw(
-    save_paths(__file__, f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"),
+    save_path,
     format="svg",
     prog="dot",
 )
+# Read the .svg into a `wandb` artifact.
+artifact = wandb.Artifact("feature_web", type="directed_graph")
+artifact.add_file(save_path)
+wandb.log_artifact(artifact)
+
+# %%
+# Wrap up logging.
+wandb.finish()
