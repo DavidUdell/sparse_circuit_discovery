@@ -22,6 +22,7 @@ import warnings
 
 import numpy as np
 import torch as t
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
@@ -68,6 +69,14 @@ SEED = config.get("SEED")
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project="sparse_circuit_discovery",
+    entity="davidudell",
+    config=config,
+)
 
 # %%
 # Either validate against the RASP toy model or run a full-scale HF model,
@@ -310,3 +319,10 @@ else:
         format="svg",
         prog="dot",
     )
+    # Read the .svg into a `wandb` artifact.
+    with open(f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg", "rb") as f:
+        wandb.log({"feature_web": wandb.Image(f.read())})
+
+# %%
+# Wrap up logging.
+wandb.finish()
