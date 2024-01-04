@@ -11,6 +11,7 @@ feature_web.png
 
 # `lightning` and `wandb` local logging
 *.ckpt
+*.json
 logs/
 wandb/
 

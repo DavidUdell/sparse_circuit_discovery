@@ -176,8 +176,13 @@ def populate_table(
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerows(csv_rows)
-        wandb.log({top_k_info_path: wandb.Table(data=csv_rows)})
-
+        wandb.log(
+            {f"layer {layer_index} top-k tokens": wandb.Table(
+                columns=csv_rows[0],
+                data=csv_rows[1:],
+                allow_mixed_types=True,
+            )}
+        )
 
 
 # %%
