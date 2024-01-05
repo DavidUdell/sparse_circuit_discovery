@@ -128,8 +128,7 @@ def graph_causal_effects(
 
         # Add an effects fraction excluded node.
         excluded_fraction = round(
-            (overall_effects - plotted_effects) / overall_effects,
-            2
+            (overall_effects - plotted_effects) / overall_effects, 2
         )
         overall_effects = round(overall_effects, 2)
         graph.add_node(
@@ -142,7 +141,7 @@ def graph_causal_effects(
                 {label_appendable(ablation_layer_idx, ablated_dim)}
                 """
             ),
-            f"Fraction of effects not plotted: {excluded_fraction}%.",
+            f"Fraction of effects not plotted: {excluded_fraction*100}%.",
         )
 
         # Assert no repeat edges.
