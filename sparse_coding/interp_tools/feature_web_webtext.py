@@ -341,7 +341,12 @@ for i, j, k in act_diffs:
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-sorted_diffs = dict(sorted(act_diffs.items()), key=lambda x: abs(x[-1].item()))
+sorted_diffs = dict(
+    sorted(
+        act_diffs.items(),
+        key=lambda x: abs(x[-1].item())
+    )
+)
 
 if N_EFFECTS is not None:
     select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
