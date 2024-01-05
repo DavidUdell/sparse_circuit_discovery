@@ -352,6 +352,7 @@ save_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
 )
+wandb.log(sorted_diffs)
 
 graph_causal_effects(
     select_diffs,

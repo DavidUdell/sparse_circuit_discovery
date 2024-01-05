@@ -305,13 +305,14 @@ else:
         OVERALL_EFFECTS != 0.0
     ), "Ablate hook effects sum to exactly zero."
 
-    sorted_diffs = dict(
+    sorted_diffs: dict = dict(
         sorted(activation_diffs.items(), key=lambda x: x[-1].item())
     )
     save_path: str = save_paths(
         __file__,
         f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
     )
+    wandb.log(sorted_diffs)
 
     graph_causal_effects(
         sorted_diffs,
