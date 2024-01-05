@@ -312,7 +312,11 @@ else:
         __file__,
         f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
     )
-    wandb.log(sorted_diffs)
+    # wandb wants a flat dict indexed by strings.
+    raw_diffs: dict[str, float] = {}
+    for i, j, k in sorted_diffs:
+        raw_diffs[f"{i}.{j}.{k}"] = sorted_diffs[i, j, k].item()
+    wandb.log(raw_diffs)
 
     graph_causal_effects(
         sorted_diffs,

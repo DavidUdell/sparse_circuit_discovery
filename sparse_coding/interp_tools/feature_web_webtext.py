@@ -312,7 +312,7 @@ for ablate_layer_idx in ablate_layer_range:
 # %%
 # Compute diffs. Recursive defaultdict indices are:
 # [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
-act_diffs: dict[tuple[int, int, int], float] = {}
+act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
 for i in ablated_activations:
     for j in ablated_activations[i]:
         for k in ablated_activations[i][j]:
@@ -352,7 +352,11 @@ save_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
 )
-wandb.log(sorted_diffs)
+# wandb wants a flat dict indexed by strings.
+raw_diffs: dict[str, float] = {}
+for i, j, k in sorted_diffs:
+    raw_diffs[f"{i}.{j}.{k}"] = sorted_diffs[i, j, k].item()
+wandb.log(raw_diffs)
 
 graph_causal_effects(
     select_diffs,
