@@ -46,6 +46,8 @@ assert (
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -81,8 +83,8 @@ np.random.seed(SEED)
 # %%
 # Log config to wandb.
 wandb.init(
-    project="sparse_circuit_discovery",
-    entity="davidudell",
+    project=WANDB_PROJECT,
+    entity=WANDB_ENTITY,
     config=config,
 )
 

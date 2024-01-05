@@ -30,13 +30,17 @@ ACCUMULATE_GRAD_BATCHES: 4
 # Causal Graphs
 # Leave out entries for None: None values here are interpreted as the string
 # "None"
-ABLATION_DIM_INDICES_PLOTTED: [1794]
+ABLATION_DIM_INDICES_PLOTTED: [1025]
 # The number of affected features plotted. If None, all affected features
 # plotted.
 N_EFFECTS: 5
 
 # Reproducibility
 SEED: 0
+
+# wandb logging
+WANDB_PROJECT: "sparse_circuit_discovery"
+WANDB_ENTITY: "davidudell"
 
 
 # Stable Dev Constants (`collect_acts_mc.py`)

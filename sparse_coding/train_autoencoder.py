@@ -36,6 +36,8 @@ assert t.__version__ >= "2.0.1", "`Lightning` requires newer `torch` versions."
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 SEED = config.get("SEED")
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -310,8 +312,8 @@ for layer_idx in seq_layer_indices:
     # parallelization.
     model: Autoencoder = Autoencoder()
     logger = L.pytorch.loggers.WandbLogger(
-        project="sparse_circuit_discovery",
-        entity="davidudell",
+        project=WANDB_PROJECT,
+        entity=WANDB_ENTITY,
         config=config,
     )
 
