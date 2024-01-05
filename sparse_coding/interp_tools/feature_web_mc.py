@@ -314,7 +314,7 @@ else:
     )
     # wandb wants a flat dict indexed by strings.
     raw_diffs: dict[str, float] = {}
-    for i, j, k in sorted_diffs:
+    for i, j, k in sorted_diffs.keys():
         raw_diffs[f"{i}.{j}.{k}"] = sorted_diffs[i, j, k].item()
     wandb.log(raw_diffs)
 
