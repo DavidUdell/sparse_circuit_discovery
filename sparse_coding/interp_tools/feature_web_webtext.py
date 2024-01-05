@@ -336,10 +336,10 @@ for i in ablated_activations:
                 act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
 
 # There should be any overall effect.
-EFFECTS_CHECKSUM = 0.0
+OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
-    EFFECTS_CHECKSUM += act_diffs[i, j, k]
-assert EFFECTS_CHECKSUM != 0.0, "Ablate hook effects sum to exactly zero."
+    OVERALL_EFFECTS += abs(act_diffs[i, j, k])
+assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
 sorted_diffs = dict(sorted(act_diffs.items()), key=lambda x: abs(x[-1].item()))
 
@@ -357,12 +357,14 @@ graph_causal_effects(
     select_diffs,
     MODEL_DIR,
     TOP_K_INFO_FILE,
+    OVERALL_EFFECTS,
     __file__,
 ).draw(
     save_path,
     format="svg",
     prog="dot",
 )
+
 # Read the .svg into a `wandb` artifact.
 artifact = wandb.Artifact("feature_web", type="directed_graph")
 artifact.add_file(save_path)

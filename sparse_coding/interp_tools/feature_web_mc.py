@@ -141,7 +141,7 @@ if MODEL_DIR == "rasp":
 
     # Plot and save effects.
     graph_causal_effects(
-        activation_diffs, MODEL_DIR, TOP_K_INFO_FILE, __file__, rasp=True
+        activation_diffs, MODEL_DIR, TOP_K_INFO_FILE, 0.0, __file__, rasp=True
     ).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
@@ -298,11 +298,11 @@ else:
                 )
 
     # Check that there was any overall effect.
-    HOOK_EFFECTS_CHECKSUM = 0.0
+    OVERALL_EFFECTS = 0.0
     for i, j, k in activation_diffs:
-        HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+        OVERALL_EFFECTS += abs(activation_diffs[i, j, k]).sum().item()
     assert (
-        HOOK_EFFECTS_CHECKSUM != 0.0
+        OVERALL_EFFECTS != 0.0
     ), "Ablate hook effects sum to exactly zero."
 
     sorted_diffs = dict(
@@ -317,6 +317,7 @@ else:
         sorted_diffs,
         MODEL_DIR,
         TOP_K_INFO_FILE,
+        OVERALL_EFFECTS,
         __file__,
     ).draw(
         save_path,
