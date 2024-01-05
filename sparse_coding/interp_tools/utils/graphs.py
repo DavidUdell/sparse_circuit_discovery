@@ -28,7 +28,6 @@ def graph_causal_effects(
     """Graph the causal effects of ablations."""
 
     graph = AGraph(directed=True)
-    plotted_effects: float = 0.0
 
     if rasp:
         # Plot neuron nodes.
@@ -84,7 +83,9 @@ def graph_causal_effects(
             )
 
         min_scalar, max_scalar = color_range_from_scalars(activations)
+
         # Plot effect edges.
+        plotted_effects: float = 0.0
         for (
             ablation_layer_idx,
             ablated_dim,
