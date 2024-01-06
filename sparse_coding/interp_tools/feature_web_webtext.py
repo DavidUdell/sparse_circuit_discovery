@@ -331,7 +331,7 @@ for i in ablated_activations:
 
             # The truncated seqs were all flattened. Now we just want what
             # would be the last position of each sequence.
-            act_diffs[i, j, k] = t.tensor(0.0)
+            act_diffs[i, j, k] = t.tensor([[0.0]])
             for x in truncated_seqs_final_indices:
                 act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
 
