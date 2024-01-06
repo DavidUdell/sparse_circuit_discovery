@@ -331,7 +331,7 @@ for i in ablated_activations:
 
             # The truncated seqs were all flattened. Now we just want what
             # would be the last position of each sequence.
-            act_diffs[i, j, k] = 0.0
+            act_diffs[i, j, k] = t.tensor(0.0)
             for x in truncated_seqs_final_indices:
                 act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
 
@@ -341,7 +341,9 @@ for i, j, k in act_diffs:
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-sorted_diffs = dict(sorted(act_diffs.items(), key=lambda x: abs(x[-1].item())))
+sorted_diffs: dict[tuple, t.Tensor] = dict(
+    sorted(act_diffs.items(), key=lambda x: abs(x[-1].item()))
+)
 
 if N_EFFECTS is not None:
     select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
@@ -352,10 +354,10 @@ save_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",
 )
-# wandb wants a flat dict indexed by strings.
+# All the other effects should be t.Tensors, but wandb plays nicer with floats.
 raw_diffs: dict[str, float] = {}
 for i, j, k in sorted_diffs.keys():
-    raw_diffs[f"{i}.{j}.{k}"] = sorted_diffs[i, j, k]
+    raw_diffs[f"{i}.{j}->{k}"] = sorted_diffs[i, j, k].item()
 wandb.log(raw_diffs)
 
 graph_causal_effects(
