@@ -61,4 +61,4 @@ with:
   Toolkit 12.2 or newer.
 
 ## Project Status
-Project is currently a WIP. Current version: 0.1.3.
+Project is currently a WIP. Current version: 0.1.4.

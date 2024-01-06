@@ -341,12 +341,7 @@ for i, j, k in act_diffs:
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-sorted_diffs = dict(
-    sorted(
-        act_diffs.items(),
-        key=lambda x: abs(x[-1].item())
-    )
-)
+sorted_diffs = dict(sorted(act_diffs.items(), key=lambda x: abs(x[-1].item())))
 
 if N_EFFECTS is not None:
     select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
@@ -355,12 +350,12 @@ else:
 
 save_path: str = save_paths(
     __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",    
+    f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",
 )
 # wandb wants a flat dict indexed by strings.
 raw_diffs: dict[str, float] = {}
 for i, j, k in sorted_diffs.keys():
-    raw_diffs[f"{i}.{j}.{k}"] = sorted_diffs[i, j, k].item()
+    raw_diffs[f"{i}.{j}.{k}"] = sorted_diffs[i, j, k]
 wandb.log(raw_diffs)
 
 graph_causal_effects(
