@@ -64,7 +64,7 @@ BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
-ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
+DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
 SEED = config.get("SEED")
 
 # %%
@@ -197,14 +197,14 @@ else:
             ablate_dim_indices,
         )
 
-        if ABLATION_DIM_INDICES_PLOTTED is not None:
-            for i in ABLATION_DIM_INDICES_PLOTTED:
+        if DIMS_PLOTTED_LIST is not None:
+            for i in DIMS_PLOTTED_LIST:
                 assert i in ablate_dim_indices, dedent(
                     f"""Index {i} not in layer {ablate_layer_idx} feature
                      indices."""
                 )
             ablate_dim_indices = []
-            ablate_dim_indices.extend(ABLATION_DIM_INDICES_PLOTTED)
+            ablate_dim_indices.extend(DIMS_PLOTTED_LIST)
 
         cache_dim_indices_per_layer = {}
         cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]

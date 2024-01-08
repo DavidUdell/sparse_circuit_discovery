@@ -51,8 +51,8 @@ BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
-ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
-N_EFFECTS = config.get("N_EFFECTS")
+DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
+BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 SEED = config.get("SEED", 0)
 
 # %%
@@ -203,12 +203,12 @@ for ablate_layer_idx in ablate_layer_range:
         [],
     )
     # Optionally pare down to a target subset of ablate dims.
-    if ABLATION_DIM_INDICES_PLOTTED is not None:
-        for i in ABLATION_DIM_INDICES_PLOTTED:
+    if DIMS_PLOTTED_LIST is not None:
+        for i in DIMS_PLOTTED_LIST:
             assert i in ablate_dim_indices, dedent(
                 f"Index {i} not in `ablate_dim_indices`."
             )
-        ablate_dim_indices = ABLATION_DIM_INDICES_PLOTTED
+        ablate_dim_indices = DIMS_PLOTTED_LIST
 
     for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
         # This inner loop is all setup; it doesn't loop over the forward
@@ -345,8 +345,8 @@ sorted_diffs: dict[tuple, t.Tensor] = dict(
     sorted(act_diffs.items(), key=lambda x: abs(x[-1].item()))
 )
 
-if N_EFFECTS is not None:
-    select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
+if BRANCHING_FACTOR is not None:
+    select_diffs = dict(list(sorted_diffs.items())[:BRANCHING_FACTOR])
 else:
     select_diffs = sorted_diffs
 
