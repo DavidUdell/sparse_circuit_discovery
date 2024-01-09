@@ -341,27 +341,43 @@ for i, j, k in act_diffs:
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-sorted_diffs: dict[tuple, t.Tensor] = dict(
-    sorted(act_diffs.items(), key=lambda x: abs(x[-1].item()))
-)
+# All other effects should be t.Tensors, but wandb plays nicer with floats.
+logged_diffs: dict[str, float] = {}
+for i, j, k in act_diffs:
+    logged_diffs[f"{i}.{j}->{i+1}{k}"] = act_diffs[i, j, k].item()
+wandb.log(logged_diffs)
 
+plotted_diffs = {}
 if BRANCHING_FACTOR is not None:
-    select_diffs = dict(list(sorted_diffs.items())[:BRANCHING_FACTOR])
+    # Keep only the top effects per ablation site i, j across all downstream
+    # indices k.
+    working_dict = {}
+
+    for key, effect in act_diffs.items():
+        site = key[:2]
+        if site not in working_dict:
+            working_dict[site] = []
+        working_dict[site].append((key, effect))
+
+    for site, items in working_dict.items():
+        sorted_items = sorted(
+            items,
+            key=lambda x: abs(x[-1].item()),
+            reverse=True,
+        )
+        for k, v in sorted_items[:BRANCHING_FACTOR]:
+            plotted_diffs[k] = v
+
 else:
-    select_diffs = sorted_diffs
+    plotted_diffs = act_diffs
 
 save_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",
 )
-# All the other effects should be t.Tensors, but wandb plays nicer with floats.
-raw_diffs: dict[str, float] = {}
-for i, j, k in sorted_diffs.keys():
-    raw_diffs[f"{i}.{j}->{k}"] = sorted_diffs[i, j, k].item()
-wandb.log(raw_diffs)
 
 graph_causal_effects(
-    select_diffs,
+    plotted_diffs,
     MODEL_DIR,
     TOP_K_INFO_FILE,
     OVERALL_EFFECTS,
