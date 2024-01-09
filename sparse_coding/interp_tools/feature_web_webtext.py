@@ -342,10 +342,12 @@ for i, j, k in act_diffs:
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
 # All other effects should be t.Tensors, but wandb plays nicer with floats.
-logged_diffs: dict[str, float] = {}
+diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
 for i, j, k in act_diffs:
-    logged_diffs[f"{i}.{j}->{i+1}{k}"] = act_diffs[i, j, k].item()
-wandb.log(logged_diffs)
+    key: str = f"{i}.{j}->{i+1}{k}"
+    value: float = act_diffs[i, j, k].item()
+    diffs_table.add_data(key, value)
+wandb.log({"Effects": diffs_table})
 
 plotted_diffs = {}
 if BRANCHING_FACTOR is not None:
