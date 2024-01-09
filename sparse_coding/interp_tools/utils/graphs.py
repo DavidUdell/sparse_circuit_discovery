@@ -3,6 +3,7 @@
 
 from textwrap import dedent
 
+import torch as t
 from pygraphviz import AGraph
 
 from sparse_coding.utils.interface import load_layer_feature_labels
@@ -18,9 +19,10 @@ def color_range_from_scalars(activations: dict) -> tuple[float, float]:
 
 
 def graph_causal_effects(
-    activations: dict,
+    activations: dict[tuple, t.Tensor],
     model_dir: str,
     top_k_info_file: str,
+    overall_effects: float,
     base_file: str,
     rasp=False,
 ) -> AGraph:
@@ -82,7 +84,9 @@ def graph_causal_effects(
             )
 
         min_scalar, max_scalar = color_range_from_scalars(activations)
+
         # Plot effect edges.
+        plotted_effects: float = 0.0
         for (
             ablation_layer_idx,
             ablated_dim,
@@ -90,6 +94,7 @@ def graph_causal_effects(
         ), effect in activations.items():
             if effect.item() == 0:
                 continue
+            plotted_effects += abs(effect.item())
             # Blue means the intervention increased downstream firing, while
             # red means it decreased firing. Alpha indicates distance from 0.0
             # effect size.
@@ -122,14 +127,41 @@ def graph_causal_effects(
                 color=rgba_color,
             )
 
+        # Add an effects fraction excluded node.
+        excluded_fraction = round(
+            (overall_effects - plotted_effects) / overall_effects, 2
+        )
+        overall_effects = round(overall_effects, 2)
+        graph.add_node(
+            f"Fraction of effects not plotted: {excluded_fraction}%."
+        )
+        graph.add_edge(
+            dedent(
+                f"""
+                {ablation_layer_idx}.{ablated_dim}:
+                {label_appendable(ablation_layer_idx, ablated_dim)}
+                """
+            ),
+            f"Fraction of all effects not plotted: {excluded_fraction*100}%.",
+        )
+
         # Assert no repeat edges.
         edges = graph.edges()
         assert len(edges) == len(set(edges)), "Repeat edges in graph."
 
         # Remove unlinked nodes.
+        unlinked_nodes = 0
         for node in graph.nodes():
             if len(graph.edges(node)) == 0:
                 graph.remove_node(node)
-                print(f"Removed isolated neuron {node} from causal graph.\n")
+                unlinked_nodes += 1
+        print(
+            dedent(
+                f"""
+                Dropped {unlinked_nodes} unlinked neuron(s) from directed
+                graph.\n
+                """
+            )
+        )
 
     return graph

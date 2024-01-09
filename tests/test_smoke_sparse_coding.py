@@ -11,6 +11,7 @@ from runpy import run_module
 import pytest
 import yaml
 import torch as t
+import wandb
 
 from sparse_coding.utils.interface import sanitize_model_name
 
@@ -98,14 +99,14 @@ def test_smoke_sparse_coding(
 ):  # pylint: disable=redefined-outer-name, unused-argument
     """Run the submodule scripts in sequence."""
     for script in [
-        "collect_acts_mc",
-        "collect_acts_webtext",
+        "collect_acts",
         "train_autoencoder",
         "interp_tools.top_tokens",
-        "interp_tools.feature_web_mc",
-        "interp_tools.feature_web_webtext",
+        "interp_tools.directed_graph_mc",
+        "interp_tools.directed_graph_webtext",
     ]:
         try:
-            run_module(f"sparse_coding.{script}")
+            with wandb.init(mode="offline"):
+                run_module(f"sparse_coding.{script}")
         except Exception as e:  # pylint: disable=broad-except
             pytest.fail(f"Smoke test for {script} failed: {e}")

@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 import torch as t
 import transformers
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import (
@@ -37,6 +38,8 @@ assert (
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
@@ -49,6 +52,14 @@ SEED = config.get("SEED")
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project=WANDB_PROJECT,
+    entity=WANDB_ENTITY,
+    config=config,
+)
 
 # %%
 # Model setup.
@@ -148,3 +159,7 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
         __file__,
         MODEL_DIR,
     )
+
+# %%
+# Wrap up logging.
+wandb.finish()

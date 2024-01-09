@@ -1,8 +1,11 @@
+## Smoke Test Main Config
 # Smoke Test Model
 MODEL_DIR: "EleutherAI/pythia-70m"
+
+# Layers Slice to Cache Activations From
 ACTS_LAYERS_SLICE: "1:3"
 
-# Encoder Size
+# Autoencoder Size
 PROJECTION_FACTOR: 1
 
 # Smoke Test Save Files
@@ -11,6 +14,7 @@ ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
 ENCODER_FILE: "smoke_test_learned_encoder.pt"
 BIASES_FILE: "smoke_test_learned_biases.pt"
 TOP_K_INFO_FILE: "smoke_test_token_info.csv"
+GRAPH_FILE: "feature_graph.svg"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-4
@@ -19,44 +23,34 @@ TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 0
 ACCUMULATE_GRAD_BATCHES: 1
 
+# Directed Graph
+BRANCHING_FACTOR: 5
+DIMS_PLOTTED_LIST: [1]
+
+
+## Stable Smoke Test Constants
 # Reproducibility
 SEED: 0
 
-# Causal Graphs
-# Leave out entries for None: None values here are interpreted as the string
-# "None"
-ABLATION_DIM_INDICES_PLOTTED: [1]
-# The number of affected features plotted. If None, all affected features
-# plotted.
-N_EFFECTS: 5
-
-
-# Smoke Test Constants (`collect_acts_mc.py`)
-MAX_NEW_TOKENS: 1
-NUM_RETURN_SEQUENCES: 1
-NUM_SHOT: 6
-NUM_QUESTIONS_EVALED: 7
-
-# Smoke Text Constants (`collect_acts_webtext.py`)
+# `collect_acts_webtext.py`
 NUM_SEQUENCES_EVALED: 5
 MAX_SEQ_LEN: 5
 
-# Smoke Test Constants (`train_autoencoder.py`)
+# `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
 EPOCHS: 2
 SYNC_DIST_LOGGING: True
 
-# Smoke Test Constants (`top_tokens.py`)
-# _Leave out entries_ for None: None values will be interpreted as "None"
-# strings.
+# `top_tokens.py`
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# Smoke Test Constants (`feature_web_mc.py`)
-# _Leave out entries_ for None: None values here are interpreted as the string
-# "None"
-NUM_QUESTIONS_INTERPED: 1
-
-# Smoke Test Constants (`feature_web_webtext.py`)
+# `feature_web_webtext.py`
 NUM_SEQUENCES_INTERPED: 1
 MAX_SEQ_INTERPED_LEN: 10
+
+# `feature_web_mc.py`
+NUM_QUESTIONS_INTERPED: 1
+MAX_NEW_TOKENS: 1
+NUM_RETURN_SEQUENCES: 1
+NUM_SHOT: 6

@@ -36,6 +36,8 @@ assert t.__version__ >= "2.0.1", "`Lightning` requires newer `torch` versions."
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 SEED = config.get("SEED")
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -195,6 +197,8 @@ for layer_idx in seq_layer_indices:
             # Orthogonal initialization.
             t.nn.init.orthogonal_(self.encoder[0].weight.data)
 
+            self.total_activity = t.zeros(PROJECTION_DIM)
+
         def forward(self, state):  # pylint: disable=arguments-differ
             """The forward pass of an autoencoder for activations."""
             encoded_state = self.encoder(state)
@@ -216,6 +220,32 @@ for layer_idx in seq_layer_indices:
             masked_data = data * data_mask
 
             encoded_state, output_state = self.forward(masked_data)
+
+            pass_activity: t.Tensor = encoded_state.sum((0, 1))
+            self.total_activity += pass_activity.to(
+                self.total_activity.device
+            )
+            total_inactive = (self.total_activity == 0.0).sum().item()
+
+            pass_frac_inactive = (
+                (pass_activity == 0.0).sum().item() / PROJECTION_DIM
+            )
+            total_frac_inactive: float = (
+                total_inactive / PROJECTION_DIM
+            )
+
+            print(f"pass_frac_inactive: {round(pass_frac_inactive, 2)}\n")
+            print(f"total_frac_inactive: {round(total_frac_inactive, 2)}\n")
+            self.log(
+                "fraction neurons inactive during pass",
+                pass_frac_inactive,
+                sync_dist=SYNC_DIST_LOGGING,
+            )
+            self.log(
+                "fraction neurons never activated",
+                total_frac_inactive,
+                sync_dist=SYNC_DIST_LOGGING,
+            )
 
             # The mask excludes the padding tokens from consideration.
             mse_loss = t.nn.functional.mse_loss(output_state, masked_data)
@@ -281,7 +311,11 @@ for layer_idx in seq_layer_indices:
     # Train the autoencoder. Note that `lightning` does its own
     # parallelization.
     model: Autoencoder = Autoencoder()
-    logger = L.pytorch.loggers.CSVLogger("logs", name="autoencoder")
+    logger = L.pytorch.loggers.WandbLogger(
+        project=WANDB_PROJECT,
+        entity=WANDB_ENTITY,
+        config=config,
+    )
 
     try:
         train_autoencoder()

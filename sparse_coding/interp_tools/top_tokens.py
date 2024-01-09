@@ -16,6 +16,7 @@ import numpy as np
 import prettytable
 import torch as t
 import transformers
+import wandb
 from accelerate import Accelerator
 from transformers import (
     AutoConfig,
@@ -45,6 +46,8 @@ assert (
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -76,6 +79,14 @@ assert (
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project=WANDB_PROJECT,
+    entity=WANDB_ENTITY,
+    config=config,
+)
 
 # %%
 # We need the original tokenizer.
@@ -167,6 +178,13 @@ def populate_table(
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerows(csv_rows)
+        wandb.log(
+            {f"layer {layer_index} top-k tokens": wandb.Table(
+                columns=csv_rows[0],
+                data=csv_rows[1:],
+                allow_mixed_types=True,
+            )}
+        )
 
 
 # %%
@@ -244,3 +262,7 @@ for layer_idx in seq_layer_indices:
     print(table)
 
     accelerator.free_memory()
+
+# %%
+# Wrap up logging.
+wandb.finish()

@@ -2,9 +2,9 @@
 """
 Mess with autoencoder activation dims during `webtext` and graph effects.
 
-`feature_web_webtext` identifies the sequence positions that most excited each
-autoencoder dimension and plots ablation effects at those positions. It relies
-on prior cached data from `pipe.py`.
+`directed_graph_webtext` identifies the sequence positions that most excited
+each autoencoder dimension and plots ablation effects at those positions. It
+relies on prior cached data from `pipe.py`.
 
 You may need to have logged a HF access token, if applicable.
 """
@@ -17,6 +17,7 @@ from textwrap import dedent
 
 import numpy as np
 import torch as t
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
@@ -41,21 +42,32 @@ from sparse_coding.utils.tasks import recursive_defaultdict
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
+GRAPH_FILE = config.get("GRAPH_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
-ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
-N_EFFECTS = config.get("N_EFFECTS")
+DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
+BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 SEED = config.get("SEED", 0)
 
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project=WANDB_PROJECT,
+    entity=WANDB_ENTITY,
+    config=config,
+)
 
 # %%
 # Load model, etc.
@@ -192,12 +204,12 @@ for ablate_layer_idx in ablate_layer_range:
         [],
     )
     # Optionally pare down to a target subset of ablate dims.
-    if ABLATION_DIM_INDICES_PLOTTED is not None:
-        for i in ABLATION_DIM_INDICES_PLOTTED:
+    if DIMS_PLOTTED_LIST is not None:
+        for i in DIMS_PLOTTED_LIST:
             assert i in ablate_dim_indices, dedent(
                 f"Index {i} not in `ablate_dim_indices`."
             )
-        ablate_dim_indices = ABLATION_DIM_INDICES_PLOTTED
+        ablate_dim_indices = DIMS_PLOTTED_LIST
 
     for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
         # This inner loop is all setup; it doesn't loop over the forward
@@ -301,7 +313,7 @@ for ablate_layer_idx in ablate_layer_range:
 # %%
 # Compute diffs. Recursive defaultdict indices are:
 # [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
-act_diffs: dict[tuple[int, int, int], float] = {}
+act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
 for i in ablated_activations:
     for j in ablated_activations[i]:
         for k in ablated_activations[i][j]:
@@ -320,30 +332,70 @@ for i in ablated_activations:
 
             # The truncated seqs were all flattened. Now we just want what
             # would be the last position of each sequence.
-            act_diffs[i, j, k] = 0.0
+            act_diffs[i, j, k] = t.tensor([[0.0]])
             for x in truncated_seqs_final_indices:
                 act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
 
 # There should be any overall effect.
-EFFECTS_CHECKSUM = 0.0
+OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
-    EFFECTS_CHECKSUM += act_diffs[i, j, k]
-assert EFFECTS_CHECKSUM != 0.0, "Ablate hook effects sum to exactly zero."
+    OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
+assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-sorted_diffs = dict(sorted(act_diffs.items()), key=lambda x: abs(x[-1].item()))
+# All other effects should be t.Tensors, but wandb plays nicer with floats.
+diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
+for i, j, k in act_diffs:
+    key: str = f"{i}.{j}->{i+1}.{k}"
+    value: float = act_diffs[i, j, k].item()
+    diffs_table.add_data(key, value)
+wandb.log({"Effects": diffs_table})
 
-if N_EFFECTS is not None:
-    select_diffs = dict(list(sorted_diffs.items())[:N_EFFECTS])
+plotted_diffs = {}
+if BRANCHING_FACTOR is not None:
+    # Keep only the top effects per ablation site i, j across all downstream
+    # indices k.
+    working_dict = {}
+
+    for key, effect in act_diffs.items():
+        site = key[:2]
+        if site not in working_dict:
+            working_dict[site] = []
+        working_dict[site].append((key, effect))
+
+    for site, items in working_dict.items():
+        sorted_items = sorted(
+            items,
+            key=lambda x: abs(x[-1].item()),
+            reverse=True,
+        )
+        for k, v in sorted_items[:BRANCHING_FACTOR]:
+            plotted_diffs[k] = v
+
 else:
-    select_diffs = sorted_diffs
+    plotted_diffs = act_diffs
+
+save_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
+)
 
 graph_causal_effects(
-    select_diffs,
+    plotted_diffs,
     MODEL_DIR,
     TOP_K_INFO_FILE,
+    OVERALL_EFFECTS,
     __file__,
 ).draw(
-    save_paths(__file__, f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"),
+    save_path,
     format="svg",
     prog="dot",
 )
+
+# Read the .svg into a `wandb` artifact.
+artifact = wandb.Artifact("feature_graph", type="directed_graph")
+artifact.add_file(save_path)
+wandb.log_artifact(artifact)
+
+# %%
+# Wrap up logging.
+wandb.finish()

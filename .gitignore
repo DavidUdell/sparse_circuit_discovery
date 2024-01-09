@@ -9,9 +9,10 @@
 feature_web.png
 *.svg
 
-# `Lightning` training logging
+# `lightning` and `wandb` local logging
 *.ckpt
-logs/
+*.json
+wandb/
 
 # HF access tokens
 hf_access.yaml

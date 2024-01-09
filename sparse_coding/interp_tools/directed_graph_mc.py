@@ -2,13 +2,14 @@
 """
 Mess with autoencoder activations dims during `truthful_qa` and graph effects.
 
-`feature_web_mc` in particular tries a model agains the multiple-choice task on
-`truthful_qa`, where the model is teed up to answer a m/c question with widely
-believed but false choices. The base task is compared to the task in which
-autoencoder activations dimensions are surgically scaled during inference, at
-the crucial last sequence position, where the model is answering. Results are
-plotted as a causal graph, using cached data from the scripts in `pipe.py`. You
-may either try ablating all feature dimensions or choose a subset by index.
+`directed_graph_mc` in particular tries a model agains the multiple-choice task
+on `truthful_qa`, where the model is teed up to answer a m/c question with
+widely believed but false choices. The base task is compared to the task in
+which autoencoder activations dimensions are surgically scaled during
+inference, at the crucial last sequence position, where the model is answering.
+Results are plotted as a causal graph, using cached data from the scripts in
+`pipe.py`. You may either try ablating all feature dimensions or choose a
+subset by index.
 
 Run the script with "rasp" as the model directory in `central_config.yaml` to
 see the rasp toy model validation. You'll need to set a HF access token if
@@ -22,6 +23,7 @@ import warnings
 
 import numpy as np
 import torch as t
+import wandb
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
@@ -54,20 +56,32 @@ from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
+WANDB_PROJECT = config.get("WANDB_PROJECT")
+WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
+GRAPH_FILE = config.get("GRAPH_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
-ABLATION_DIM_INDICES_PLOTTED = config.get("ABLATION_DIM_INDICES_PLOTTED", None)
+DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
+BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 SEED = config.get("SEED")
 
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
 np.random.seed(SEED)
+
+# %%
+# Log config to wandb.
+wandb.init(
+    project=WANDB_PROJECT,
+    entity=WANDB_ENTITY,
+    config=config,
+)
 
 # %%
 # Either validate against the RASP toy model or run a full-scale HF model,
@@ -112,10 +126,10 @@ if MODEL_DIR == "rasp":
             transformer_lens_model.reset_hooks(including_permanent=True)
 
     # Compute effects.
-    activation_diffs = {}
+    act_diffs = {}
 
     for ablate_layer_idx, neuron_idx in ablated_activations:
-        activation_diffs[ablate_layer_idx, neuron_idx] = (
+        act_diffs[ablate_layer_idx, neuron_idx] = (
             base_activations[(ablate_layer_idx, neuron_idx)][
                 "blocks.1.hook_resid_pre"
             ]
@@ -130,7 +144,7 @@ if MODEL_DIR == "rasp":
 
     # Plot and save effects.
     graph_causal_effects(
-        activation_diffs, MODEL_DIR, TOP_K_INFO_FILE, __file__, rasp=True
+        act_diffs, MODEL_DIR, TOP_K_INFO_FILE, 0.0, __file__, rasp=True
     ).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
@@ -186,14 +200,14 @@ else:
             ablate_dim_indices,
         )
 
-        if ABLATION_DIM_INDICES_PLOTTED is not None:
-            for i in ABLATION_DIM_INDICES_PLOTTED:
+        if DIMS_PLOTTED_LIST is not None:
+            for i in DIMS_PLOTTED_LIST:
                 assert i in ablate_dim_indices, dedent(
                     f"""Index {i} not in layer {ablate_layer_idx} feature
                      indices."""
                 )
             ablate_dim_indices = []
-            ablate_dim_indices.extend(ABLATION_DIM_INDICES_PLOTTED)
+            ablate_dim_indices.extend(DIMS_PLOTTED_LIST)
 
         cache_dim_indices_per_layer = {}
         cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]
@@ -277,36 +291,76 @@ else:
 
     # Compute ablated effects minus base effects. Recursive defaultdict indices
     # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
-    activation_diffs = {}
+    act_diffs = {}
     for i in ablate_range:
         for j in base_activations[i].keys():
             for k in base_activations[i][j].keys():
-                activation_diffs[i, j, k] = (
+                act_diffs[i, j, k] = (
                     ablated_activations[i][j][k].sum(axis=1).squeeze()
                     - base_activations[i][j][k].sum(axis=1).squeeze()
                 )
 
     # Check that there was any overall effect.
-    HOOK_EFFECTS_CHECKSUM = 0.0
-    for i, j, k in activation_diffs:
-        HOOK_EFFECTS_CHECKSUM += activation_diffs[i, j, k].sum().item()
+    OVERALL_EFFECTS = 0.0
+    for i, j, k in act_diffs:
+        OVERALL_EFFECTS += abs(act_diffs[i, j, k]).sum().item()
     assert (
-        HOOK_EFFECTS_CHECKSUM != 0.0
+        OVERALL_EFFECTS != 0.0
     ), "Ablate hook effects sum to exactly zero."
 
-    sorted_diffs = dict(
-        sorted(activation_diffs.items(), key=lambda x: x[-1].item())
+    # All other effects should be t.Tensors, but wandb plays nicer with floats.
+    diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
+    for i, j, k in act_diffs:
+        key: str = f"{i}.{j}->{i+1}.{k}"
+        value: float = act_diffs[i, j, k].item()
+        diffs_table.add_data(key, value)
+    wandb.log({"Effects": diffs_table})
+
+    plotted_diffs = {}
+    if BRANCHING_FACTOR is not None:
+        # Keep only the top effects per ablation site i, j across all
+        # downstream indices k.
+        working_dict = {}
+
+        for key, effect in act_diffs.items():
+            site = key[:2]
+            if site not in working_dict:
+                working_dict[site] = []
+            working_dict[site].append((key, effect))
+
+        for site, items in working_dict.items():
+            sorted_items = sorted(
+                items,
+                key=lambda x: abs(x[-1].item()),
+                reverse=True,
+            )
+            for k, v in sorted_items[:BRANCHING_FACTOR]:
+                plotted_diffs[k] = v
+
+    else:
+        plotted_diffs = act_diffs
+
+    save_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
     )
+
     graph_causal_effects(
-        sorted_diffs,
+        plotted_diffs,
         MODEL_DIR,
         TOP_K_INFO_FILE,
+        OVERALL_EFFECTS,
         __file__,
     ).draw(
-        save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg"
-        ),
+        save_path,
         format="svg",
         prog="dot",
     )
+    # Read the .svg into a `wandb` artifact.
+    artifact = wandb.Artifact("feature_graph", type="directed_graph")
+    artifact.add_file(save_path)
+    wandb.log_artifact(artifact)
+
+# %%
+# Wrap up logging.
+wandb.finish()

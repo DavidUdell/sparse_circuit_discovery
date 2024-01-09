@@ -5,10 +5,10 @@ from runpy import run_module
 
 
 for script in [
-    "collect_acts_webtext",
+    "collect_acts",
     "train_autoencoder",
     "interp_tools.top_tokens",
-    "interp_tools.feature_web_webtext",
+    "interp_tools.directed_graph_webtext",
 ]:
     try:
         run_module(f"sparse_coding.{script}")
