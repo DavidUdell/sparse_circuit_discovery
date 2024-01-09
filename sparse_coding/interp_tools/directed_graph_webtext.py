@@ -2,9 +2,9 @@
 """
 Mess with autoencoder activation dims during `webtext` and graph effects.
 
-`directed_graph_webtext` identifies the sequence positions that most excited each
-autoencoder dimension and plots ablation effects at those positions. It relies
-on prior cached data from `pipe.py`.
+`directed_graph_webtext` identifies the sequence positions that most excited
+each autoencoder dimension and plots ablation effects at those positions. It
+relies on prior cached data from `pipe.py`.
 
 You may need to have logged a HF access token, if applicable.
 """
