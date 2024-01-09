@@ -344,7 +344,7 @@ assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 # All other effects should be t.Tensors, but wandb plays nicer with floats.
 diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
 for i, j, k in act_diffs:
-    key: str = f"{i}.{j}->{i+1}{k}"
+    key: str = f"{i}.{j}->{i+1}.{k}"
     value: float = act_diffs[i, j, k].item()
     diffs_table.add_data(key, value)
 wandb.log({"Effects": diffs_table})
