@@ -2,7 +2,7 @@
 """
 Mess with autoencoder activation dims during `webtext` and graph effects.
 
-`feature_web_webtext` identifies the sequence positions that most excited each
+`directed_graph_webtext` identifies the sequence positions that most excited each
 autoencoder dimension and plots ablation effects at those positions. It relies
 on prior cached data from `pipe.py`.
 
@@ -49,6 +49,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
+GRAPH_FILE = config.get("GRAPH_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
@@ -375,7 +376,7 @@ else:
 
 save_path: str = save_paths(
     __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/feature_web.svg",
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
 )
 
 graph_causal_effects(
@@ -391,7 +392,7 @@ graph_causal_effects(
 )
 
 # Read the .svg into a `wandb` artifact.
-artifact = wandb.Artifact("feature_web", type="directed_graph")
+artifact = wandb.Artifact("feature_graph", type="directed_graph")
 artifact.add_file(save_path)
 wandb.log_artifact(artifact)
 

@@ -1,5 +1,6 @@
-# (Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".)
+## Config Notes
+# Throughout, leave out entries for None. Writing in `None` values will get
+# you the string "None".
 
 
 ## Main Config
@@ -24,6 +25,7 @@ ACTS_DATA_FILE: "activations_dataset.pt"
 ENCODER_FILE: "learned_encoder.pt"
 BIASES_FILE: "learned_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
+GRAPH_FILE: "feature_graph.svg"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
@@ -33,18 +35,19 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Directed Graph
-# None for unrestricted plotting.
+# None at BRANCHING_FACTOR and DIMS_PLOTTED_LIST will plot everything in the
+# directed graph.
 BRANCHING_FACTOR: 5
 DIMS_PLOTTED_LIST:
 
 
 ## Stable Dev Constants
-# Reproducibility
-SEED: 0
-
 # `wandb` logging
 WANDB_PROJECT: "sparse_circuit_discovery"
 WANDB_ENTITY: "davidudell"
+
+# Reproducibility
+SEED: 0
 
 # `collect_acts_webtext.py`
 NUM_SEQUENCES_EVALED: 1000
@@ -66,4 +69,7 @@ NUM_SEQUENCES_INTERPED: 10
 MAX_SEQ_INTERPED_LEN: 100
 
 # `feature_web_mc.py`
-NUM_QUESTIONS_INTERPED: 500
+NUM_QUESTIONS_INTERPED: 10
+MAX_NEW_TOKENS: 1
+NUM_RETURN_SEQUENCES: 1
+NUM_SHOT: 6

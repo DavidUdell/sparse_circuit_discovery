@@ -99,11 +99,11 @@ def test_smoke_sparse_coding(
 ):  # pylint: disable=redefined-outer-name, unused-argument
     """Run the submodule scripts in sequence."""
     for script in [
-        "collect_acts_webtext",
+        "collect_acts",
         "train_autoencoder",
         "interp_tools.top_tokens",
-        "interp_tools.feature_web_mc",
-        "interp_tools.feature_web_webtext",
+        "interp_tools.directed_graph_mc",
+        "interp_tools.directed_graph_webtext",
     ]:
         try:
             with wandb.init(mode="offline"):
