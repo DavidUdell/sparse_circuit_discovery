@@ -142,7 +142,7 @@ def graph_causal_effects(
                 {label_appendable(ablation_layer_idx, ablated_dim)}
                 """
             ),
-            f"Fraction of effects not plotted: {excluded_fraction*100}%.",
+            f"Fraction of all effects not plotted: {excluded_fraction*100}%.",
         )
 
         # Assert no repeat edges.
