@@ -26,7 +26,7 @@ ENCODER_FILE: "learned_encoder.pt"
 BIASES_FILE: "learned_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
 GRAPH_FILE: "feature_graph.svg"
-GRAPH_PICKLE_FILE: "feature_graph.pkl"
+GRAPH_DOT_FILE: "feature_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2

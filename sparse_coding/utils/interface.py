@@ -363,11 +363,11 @@ def load_layer_feature_labels(
 
 def load_preexisting_graph(
     model_dir: str,
-    graph_pickle_file: str,
+    graph_dot_file: str,
     base_file: str,
 ) -> AGraph | None:
     """
-    Load a preexisting pickled graph from disk.
+    Load a preexisting graph from disk.
 
     `base_file` should be `__file__` in the calling module.
     """
@@ -378,12 +378,10 @@ def load_preexisting_graph(
             (
                 sanitize_model_name(model_dir)
                 + "/"
-                + graph_pickle_file
+                + graph_dot_file
             ),
         )
-        with open(graph_rel_path, "rb") as f:
-            # AGraph object is pickled.
-            graph = pickle.load(f)
+        graph = AGraph(graph_rel_path)
         return graph
     except FileNotFoundError:
         return None

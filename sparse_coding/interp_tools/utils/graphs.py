@@ -25,7 +25,7 @@ def graph_causal_effects(
     activations: dict[tuple, t.Tensor],
     model_dir: str,
     top_k_info_file: str,
-    graph_pickle_file: str,
+    graph_dot_file: str,
     overall_effects: float,
     base_file: str,
     rasp=False,
@@ -35,7 +35,7 @@ def graph_causal_effects(
     # Load preexistin graph, if applicable.
     graph = load_preexisting_graph(
         model_dir,
-        graph_pickle_file,
+        graph_dot_file,
         base_file
     )
     if graph is None:
