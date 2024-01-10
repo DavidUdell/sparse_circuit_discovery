@@ -17,9 +17,10 @@ needed.
 """
 
 
+import pickle
+import warnings
 from collections import defaultdict
 from textwrap import dedent
-import warnings
 
 import numpy as np
 import torch as t
@@ -64,6 +65,7 @@ ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
+GRAPH_PICKLE_FILE = config.get("GRAPH_PICKLE_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
@@ -144,7 +146,13 @@ if MODEL_DIR == "rasp":
 
     # Plot and save effects.
     graph_causal_effects(
-        act_diffs, MODEL_DIR, TOP_K_INFO_FILE, 0.0, __file__, rasp=True
+        act_diffs,
+        MODEL_DIR,
+        TOP_K_INFO_FILE,
+        GRAPH_PICKLE_FILE,
+        0.0,
+        __file__,
+        rasp=True,
     ).draw(
         save_paths(__file__, "feature_web.png"),
         prog="dot",
@@ -344,22 +352,35 @@ else:
         __file__,
         f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
     )
+    save_pickle_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_PICKLE_FILE}",
+    )
 
-    graph_causal_effects(
+    graph = graph_causal_effects(
         plotted_diffs,
         MODEL_DIR,
         TOP_K_INFO_FILE,
+        GRAPH_PICKLE_FILE,
         OVERALL_EFFECTS,
         __file__,
-    ).draw(
+    )
+
+    # Save the graph .svg.
+    graph.draw(
         save_path,
         format="svg",
         prog="dot",
     )
+
     # Read the .svg into a `wandb` artifact.
     artifact = wandb.Artifact("feature_graph", type="directed_graph")
     artifact.add_file(save_path)
     wandb.log_artifact(artifact)
+
+    # Save the AGraph object.
+    with open(save_pickle_path, "wb") as f:
+        pickle.dump(graph, f)
 
 # %%
 # Wrap up logging.

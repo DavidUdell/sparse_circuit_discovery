@@ -11,6 +11,7 @@ You may need to have logged a HF access token, if applicable.
 
 
 import gc
+import pickle
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -50,6 +51,7 @@ ENCODER_FILE = config.get("ENCODER_FILE")
 BIASES_FILE = config.get("BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
+GRAPH_PICKLE_FILE = config.get("GRAPH_PICKLE_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST")
@@ -385,14 +387,22 @@ save_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
 )
+save_pickle_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_PICKLE_FILE}",
+)
 
-graph_causal_effects(
+graph = graph_causal_effects(
     plotted_diffs,
     MODEL_DIR,
     TOP_K_INFO_FILE,
+    GRAPH_PICKLE_FILE,
     OVERALL_EFFECTS,
     __file__,
-).draw(
+)
+
+# Save the graph .svg.
+graph.draw(
     save_path,
     format="svg",
     prog="dot",
@@ -402,6 +412,10 @@ graph_causal_effects(
 artifact = wandb.Artifact("feature_graph", type="directed_graph")
 artifact.add_file(save_path)
 wandb.log_artifact(artifact)
+
+# Save the AGraph object.
+with open(save_pickle_path, "wb") as f:
+    pickle.dump(graph, f)
 
 # %%
 # Wrap up logging.

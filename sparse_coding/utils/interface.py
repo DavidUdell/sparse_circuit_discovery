@@ -4,6 +4,7 @@
 import csv
 import gc
 import os
+import pickle
 from pathlib import Path
 from textwrap import dedent
 
@@ -11,6 +12,7 @@ import yaml
 import numpy as np
 import torch as t
 from transformers import PreTrainedModel
+from pygraphviz import AGraph
 
 
 def parse_slice(slice_string: str) -> slice:
@@ -357,6 +359,34 @@ def load_layer_feature_labels(
                 """
             )
         )
+
+
+def load_preexisting_graph(
+    model_dir: str,
+    graph_pickle_file: str,
+    base_file: str,
+) -> AGraph | None:
+    """
+    Load a preexisting pickled graph from disk.
+
+    `base_file` should be `__file__` in the calling module.
+    """
+
+    try:
+        graph_rel_path = save_paths(
+            base_file,
+            (
+                sanitize_model_name(model_dir)
+                + "/"
+                + graph_pickle_file
+            ),
+        )
+        with open(graph_rel_path, "rb") as f:
+            # AGraph object is pickled.
+            graph = pickle.load(f)
+        return graph
+    except FileNotFoundError:
+        return None
 
 
 def pad_activations(

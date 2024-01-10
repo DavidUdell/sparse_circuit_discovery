@@ -6,7 +6,10 @@ from textwrap import dedent
 import torch as t
 from pygraphviz import AGraph
 
-from sparse_coding.utils.interface import load_layer_feature_labels
+from sparse_coding.utils.interface import (
+    load_layer_feature_labels,
+    load_preexisting_graph,
+)
 
 
 def color_range_from_scalars(activations: dict) -> tuple[float, float]:
@@ -22,13 +25,21 @@ def graph_causal_effects(
     activations: dict[tuple, t.Tensor],
     model_dir: str,
     top_k_info_file: str,
+    graph_pickle_file: str,
     overall_effects: float,
     base_file: str,
     rasp=False,
 ) -> AGraph:
     """Graph the causal effects of ablations."""
 
-    graph = AGraph(directed=True)
+    # Load preexistin graph, if applicable.
+    graph = load_preexisting_graph(
+        model_dir,
+        graph_pickle_file,
+        base_file
+    )
+    if graph is None:
+        graph = AGraph(directed=True)
 
     if rasp:
         # Plot neuron nodes.
