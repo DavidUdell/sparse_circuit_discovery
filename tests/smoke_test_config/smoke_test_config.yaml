@@ -14,7 +14,8 @@ ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
 ENCODER_FILE: "smoke_test_learned_encoder.pt"
 BIASES_FILE: "smoke_test_learned_biases.pt"
 TOP_K_INFO_FILE: "smoke_test_token_info.csv"
-GRAPH_FILE: "feature_graph.svg"
+GRAPH_FILE: "smoke_test_graph.svg"
+GRAPH_PICKLE_FILE: "smoke_test_graph.pkl"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-4
