@@ -346,7 +346,6 @@ for i in ablated_activations:
 # There should have been some effect.
 OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
-    print(abs(act_diffs[i, j, k].item()))
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
