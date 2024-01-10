@@ -49,7 +49,7 @@ WANDB_ENTITY: "davidudell"
 # Reproducibility
 SEED: 0
 
-# `collect_acts_webtext.py`
+# `collect_acts.py`
 NUM_SEQUENCES_EVALED: 1000
 MAX_SEQ_LEN: 1000
 
@@ -64,7 +64,7 @@ TOP_K: 6
 
 # `feature_web_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
-# NUM_SEQUENCES_EVALED in `collect_acts_webtext.py`.
+# NUM_SEQUENCES_EVALED in `collect_acts.py`.
 NUM_SEQUENCES_INTERPED: 10
 MAX_SEQ_INTERPED_LEN: 100
 

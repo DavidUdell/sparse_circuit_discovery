@@ -52,7 +52,7 @@ TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
-DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
+DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST")
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 SEED = config.get("SEED", 0)
 
@@ -172,8 +172,10 @@ for i in base_activations_all_positions:
             # tuple (ablate_layer_idx, None, base_cache_dim_index).
             activations_tensor = base_activations_all_positions[i][j][k]
 
-            favorite_seq_pos = t.argmax(activations_tensor, dim=1).squeeze()
-            max_val = activations_tensor[:, favorite_seq_pos, :].unsqueeze(1)
+            fave_seq_pos_flat: int = t.argmax(
+                activations_tensor, dim=1
+            ).squeeze().item()
+            max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
             min_val = max_val / 2.0
             mask = (activations_tensor >= min_val) & (
                 activations_tensor <= max_val
@@ -181,7 +183,6 @@ for i in base_activations_all_positions:
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
             favorite_sequence_positions[i, j, k] = top_indices.tolist()
-
 
 # %%
 # Run ablations at top sequence positions.
@@ -260,15 +261,21 @@ for ablate_layer_idx in ablate_layer_range:
                     truncation=True,
                     max_length=MAX_SEQ_INTERPED_LEN,
                 )
-                if len(tok_seq["input_ids"]) < per_seq_position:
-                    per_seq_position = per_seq_position - len(
-                        tok_seq["input_ids"]
+                if tok_seq["input_ids"].size(-1) < per_seq_position:
+                    per_seq_position = (
+                        per_seq_position - tok_seq["input_ids"].size(-1)
                     )
                     continue
                 truncated_tok_seqs.append(tok_seq)
                 truncated_seqs_final_indices.append(per_seq_position)
                 break
 
+        assert len(truncated_tok_seqs) > 0, dedent(
+            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim}."
+        )
+        assert len(truncated_seqs_final_indices) > 0, dedent(
+            "No truncated sequence final indices were found."
+        )
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
         # run one ablated and once not.
@@ -336,9 +343,10 @@ for i in ablated_activations:
             for x in truncated_seqs_final_indices:
                 act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
 
-# There should be any overall effect.
+# There should have been some effect.
 OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
+    print(abs(act_diffs[i, j, k].item()))
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 

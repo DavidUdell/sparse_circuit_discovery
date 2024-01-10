@@ -32,7 +32,7 @@ DIMS_PLOTTED_LIST: [1]
 # Reproducibility
 SEED: 0
 
-# `collect_acts_webtext.py`
+# `collect_acts.py`
 NUM_SEQUENCES_EVALED: 5
 MAX_SEQ_LEN: 5
 
