@@ -6,8 +6,7 @@
 *.csv
 
 # Causal graph files
-feature_web.png
-feature_graph.png
+rasp_feature_graph.png
 *.svg
 *.dot
 
