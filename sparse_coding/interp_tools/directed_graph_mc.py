@@ -59,8 +59,9 @@ GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
 COEFFICIENT = config.get("COEFFICIENT", 0.0)
-DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
+THINNING_FACTOR = config.get("THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
+DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
 SEED = config.get("SEED")
 
 # %%
@@ -128,6 +129,17 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
         ablate_dim_indices,
     )
 
+    # THINNING_FACTOR pruning of ablate_dim_indices.
+    if THINNING_FACTOR is not None:
+        np.random.seed(SEED)
+        ablate_dim_indices = np.random.choice(
+            ablate_dim_indices,
+            size=int(len(ablate_dim_indices) * THINNING_FACTOR),
+            replace=False,
+        ).tolist()
+
+    # DIMS_PLOTTED_LIST will immediately override THINNING_FACTOR, if it was
+    # set.
     if DIMS_PLOTTED_LIST is not None:
         for i in DIMS_PLOTTED_LIST:
             assert i in ablate_dim_indices, dedent(
