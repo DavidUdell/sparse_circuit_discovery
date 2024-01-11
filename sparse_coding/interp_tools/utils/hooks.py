@@ -33,6 +33,7 @@ def hooks_manager(
     tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
     ablate_during_run: bool = True,
+    coefficient: float = 0.0,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -64,7 +65,7 @@ def hooks_manager(
             # Ablate the activation at dim_idx. Modify here to scale in
             # different ways besides ablation.
             projected_acts[:, -1, dim_idx] = (
-                projected_acts[:, -1, dim_idx] * 0.0
+                projected_acts[:, -1, dim_idx] * coefficient
             )
             # Project back to activation space.
             ablated_activations = (

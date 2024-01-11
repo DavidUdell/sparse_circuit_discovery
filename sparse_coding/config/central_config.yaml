@@ -37,7 +37,8 @@ ACCUMULATE_GRAD_BATCHES: 4
 
 # Directed Graph
 # None at BRANCHING_FACTOR and DIMS_PLOTTED_LIST will plot everything in the
-# directed graph.
+# directed graph. COEFFICIENT 0.0 means ablate features.
+COEFFICIENT: 0.0
 BRANCHING_FACTOR: 2
 DIMS_PLOTTED_LIST:
 

@@ -54,6 +54,7 @@ GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST")
+COEFFICIENT = config.get("COEFFICIENT", 0.0)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 SEED = config.get("SEED", 0)
 
@@ -308,6 +309,7 @@ for ablate_layer_idx in ablate_layer_range:
             per_layer_autoencoders,
             ablated_activations,
             ablate_during_run=True,
+            coefficient=COEFFICIENT,
         ):
             for s in truncated_tok_seqs:
                 top_input = s.to(model.device)

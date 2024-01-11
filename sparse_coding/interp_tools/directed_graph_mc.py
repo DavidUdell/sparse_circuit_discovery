@@ -58,6 +58,7 @@ GRAPH_FILE = config.get("GRAPH_FILE")
 GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_QUESTIONS_INTERPED = config.get("NUM_QUESTIONS_INTERPED", 50)
 NUM_SHOT = config.get("NUM_SHOT", 6)
+COEFFICIENT = config.get("COEFFICIENT", 0.0)
 DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 SEED = config.get("SEED")
@@ -204,6 +205,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
             tensors_per_layer,
             ablated_activations,
             ablate_during_run=True,
+            coefficient=COEFFICIENT,
         ):
             multiple_choice_task(
                 dataset,
