@@ -153,7 +153,7 @@ if MODEL_DIR == "rasp":
         __file__,
         rasp=True,
     ).draw(
-        save_paths(__file__, "feature_web.png"),
+        save_paths(__file__, "feature_graph.png"),
         prog="dot",
     )
 

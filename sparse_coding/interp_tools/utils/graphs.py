@@ -40,6 +40,7 @@ def graph_causal_effects(
     )
     if graph is None:
         graph = AGraph(directed=True)
+    assert graph is not None, "Graph is None."
 
     if rasp:
         # Plot neuron nodes.

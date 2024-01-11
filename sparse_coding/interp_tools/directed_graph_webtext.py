@@ -342,7 +342,9 @@ for i in ablated_activations:
             # would be the last position of each sequence.
             act_diffs[i, j, k] = t.tensor([[0.0]])
             for x in truncated_seqs_final_indices:
-                act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
+                act_diffs[i, j, k] += (
+                    ablate_vec[:, x-1, :] - base_vec[:, x-1, :]
+                )
 
 # There should have been some effect.
 OVERALL_EFFECTS = 0.0
@@ -384,7 +386,7 @@ else:
 
 save_path: str = save_paths(
     __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",
 )
 save_pickle_path: str = save_paths(
     __file__,

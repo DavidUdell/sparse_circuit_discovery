@@ -382,8 +382,9 @@ def load_preexisting_graph(
             ),
         )
         graph = AGraph(graph_rel_path)
+        assert graph is not None, "Newly loaded graph is None."
         return graph
-    except FileNotFoundError:
+    except Exception:
         return None
 
 
