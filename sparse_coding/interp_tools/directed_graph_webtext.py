@@ -385,7 +385,7 @@ graph.draw(
 
 # Read the .svg into a `wandb` artifact.
 artifact = wandb.Artifact(
-    f"layer {ablate_layer_idx} feature_graph",
+    "feature_graph",
     type="directed_graph"
 )
 artifact.add_file(save_path)
