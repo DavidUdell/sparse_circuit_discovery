@@ -132,7 +132,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
     # THINNING_FACTOR pruning of ablate_dim_indices.
     if THINNING_FACTOR is not None:
         np.random.seed(SEED)
-        ablate_dim_indices = np.random.choice(
+        ablate_dim_indices_thinned = np.random.choice(
             ablate_dim_indices,
             size=int(len(ablate_dim_indices) * THINNING_FACTOR),
             replace=False,
@@ -148,6 +148,8 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
             )
         ablate_dim_indices = []
         ablate_dim_indices.extend(DIMS_PLOTTED_LIST)
+    else:
+        ablate_dim_indices = ablate_dim_indices_thinned
 
     cache_dim_indices_per_layer = {}
     cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]

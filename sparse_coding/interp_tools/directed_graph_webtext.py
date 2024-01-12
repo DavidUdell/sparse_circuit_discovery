@@ -210,7 +210,7 @@ for ablate_layer_idx in ablate_layer_range:
     # THINNING_FACTOR pruning of ablate_dim_indices.
     if THINNING_FACTOR is not None:
         np.random.seed(SEED)
-        ablate_dim_indices = np.random.choice(
+        ablate_dim_indices_thinned = np.random.choice(
             ablate_dim_indices,
             size=int(len(ablate_dim_indices) * THINNING_FACTOR),
             replace=False,
@@ -224,6 +224,8 @@ for ablate_layer_idx in ablate_layer_range:
                 f"Index {i} not in `ablate_dim_indices`."
             )
         ablate_dim_indices = DIMS_PLOTTED_LIST
+    else:
+        ablate_dim_indices = ablate_dim_indices_thinned
 
     for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
         # This inner loop is all setup; it doesn't loop over the forward
