@@ -59,94 +59,68 @@ def graph_causal_effects(
                         label=str(effect.item()),
                     )
 
-    else:
+        return graph
 
-        def label_appendable(layer_idx, neuron_idx):
-            return load_layer_feature_labels(
-                model_dir,
-                layer_idx,
-                neuron_idx,
-                top_k_info_file,
-                base_file,
-            )
-
-        # Plot neuron nodes.
-        for (
-            ablation_layer_idx,
-            ablated_dim,
-            downstream_dim,
-        ) in activations.keys():
-            # I need to be saving the downstream layer index too. But this
-            # works for now.
-            graph.add_node(
-                dedent(
-                    f"""
-                    {ablation_layer_idx}.{ablated_dim}:
-                    {label_appendable(ablation_layer_idx, ablated_dim)}
-                    """
-                )
-            )
-            graph.add_node(
-                dedent(
-                    f"""
-                    {ablation_layer_idx + 1}.{downstream_dim}:
-                    {label_appendable(ablation_layer_idx + 1, downstream_dim)}
-                    """
-                )
-            )
-
-        min_scalar, max_scalar = color_range_from_scalars(activations)
-
-        # Plot effect edges.
-        plotted_effects: float = 0.0
-        for (
-            ablation_layer_idx,
-            ablated_dim,
-            downstream_dim,
-        ), effect in activations.items():
-            if effect.item() == 0:
-                continue
-            plotted_effects += abs(effect.item())
-            # Blue means the intervention increased downstream firing, while
-            # red means it decreased firing. Alpha indicates distance from 0.0
-            # effect size.
-            if effect.item() > 0.0:
-                red = 0
-                blue = 255
-            elif effect.item() < 0.0:
-                red = 255
-                blue = 0
-            alpha = int(
-                255
-                * abs(effect.item())
-                / (max(abs(max_scalar), abs(min_scalar)))
-            )
-            rgba_color = f"#{red:02x}00{blue:02x}{alpha:02x}"
-
-            graph.add_edge(
-                dedent(
-                    f"""
-                    {ablation_layer_idx}.{ablated_dim}:
-                    {label_appendable(ablation_layer_idx, ablated_dim)}
-                    """
-                ),
-                dedent(
-                    f"""
-                    {ablation_layer_idx + 1}.{downstream_dim}:
-                    {label_appendable(ablation_layer_idx + 1, downstream_dim)}
-                    """
-                ),
-                color=rgba_color,
-            )
-
-        # Add an effects fraction excluded node.
-        excluded_fraction = round(
-            (overall_effects - plotted_effects) / overall_effects, 2
+    def label_appendable(layer_idx, neuron_idx):
+        return load_layer_feature_labels(
+            model_dir,
+            layer_idx,
+            neuron_idx,
+            top_k_info_file,
+            base_file,
         )
-        overall_effects = round(overall_effects, 2)
+
+    # Plot neuron nodes.
+    for (
+        ablation_layer_idx,
+        ablated_dim,
+        downstream_dim,
+    ) in activations.keys():
         graph.add_node(
-            f"Fraction of effects not plotted: {excluded_fraction}%."
+            dedent(
+                f"""
+                {ablation_layer_idx}.{ablated_dim}:
+                {label_appendable(ablation_layer_idx, ablated_dim)}
+                """
+            )
         )
+        graph.add_node(
+            dedent(
+                f"""
+                {ablation_layer_idx + 1}.{downstream_dim}:
+                {label_appendable(ablation_layer_idx + 1, downstream_dim)}
+                """
+            )
+        )
+
+    min_scalar, max_scalar = color_range_from_scalars(activations)
+
+    # Plot effect edges.
+    plotted_effects: float = 0.0
+    for (
+        ablation_layer_idx,
+        ablated_dim,
+        downstream_dim,
+    ), effect in activations.items():
+        if effect.item() == 0:
+            continue
+        plotted_effects += abs(effect.item())
+        # Blue means the intervention increased downstream firing, while
+        # red means it decreased firing. Alpha indicates distance from 0.0
+        # effect size.
+        if effect.item() > 0.0:
+            red = 0
+            blue = 255
+        elif effect.item() < 0.0:
+            red = 255
+            blue = 0
+        alpha = int(
+            255
+            * abs(effect.item())
+            / (max(abs(max_scalar), abs(min_scalar)))
+        )
+        rgba_color = f"#{red:02x}00{blue:02x}{alpha:02x}"
+
         graph.add_edge(
             dedent(
                 f"""
@@ -154,26 +128,50 @@ def graph_causal_effects(
                 {label_appendable(ablation_layer_idx, ablated_dim)}
                 """
             ),
-            f"Fraction of all effects not plotted: {excluded_fraction*100}%.",
-        )
-
-        # Assert no repeat edges.
-        edges = graph.edges()
-        assert len(edges) == len(set(edges)), "Repeat edges in graph."
-
-        # Remove unlinked nodes.
-        unlinked_nodes = 0
-        for node in graph.nodes():
-            if len(graph.edges(node)) == 0:
-                graph.remove_node(node)
-                unlinked_nodes += 1
-        print(
             dedent(
                 f"""
-                Dropped {unlinked_nodes} unlinked neuron(s) from directed
-                graph.\n
+                {ablation_layer_idx + 1}.{downstream_dim}:
+                {label_appendable(ablation_layer_idx + 1, downstream_dim)}
                 """
-            )
+            ),
+            color=rgba_color,
         )
+
+    # Add an effects fraction excluded node.
+    excluded_fraction = round(
+        (overall_effects - plotted_effects) / overall_effects, 2
+    )
+    overall_effects = round(overall_effects, 2)
+    graph.add_node(
+        f"Fraction of effects not plotted: {excluded_fraction}%."
+    )
+    graph.add_edge(
+        dedent(
+            f"""
+            {ablation_layer_idx}.{ablated_dim}:
+            {label_appendable(ablation_layer_idx, ablated_dim)}
+            """
+        ),
+        f"Fraction of all effects not plotted: {excluded_fraction*100}%.",
+    )
+
+    # Assert no repeat edges.
+    edges = graph.edges()
+    assert len(edges) == len(set(edges)), "Repeat edges in graph."
+
+    # Remove unlinked nodes.
+    unlinked_nodes = 0
+    for node in graph.nodes():
+        if len(graph.edges(node)) == 0:
+            graph.remove_node(node)
+            unlinked_nodes += 1
+    print(
+        dedent(
+            f"""
+            Dropped {unlinked_nodes} unlinked neuron(s) from directed
+            graph.\n
+            """
+        )
+    )
 
     return graph
