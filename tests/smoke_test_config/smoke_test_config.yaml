@@ -3,7 +3,7 @@
 MODEL_DIR: "EleutherAI/pythia-70m"
 
 # Layers Slice to Cache Activations From
-ACTS_LAYERS_SLICE: "1:3"
+ACTS_LAYERS_SLICE: "1:4"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 1

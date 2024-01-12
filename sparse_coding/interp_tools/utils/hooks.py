@@ -148,6 +148,7 @@ def hooks_manager(
     if ablate_layer_idx == model_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
     cache_range: range = range(ablate_layer_idx + 1, model_layer_range[-1] + 1)
+    print(tensors_per_layer)
     # Just the Pythia layer syntax, for now.
     if ablate_during_run:
         ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]

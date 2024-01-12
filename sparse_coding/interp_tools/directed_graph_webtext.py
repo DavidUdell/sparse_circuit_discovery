@@ -106,6 +106,9 @@ eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 # Collect base case data.
 base_activations_all_positions = defaultdict(recursive_defaultdict)
 
+# The layer_autoencoder objects aren't well-formed for all the loops. They're
+# accidently in the right shape here, but we need them to track the ablate and
+# cache dim pairs for all loops.
 for ablate_layer_idx in ablate_layer_range:
     ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
         MODEL_DIR,
