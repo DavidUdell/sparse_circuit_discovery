@@ -147,7 +147,7 @@ def hooks_manager(
 
     if ablate_layer_idx == model_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
-    cache_range: range = range(ablate_layer_idx + 1, model_layer_range[-1] + 1)
+    cache_layer_idx: int = ablate_layer_idx + 1
     # Just the Pythia layer syntax, for now.
     if ablate_during_run:
         ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]
@@ -157,26 +157,23 @@ def hooks_manager(
             ablate_hook_fac(ablate_dim_idx, ablate_encoder, ablate_bias)
         )
 
-    cache_hook_handles = {}
-    for cache_layer_idx in cache_range:
-        cache_encoder, cache_bias = tensors_per_layer[cache_layer_idx]
-        cache_hook_handles[cache_layer_idx] = model.gpt_neox.layers[
-            cache_layer_idx
-        ].register_forward_hook(
-            cache_hook_fac(
-                ablate_dim_idx,
-                cache_dim_indices[cache_layer_idx],
-                ablate_layer_idx,
-                cache_encoder,
-                cache_bias,
-                activations_dict,
-            )
+    cache_encoder, cache_bias = tensors_per_layer[cache_layer_idx]
+    cache_hook_handle = model.gpt_neox.layers[
+        cache_layer_idx
+    ].register_forward_hook(
+        cache_hook_fac(
+            ablate_dim_idx,
+            cache_dim_indices[cache_layer_idx],
+            ablate_layer_idx,
+            cache_encoder,
+            cache_bias,
+            activations_dict,
         )
+    )
 
     try:
         yield
     finally:
+        cache_hook_handle.remove()
         if ablate_during_run:
             ablate_hook_handle.remove()
-        for handle in cache_hook_handles.values():
-            handle.remove()

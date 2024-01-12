@@ -290,108 +290,109 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
-    # Compute diffs. Recursive defaultdict indices are:
-    # [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
-    act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
-    for i in ablated_activations:
-        for j in ablated_activations[i]:
-            for k in ablated_activations[i][j]:
-                ablate_vec = ablated_activations[i][j][k]
-                base_vec = base_activations_top_positions[i][j][k]
+# %%
+# Compute diffs. Recursive defaultdict indices are:
+# [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
+act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
+for i in ablated_activations:
+    for j in ablated_activations[i]:
+        for k in ablated_activations[i][j]:
+            ablate_vec = ablated_activations[i][j][k]
+            base_vec = base_activations_top_positions[i][j][k]
 
-                assert (
-                    ablate_vec.shape == base_vec.shape == (
-                        1, base_vec.size(1), 1
-                    )
-                ), dedent(
-                    f"""
-                    Shape mismatch between ablated and base vectors for ablate
-                    layer {i}, ablate dim {j}, and cache dim {k}; ablate shape
-                    {ablate_vec.shape} and base shape {base_vec.shape}.
-                    """
+            assert (
+                ablate_vec.shape == base_vec.shape == (
+                    1, base_vec.size(1), 1
+                )
+            ), dedent(
+                f"""
+                Shape mismatch between ablated and base vectors for ablate
+                layer {i}, ablate dim {j}, and cache dim {k}; ablate shape
+                {ablate_vec.shape} and base shape {base_vec.shape}.
+                """
+            )
+
+            # The truncated seqs were all flattened. Now we just want what
+            # would be the last position of each sequence.
+            act_diffs[i, j, k] = t.tensor([[0.0]])
+            for x in truncated_seqs_final_indices:
+                act_diffs[i, j, k] += (
+                    ablate_vec[:, x-1, :] - base_vec[:, x-1, :]
                 )
 
-                # The truncated seqs were all flattened. Now we just want what
-                # would be the last position of each sequence.
-                act_diffs[i, j, k] = t.tensor([[0.0]])
-                for x in truncated_seqs_final_indices:
-                    act_diffs[i, j, k] += (
-                        ablate_vec[:, x-1, :] - base_vec[:, x-1, :]
-                    )
+# There should have been some effect.
+OVERALL_EFFECTS = 0.0
+for i, j, k in act_diffs:
+    OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
+assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-    # There should have been some effect.
-    OVERALL_EFFECTS = 0.0
-    for i, j, k in act_diffs:
-        OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
-    assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
+# All other effects should be t.Tensors, but wandb plays nicer with floats.
+diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
+for i, j, k in act_diffs:
+    key: str = f"{i}.{j}->{i+1}.{k}"
+    value: float = act_diffs[i, j, k].item()
+    diffs_table.add_data(key, value)
+wandb.log({"Effects": diffs_table})
 
-    # All other effects should be t.Tensors, but wandb plays nicer with floats.
-    diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
-    for i, j, k in act_diffs:
-        key: str = f"{i}.{j}->{i+1}.{k}"
-        value: float = act_diffs[i, j, k].item()
-        diffs_table.add_data(key, value)
-    wandb.log({"Effects": diffs_table})
+plotted_diffs = {}
+if BRANCHING_FACTOR is not None:
+    # Keep only the top effects per ablation site i, j across all downstream
+    # indices k.
+    working_dict = {}
 
-    plotted_diffs = {}
-    if BRANCHING_FACTOR is not None:
-        # Keep only the top effects per ablation site i, j across all
-        # downstream indices k.
-        working_dict = {}
+    for key, effect in act_diffs.items():
+        site = key[:2]
+        if site not in working_dict:
+            working_dict[site] = []
+        working_dict[site].append((key, effect))
 
-        for key, effect in act_diffs.items():
-            site = key[:2]
-            if site not in working_dict:
-                working_dict[site] = []
-            working_dict[site].append((key, effect))
+    for site, items in working_dict.items():
+        sorted_items = sorted(
+            items,
+            key=lambda x: abs(x[-1].item()),
+            reverse=True,
+        )
+        for k, v in sorted_items[:BRANCHING_FACTOR]:
+            plotted_diffs[k] = v
 
-        for site, items in working_dict.items():
-            sorted_items = sorted(
-                items,
-                key=lambda x: abs(x[-1].item()),
-                reverse=True,
-            )
-            for k, v in sorted_items[:BRANCHING_FACTOR]:
-                plotted_diffs[k] = v
+else:
+    plotted_diffs = act_diffs
 
-    else:
-        plotted_diffs = act_diffs
+save_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",
+)
+save_pickle_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_DOT_FILE}",
+)
 
-    save_path: str = save_paths(
-        __file__,
-        f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",
-    )
-    save_pickle_path: str = save_paths(
-        __file__,
-        f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_DOT_FILE}",
-    )
+graph = graph_causal_effects(
+    plotted_diffs,
+    MODEL_DIR,
+    TOP_K_INFO_FILE,
+    GRAPH_DOT_FILE,
+    OVERALL_EFFECTS,
+    __file__,
+)
 
-    graph = graph_causal_effects(
-        plotted_diffs,
-        MODEL_DIR,
-        TOP_K_INFO_FILE,
-        GRAPH_DOT_FILE,
-        OVERALL_EFFECTS,
-        __file__,
-    )
+# Save the graph .svg.
+graph.draw(
+    save_path,
+    format="svg",
+    prog="dot",
+)
 
-    # Save the graph .svg.
-    graph.draw(
-        save_path,
-        format="svg",
-        prog="dot",
-    )
+# Read the .svg into a `wandb` artifact.
+artifact = wandb.Artifact(
+    f"layer {ablate_layer_idx} feature_graph",
+    type="directed_graph"
+)
+artifact.add_file(save_path)
+wandb.log_artifact(artifact)
 
-    # Read the .svg into a `wandb` artifact.
-    artifact = wandb.Artifact(
-        f"layer {ablate_layer_idx} feature_graph",
-        type="directed_graph"
-    )
-    artifact.add_file(save_path)
-    wandb.log_artifact(artifact)
-
-    # Save the AGraph object as a DOT file.
-    graph.write(save_pickle_path)
+# Save the AGraph object as a DOT file.
+graph.write(save_pickle_path)
 
 # %%
 # Wrap up logging.
