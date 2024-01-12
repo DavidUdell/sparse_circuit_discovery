@@ -284,13 +284,14 @@ def load_layer_feature_indices(
     layer_idx: int,
     top_k_info_file: str,
     base_file: str,
-    indices: list,
 ) -> list[int]:
     """
     Return the meaningful feature indices for a model layer.
 
     `base_file` should be `__file__` in the calling module.
     """
+
+    indices = []
 
     with open(
         save_paths(

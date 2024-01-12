@@ -128,7 +128,6 @@ for layer_idx in layer_range:
         layer_idx,
         TOP_K_INFO_FILE,
         __file__,
-        [],
     )
     layer_dim_indices[layer_idx] = layer_dim_list
 
