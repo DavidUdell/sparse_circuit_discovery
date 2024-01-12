@@ -4,7 +4,6 @@
 import csv
 import gc
 import os
-import pickle
 from pathlib import Path
 from textwrap import dedent
 
@@ -385,7 +384,7 @@ def load_preexisting_graph(
         graph = AGraph(graph_rel_path)
         assert graph is not None, "Newly loaded graph is None."
         return graph
-    except Exception:
+    except FileNotFoundError:
         return None
 
 
