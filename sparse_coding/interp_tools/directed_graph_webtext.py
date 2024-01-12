@@ -103,36 +103,32 @@ eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
 eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
-# Collect base case data.
-base_activations_all_positions = defaultdict(recursive_defaultdict)
-
-# The layer_autoencoder objects aren't well-formed for all the loops. They're
-# accidently in the right shape here, but we need them to track the ablate and
-# cache dim pairs for all loops.
-for ablate_layer_idx in ablate_layer_range:
-    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
+# Prepare all layer autoencoders and layer dim index lists up front.
+layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
+layer_dim_indices: dict[int, list[int]] = {}
+for layer_idx in layer_range:
+    layer_encoder, layer_bias = load_layer_tensors(
         MODEL_DIR,
-        ablate_layer_idx,
+        layer_idx,
         ENCODER_FILE,
         BIASES_FILE,
         __file__,
     )
-    ablation_layer_autoencoder = {
-        ablate_layer_idx: (
-            ablate_layer_encoder,
-            ablate_layer_bias,
-        ),
-    }
-    ablate_dims = load_layer_feature_indices(
+    layer_autoencoders[layer_idx] = (layer_encoder, layer_bias)
+    layer_dim_list = load_layer_feature_indices(
         MODEL_DIR,
-        ablate_layer_idx,
+        layer_idx,
         TOP_K_INFO_FILE,
         __file__,
         [],
     )
-    base_cache_dim_index: dict[int, list[int]] = {
-        ablate_layer_idx: ablate_dims
-    }
+    layer_dim_indices[layer_idx] = layer_dim_list
+
+# %%
+# Collect base case data.
+base_activations_all_positions = defaultdict(recursive_defaultdict)
+
+for ablate_layer_idx in ablate_layer_range:
     # Base run, to determine top activating sequence positions. I'm
     # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
     # layer, by using its interface in a hacky way.
@@ -140,9 +136,9 @@ for ablate_layer_idx in ablate_layer_range:
         ablate_layer_idx - 1,
         None,
         [ablate_layer_idx],
-        base_cache_dim_index,
+        layer_dim_indices,
         model,
-        ablation_layer_autoencoder,
+        layer_autoencoders,
         base_activations_all_positions,
         ablate_during_run=False,
     ):
@@ -196,20 +192,7 @@ ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
 
 for ablate_layer_idx in ablate_layer_range:
-    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-        MODEL_DIR,
-        ablate_layer_idx,
-        ENCODER_FILE,
-        BIASES_FILE,
-        __file__,
-    )
-    ablate_dim_indices = load_layer_feature_indices(
-        MODEL_DIR,
-        ablate_layer_idx,
-        TOP_K_INFO_FILE,
-        __file__,
-        [],
-    )
+    ablate_dim_indices = layer_dim_indices[ablate_layer_idx]
     # THINNING_FACTOR pruning of ablate_dim_indices.
     if THINNING_FACTOR is not None:
         np.random.seed(SEED)
@@ -231,37 +214,6 @@ for ablate_layer_idx in ablate_layer_range:
         ablate_dim_indices = ablate_dim_indices_thinned
 
     for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
-        # This inner loop is all setup; it doesn't loop over the forward
-        # passes.
-        for cache_layer_idx in cache_layer_range:
-            ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-                MODEL_DIR,
-                cache_layer_idx,
-                ENCODER_FILE,
-                BIASES_FILE,
-                __file__,
-            )
-            per_layer_autoencoders: dict[int, tuple[t.Tensor]] = {
-                ablate_layer_idx: (
-                    ablate_layer_encoder,
-                    ablate_layer_bias,
-                ),
-                cache_layer_idx: (
-                    ablate_layer_encoder,
-                    ablate_layer_bias,
-                ),
-            }
-            cache_dims = load_layer_feature_indices(
-                MODEL_DIR,
-                cache_layer_idx,
-                TOP_K_INFO_FILE,
-                __file__,
-                [],
-            )
-            base_cache_dim_index: dict[int, list[int]] = {
-                cache_layer_idx: cache_dims,
-            }
-
         # Ablation run at top activating sequence positions. We use the -1
         # index from the initial top position collection.
         per_seq_positions: list[int] = favorite_sequence_positions[
@@ -301,9 +253,9 @@ for ablate_layer_idx in ablate_layer_range:
             ablate_layer_idx,
             ablate_dim,
             layer_range,
-            base_cache_dim_index,
+            layer_dim_indices,
             model,
-            per_layer_autoencoders,
+            layer_autoencoders,
             base_activations_top_positions,
             ablate_during_run=False,
         ):
@@ -320,9 +272,9 @@ for ablate_layer_idx in ablate_layer_range:
             ablate_layer_idx,
             ablate_dim,
             layer_range,
-            base_cache_dim_index,
+            layer_dim_indices,
             model,
-            per_layer_autoencoders,
+            layer_autoencoders,
             ablated_activations,
             ablate_during_run=True,
             coefficient=COEFFICIENT,

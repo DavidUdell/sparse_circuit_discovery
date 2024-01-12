@@ -107,27 +107,34 @@ validation_indices: list = dataset_indices[starting_index:].tolist()
 base_activations = defaultdict(recursive_defaultdict)
 ablated_activations = defaultdict(recursive_defaultdict)
 
-for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
-    # Ablation layer autoencoder tensors.
-    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-        MODEL_DIR, ablate_layer_idx, ENCODER_FILE, BIASES_FILE, __file__
-    )
-    ablate_layer_encoder, ablate_layer_bias = accelerator.prepare(
-        ablate_layer_encoder, ablate_layer_bias
-    )
-    tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]] = {
-        ablate_layer_idx: (ablate_layer_encoder, ablate_layer_bias)
-    }
-
-    # Ablation layer feature-dim indices.
-    ablate_dim_indices = []
-    ablate_dim_indices = load_layer_feature_indices(
+# %%
+# Prepare all layer autoencoders and layer dim index lists up front.
+layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
+layer_dim_indices: dict[int, list[int]] = {}
+for layer_idx in layer_range:
+    layer_encoder, layer_bias = load_layer_tensors(
         MODEL_DIR,
-        ablate_layer_idx,
+        layer_idx,
+        ENCODER_FILE,
+        BIASES_FILE,
+        __file__,
+    )
+    layer_encoder, layer_bias = accelerator.prepare(
+        layer_encoder, layer_bias
+    )
+    layer_autoencoders[layer_idx] = (layer_encoder, layer_bias)
+    layer_dim_list = load_layer_feature_indices(
+        MODEL_DIR,
+        layer_idx,
         TOP_K_INFO_FILE,
         __file__,
-        ablate_dim_indices,
+        [],
     )
+    layer_dim_indices[layer_idx] = layer_dim_list
+
+for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
+    # Ablation layer feature-dim indices.
+    ablate_dim_indices = layer_dim_indices[ablate_layer_idx]
 
     # THINNING_FACTOR pruning of ablate_dim_indices.
     if THINNING_FACTOR is not None:
@@ -151,37 +158,6 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
     else:
         ablate_dim_indices = ablate_dim_indices_thinned
 
-    cache_dim_indices_per_layer = {}
-    cache_layer_range = layer_range[ablate_layer_meta_index + 1 :]
-
-    for cache_layer_idx in cache_layer_range:
-        # Cache layer autoencoder tensors.
-        (cache_layer_encoder, cache_layer_bias) = load_layer_tensors(
-            MODEL_DIR,
-            cache_layer_idx,
-            ENCODER_FILE,
-            BIASES_FILE,
-            __file__,
-        )
-        cache_layer_encoder, cache_layer_bias = accelerator.prepare(
-            cache_layer_encoder, cache_layer_bias
-        )
-        tensors_per_layer[cache_layer_idx] = (
-            cache_layer_encoder,
-            cache_layer_bias,
-        )
-
-        # Cache layer feature-dim indices.
-        layer_cache_dims = []
-        layer_cache_dims = load_layer_feature_indices(
-            MODEL_DIR,
-            cache_layer_idx,
-            TOP_K_INFO_FILE,
-            __file__,
-            layer_cache_dims,
-        )
-        cache_dim_indices_per_layer[cache_layer_idx] = layer_cache_dims
-
     for ablate_dim_idx in tqdm(
         ablate_dim_indices, desc="Feature ablations progress"
     ):
@@ -191,9 +167,9 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
             ablate_layer_idx,
             ablate_dim_idx,
             layer_range,
-            cache_dim_indices_per_layer,
+            layer_dim_indices,
             model,
-            tensors_per_layer,
+            layer_autoencoders,
             base_activations,
             ablate_during_run=False,
         ):
@@ -214,9 +190,9 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
             ablate_layer_idx,
             ablate_dim_idx,
             layer_range,
-            cache_dim_indices_per_layer,
+            layer_dim_indices,
             model,
-            tensors_per_layer,
+            layer_autoencoders,
             ablated_activations,
             ablate_during_run=True,
             coefficient=COEFFICIENT,
