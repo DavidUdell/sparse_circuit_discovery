@@ -189,6 +189,7 @@ for ablate_layer_idx in ablate_layer_range:
         DIMS_PLOTTED_DICT,
         layer_dim_indices[ablate_layer_idx],
         ablate_layer_idx,
+        layer_range,
         SEED,
     )
 

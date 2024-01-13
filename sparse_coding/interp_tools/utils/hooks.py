@@ -56,12 +56,15 @@ def prepare_dim_indices(
         dims_plotted_dict: dict[int, int] | None,
         ablate_dim_indices: list[int],
         ablate_layer_idx: int,
+        layer_range: range,
         seed: int,
 ) -> list[int]:
     """
     Apply DIMS_PLOTTED_LIST and/or THINNING_FACTOR to ablate_dim_indices.
 
     `dims_plotted_list` will override `thinning_factor`, if set.
+    `thinning_factor` will only be applied to the first layer, if set, since
+    layer plotted dims are already pruned to those that were affected upstream.
     """
 
     if dims_plotted_dict is not None:
@@ -75,7 +78,7 @@ def prepare_dim_indices(
 
         return specified_dims
 
-    if thinning_factor is not None:
+    if thinning_factor is not None and ablate_layer_idx == layer_range[0]:
         np.random.seed(seed)
         ablate_dim_indices_thinned: list[int] = np.random.choice(
             ablate_dim_indices,

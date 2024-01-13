@@ -129,6 +129,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
         DIMS_PLOTTED_DICT,
         layer_dim_indices[ablate_layer_idx],
         ablate_layer_idx,
+        layer_range,
         SEED,
     )
 
