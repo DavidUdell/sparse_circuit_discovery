@@ -63,7 +63,7 @@ def graph_and_log(
                     plotted_diffs[i, j, k] = v
                 # Only plot effects that are downstream of immediately prior
                 # ablation sites.
-                elif j == layer_dim_indices[i-1]:
+                elif j in layer_dim_indices[i-1]:
                     plotted_diffs[i, j, k] = v
 
     else:

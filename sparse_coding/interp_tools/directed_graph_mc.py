@@ -183,6 +183,17 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
                 return_outputs=False,
             )
 
+    # Drop indices from the next layer that weren't affected by these last
+    # ablations.
+    for j in base_activations[ablate_layer_idx]:
+        for k in base_activations[ablate_layer_idx][j]:
+            if not isinstance(
+                base_activations[ablate_layer_idx][j][k],
+                t.Tensor
+            ):
+                del base_activations[ablate_layer_idx][j][k]
+                del ablated_activations[ablate_layer_idx][j][k]
+
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
 # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]

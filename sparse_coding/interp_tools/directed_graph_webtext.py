@@ -269,6 +269,18 @@ for ablate_layer_idx in ablate_layer_range:
                 except RuntimeError:
                     gc.collect()
                     model(**top_input)
+    
+    # Drop indices from the next layer that weren't affected by these last
+    # ablations.
+    for j in ablated_activations[ablate_layer_idx]:
+        for k in ablated_activations[ablate_layer_idx][j]:
+            if not isinstance(
+                ablated_activations[ablate_layer_idx][j][k],
+                t.Tensor
+            ):
+                del base_activations_top_positions[ablate_layer_idx][j][k]
+                del ablated_activations[ablate_layer_idx][j][k]
+
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
