@@ -56,7 +56,7 @@ MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 COEFFICIENT = config.get("COEFFICIENT", 0.0)
 THINNING_FACTOR = config.get("THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
-DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST")
+DIMS_PLOTTED_DICT = config.get("DIMS_PLOTTED_DICT", None)
 SEED = config.get("SEED", 0)
 
 # %%
@@ -186,7 +186,7 @@ base_activations_top_positions = defaultdict(recursive_defaultdict)
 for ablate_layer_idx in ablate_layer_range:
     ablate_dim_indices: list[int] = prepare_dim_indices(
         THINNING_FACTOR,
-        DIMS_PLOTTED_LIST,
+        DIMS_PLOTTED_DICT,
         layer_dim_indices[ablate_layer_idx],
         ablate_layer_idx,
         SEED,

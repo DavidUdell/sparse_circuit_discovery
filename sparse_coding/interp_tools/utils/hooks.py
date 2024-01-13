@@ -53,24 +53,27 @@ def prepare_autoencoder_and_indices(
 
 def prepare_dim_indices(
         thinning_factor: float | None,
-        dims_plotted_list: list[int] | None,
+        dims_plotted_dict: dict[int, int] | None,
         ablate_dim_indices: list[int],
         ablate_layer_idx: int,
         seed: int,
 ) -> list[int]:
     """
-    Apply THINNING_FACTOR and/or DIMS_PLOTTED_LIST to ablate_dim_indices.
+    Apply DIMS_PLOTTED_LIST and/or THINNING_FACTOR to ablate_dim_indices.
 
     `dims_plotted_list` will override `thinning_factor`, if set.
     """
 
-    if dims_plotted_list is not None:
-        for i in dims_plotted_list:
-            assert i in ablate_dim_indices, dedent(
-                f"Index {i} not in `ablate_dim_indices`."
-            )
+    if dims_plotted_dict is not None:
+        specified_dims: list[int] = []
+        for k, v in dims_plotted_dict.items():
+            if k == ablate_layer_idx:
+                assert v in ablate_dim_indices, dedent(
+                    f"Index {v} not in `ablate_dim_indices`."
+                )
+                specified_dims.append(v)
 
-        return dims_plotted_list
+        return specified_dims
 
     if thinning_factor is not None:
         np.random.seed(seed)

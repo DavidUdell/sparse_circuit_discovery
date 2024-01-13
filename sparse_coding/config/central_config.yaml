@@ -36,14 +36,14 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Directed Graph
-# None at BRANCHING_FACTOR and DIMS_PLOTTED_LIST will plot everything in the
+# None at BRANCHING_FACTOR and at DIMS_PLOTTED_DICT will plot everything in the
 # directed graph. COEFFICIENT 0.0 means ablate features. THINNING_FACTOR will
-# be overridden if DIMS_PLOTTED_LIST is set.
+# be overridden if DIMS_PLOTTED_DICT is set. DIMS_PLOTTED_DICT is a dict of
+# layer key ints going to individual dim value ints.
 COEFFICIENT: 0.0
 THINNING_FACTOR: 0.2
 BRANCHING_FACTOR: 2
-DIMS_PLOTTED_LIST:
-
+DIMS_PLOTTED_DICT:
 
 ## Stable Dev Constants
 # `wandb` logging

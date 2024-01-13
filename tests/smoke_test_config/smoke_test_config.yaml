@@ -29,7 +29,8 @@ COEFFICIENT: 0.0
 THINNING_FACTOR: 0.2
 BRANCHING_FACTOR: 5
 DIMS_PLOTTED_LIST:
-
+  1: 1
+  2: 1
 
 ## Stable Smoke Test Constants
 # Reproducibility
