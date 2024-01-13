@@ -17,6 +17,8 @@ from sparse_coding.utils.interface import (
 
 def graph_and_log(
         act_diffs: dict[tuple[int, int, int], t.Tensor],
+        layer_range: range,
+        layer_dim_indices: dict[int, list[int]],
         branching_factor: float,
         model_dir: str,
         graph_file: str,
@@ -41,20 +43,28 @@ def graph_and_log(
         # downstream indices k.
         working_dict = {}
 
-        for key, effect in act_diffs.items():
-            site = key[:2]
-            if site not in working_dict:
-                working_dict[site] = []
-            working_dict[site].append((key, effect))
+        for address, effect in act_diffs.items():
+            ablation_site = address[:2]
 
-        for site, items in working_dict.items():
+            # Avoids a defaultdict.
+            if ablation_site not in working_dict:
+                working_dict[ablation_site] = []
+
+            working_dict[ablation_site].append((address, effect))
+
+        for ablation_site, items in working_dict.items():
             sorted_items = sorted(
                 items,
                 key=lambda x: abs(x[-1].item()),
                 reverse=True,
             )
-            for k, v in sorted_items[:branching_factor]:
-                plotted_diffs[k] = v
+            for (i, j, k), v in sorted_items[:branching_factor]:
+                if i == layer_range[0]:
+                    plotted_diffs[i, j, k] = v
+                # Only plot effects that are downstream of immediately prior
+                # ablation sites.
+                elif j == layer_dim_indices[i-1]:
+                    plotted_diffs[i, j, k] = v
 
     else:
         plotted_diffs = act_diffs

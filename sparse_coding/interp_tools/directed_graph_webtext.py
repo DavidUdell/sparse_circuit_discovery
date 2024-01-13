@@ -309,6 +309,8 @@ assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 # Graph effects.
 graph_and_log(
     act_diffs,
+    layer_range,
+    layer_dim_indices,
     BRANCHING_FACTOR,
     MODEL_DIR,
     GRAPH_FILE,
