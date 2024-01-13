@@ -23,18 +23,16 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
-from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
+from sparse_coding.interp_tools.utils.graphs import graph_and_log
 from sparse_coding.interp_tools.utils.hooks import (
     hooks_manager,
     prepare_autoencoder_and_indices,
     prepare_dim_indices,
 )
 from sparse_coding.utils.interface import (
+    load_yaml_constants,
     parse_slice,
     slice_to_range,
-    load_yaml_constants,
-    save_paths,
-    sanitize_model_name,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
 
@@ -97,16 +95,18 @@ dataset: list[list[str]] = load_dataset(
     split="train",
 )["text"]
 dataset_indices: np.ndarray = np.random.choice(
-    len(dataset), size=len(dataset), replace=False
+    len(dataset),
+    size=len(dataset),
+    replace=False,
 )
 STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
 eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
-# Prepare all layer autoencoders and dim index lists up front.
-# layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
-# layer_dim_indices: dict[int, list[int]] = {}
+# Prepare all layer autoencoders and layer dim index lists up front.
+# layer_autoencoders: dict[int, tuple[t.Tensor]]
+# layer_dim_indices: dict[int, list[int]]
 layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
@@ -192,11 +192,13 @@ for ablate_layer_idx in ablate_layer_range:
         SEED,
     )
 
-    for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
+    for ablate_dim_idx in tqdm(
+        ablate_dim_indices, desc="Dim Ablations Progress"
+    ):
         # Ablation run at top activating sequence positions. We use the -1
         # index from the initial top position collection.
         per_seq_positions: list[int] = favorite_sequence_positions[
-            ablate_layer_idx - 1, None, ablate_dim
+            ablate_layer_idx - 1, None, ablate_dim_idx
         ]
         truncated_tok_seqs = []
         truncated_seqs_final_indices: list[int] = []
@@ -220,7 +222,7 @@ for ablate_layer_idx in ablate_layer_range:
                 break
 
         assert len(truncated_tok_seqs) > 0, dedent(
-            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim}."
+            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
         )
         assert len(truncated_seqs_final_indices) > 0, dedent(
             "No truncated sequence final indices were found."
@@ -230,7 +232,7 @@ for ablate_layer_idx in ablate_layer_range:
         # run one ablated and once not.
         with hooks_manager(
             ablate_layer_idx,
-            ablate_dim,
+            ablate_dim_idx,
             layer_range,
             layer_dim_indices,
             model,
@@ -249,7 +251,7 @@ for ablate_layer_idx in ablate_layer_range:
 
         with hooks_manager(
             ablate_layer_idx,
-            ablate_dim,
+            ablate_dim_idx,
             layer_range,
             layer_dim_indices,
             model,
@@ -268,8 +270,8 @@ for ablate_layer_idx in ablate_layer_range:
                     model(**top_input)
 
 # %%
-# Compute diffs. Recursive defaultdict indices are:
-# [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
+# Compute ablated effects minus base effects. Recursive defaultdict indices
+# are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
 act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
 for i in ablated_activations:
     for j in ablated_activations[i]:
@@ -297,79 +299,24 @@ for i in ablated_activations:
                     ablate_vec[:, x-1, :] - base_vec[:, x-1, :]
                 )
 
-# There should have been some effect.
+# Check that there was any effect.
 OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
     OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
-# All other effects should be t.Tensors, but wandb plays nicer with floats.
-diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
-for i, j, k in act_diffs:
-    key: str = f"{i}.{j}->{i+1}.{k}"
-    value: float = act_diffs[i, j, k].item()
-    diffs_table.add_data(key, value)
-wandb.log({"Effects": diffs_table})
-
-plotted_diffs = {}
-if BRANCHING_FACTOR is not None:
-    # Keep only the top effects per ablation site i, j across all downstream
-    # indices k.
-    working_dict = {}
-
-    for key, effect in act_diffs.items():
-        site = key[:2]
-        if site not in working_dict:
-            working_dict[site] = []
-        working_dict[site].append((key, effect))
-
-    for site, items in working_dict.items():
-        sorted_items = sorted(
-            items,
-            key=lambda x: abs(x[-1].item()),
-            reverse=True,
-        )
-        for k, v in sorted_items[:BRANCHING_FACTOR]:
-            plotted_diffs[k] = v
-
-else:
-    plotted_diffs = act_diffs
-
-save_path: str = save_paths(
-    __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",
-)
-save_pickle_path: str = save_paths(
-    __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_DOT_FILE}",
-)
-
-graph = graph_causal_effects(
-    plotted_diffs,
+# %%
+# Graph effects.
+graph_and_log(
+    act_diffs,
+    BRANCHING_FACTOR,
     MODEL_DIR,
-    TOP_K_INFO_FILE,
+    GRAPH_FILE,
     GRAPH_DOT_FILE,
+    TOP_K_INFO_FILE,
     OVERALL_EFFECTS,
     __file__,
 )
-
-# Save the graph .svg.
-graph.draw(
-    save_path,
-    format="svg",
-    prog="dot",
-)
-
-# Read the .svg into a `wandb` artifact.
-artifact = wandb.Artifact(
-    "feature_graph",
-    type="directed_graph"
-)
-artifact.add_file(save_path)
-wandb.log_artifact(artifact)
-
-# Save the AGraph object as a DOT file.
-graph.write(save_pickle_path)
 
 # %%
 # Wrap up logging.

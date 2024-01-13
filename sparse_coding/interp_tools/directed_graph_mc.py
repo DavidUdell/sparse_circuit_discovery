@@ -1,6 +1,6 @@
 # %%
 """
-Mess with autoencoder activations dims during `truthful_qa` and graph effects.
+Mess with autoencoder activation dims during `truthful_qa` and graph effects.
 
 `directed_graph_mc` in particular tries a model agains the multiple-choice task
 on `truthful_qa`, where the model is teed up to answer a m/c question with
@@ -9,13 +9,14 @@ which autoencoder activations dimensions are surgically scaled during
 inference, at the crucial last sequence position, where the model is answering.
 Results are plotted as a causal graph, using cached data from the scripts in
 `pipe.py`. You may either try ablating all feature dimensions or choose a
-subset by index. You'll need to set a HF access token if needed.
+subset by index.
+
+You may need to have logged a HF access token, if applicable.
 """
 
 
 import warnings
 from collections import defaultdict
-from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -25,27 +26,25 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
+from sparse_coding.interp_tools.utils.graphs import graph_and_log
 from sparse_coding.interp_tools.utils.hooks import (
     hooks_manager,
     prepare_autoencoder_and_indices,
     prepare_dim_indices,
 )
 from sparse_coding.utils.interface import (
+    load_yaml_constants,
     parse_slice,
     slice_to_range,
-    load_yaml_constants,
-    save_paths,
-    sanitize_model_name,
 )
 from sparse_coding.utils.tasks import (
     multiple_choice_task,
     recursive_defaultdict,
 )
-from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
 
 
 # %%
-# Import constants.
+# Load constants.
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
@@ -111,9 +110,9 @@ ablated_activations = defaultdict(recursive_defaultdict)
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
-layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
-layer_dim_indices: dict[int, list[int]] = {}
-layer_autoencoder, layer_dim_indices = prepare_autoencoder_and_indices(
+# layer_autoencoders: dict[int, tuple[t.Tensor]]
+# layer_dim_indices: dict[int, list[int]]
+layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
     ENCODER_FILE,
@@ -134,7 +133,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
     )
 
     for ablate_dim_idx in tqdm(
-        ablate_dim_indices, desc="Feature ablations progress"
+        ablate_dim_indices, desc="Dim Ablations Progress"
     ):
         np.random.seed(SEED)
         # Base run.
@@ -186,7 +185,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
 # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
-act_diffs = {}
+act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
 for i in ablate_range:
     for j in base_activations[i].keys():
         for k in base_activations[i][j].keys():
@@ -195,80 +194,24 @@ for i in ablate_range:
                 - base_activations[i][j][k].sum(axis=1).squeeze()
             )
 
-# Check that there was any overall effect.
+# Check that there was any effect.
 OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
     OVERALL_EFFECTS += abs(act_diffs[i, j, k]).sum().item()
-assert (
-    OVERALL_EFFECTS != 0.0
-), "Ablate hook effects sum to exactly zero."
-
-# All other effects should be t.Tensors, but wandb plays nicer with floats.
-diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
-for i, j, k in act_diffs:
-    key: str = f"{i}.{j}->{i+1}.{k}"
-    value: float = act_diffs[i, j, k].item()
-    diffs_table.add_data(key, value)
-wandb.log({"Effects": diffs_table})
-
-plotted_diffs = {}
-if BRANCHING_FACTOR is not None:
-    # Keep only the top effects per ablation site i, j across all
-    # downstream indices k.
-    working_dict = {}
-
-    for key, effect in act_diffs.items():
-        site = key[:2]
-        if site not in working_dict:
-            working_dict[site] = []
-        working_dict[site].append((key, effect))
-
-    for site, items in working_dict.items():
-        sorted_items = sorted(
-            items,
-            key=lambda x: abs(x[-1].item()),
-            reverse=True,
-        )
-        for k, v in sorted_items[:BRANCHING_FACTOR]:
-            plotted_diffs[k] = v
-
-else:
-    plotted_diffs = act_diffs
+assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
 # %%
 # Graph effects.
-save_path: str = save_paths(
-    __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
-)
-save_pickle_path: str = save_paths(
-    __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_DOT_FILE}",
-)
-
-graph = graph_causal_effects(
-    plotted_diffs,
+graph_and_log(
+    act_diffs,
+    BRANCHING_FACTOR,
     MODEL_DIR,
-    TOP_K_INFO_FILE,
+    GRAPH_FILE,
     GRAPH_DOT_FILE,
+    TOP_K_INFO_FILE,
     OVERALL_EFFECTS,
     __file__,
 )
-
-# Save the graph .svg.
-graph.draw(
-    save_path,
-    format="svg",
-    prog="dot",
-)
-
-# Read the .svg into a `wandb` artifact.
-artifact = wandb.Artifact("feature_graph", type="directed_graph")
-artifact.add_file(save_path)
-wandb.log_artifact(artifact)
-
-# Save the AGraph object as a DOT file.
-graph.write(save_pickle_path)
 
 # %%
 # Wrap up logging.

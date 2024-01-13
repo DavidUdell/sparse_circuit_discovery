@@ -4,12 +4,96 @@
 from textwrap import dedent
 
 import torch as t
+import wandb
 from pygraphviz import AGraph
 
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
     load_preexisting_graph,
+    sanitize_model_name,
+    save_paths,
 )
+
+
+def graph_and_log(
+        act_diffs: dict[tuple[int, int, int], t.Tensor],
+        branching_factor: float,
+        model_dir: str,
+        graph_file: str,
+        graph_dot_file: str,
+        top_k_info_file: str,
+        overall_effects: float,
+        base_file: str,
+):
+    """Graph and log the causal effects of ablations."""
+
+    # All other effect items are t.Tensors, but wandb plays nicer with floats.
+    diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
+    for i, j, k in act_diffs:
+        key: str = f"{i}.{j}->{i+1}.{k}"
+        value: float = act_diffs[i, j, k].item()
+        diffs_table.add_data(key, value)
+    wandb.log({"Effects": diffs_table})
+
+    plotted_diffs = {}
+    if branching_factor is not None:
+        # Keep only the top effects per ablation site i, j across all
+        # downstream indices k.
+        working_dict = {}
+
+        for key, effect in act_diffs.items():
+            site = key[:2]
+            if site not in working_dict:
+                working_dict[site] = []
+            working_dict[site].append((key, effect))
+
+        for site, items in working_dict.items():
+            sorted_items = sorted(
+                items,
+                key=lambda x: abs(x[-1].item()),
+                reverse=True,
+            )
+            for k, v in sorted_items[:branching_factor]:
+                plotted_diffs[k] = v
+
+    else:
+        plotted_diffs = act_diffs
+
+    save_plot_path: str = save_paths(
+        base_file,
+        f"{sanitize_model_name(model_dir)}/{graph_file}",
+    )
+    save_dot_path: str = save_paths(
+        base_file,
+        f"{sanitize_model_name(model_dir)}/{graph_dot_file}",
+    )
+
+    graph = graph_causal_effects(
+        plotted_diffs,
+        model_dir,
+        top_k_info_file,
+        graph_dot_file,
+        overall_effects,
+        base_file,
+    )
+
+    # Save the graph .svg.
+    graph.draw(
+        save_plot_path,
+        format="svg",
+        prog="dot",
+    )
+
+    # Read the .svg into a `wandb` artifact.
+    artifact = wandb.Artifact(
+        "feature_graph",
+        type="directed_graph"
+    )
+    artifact.add_file(save_plot_path)
+    wandb.log_artifact(artifact)
+
+    # Save the AGraph object as a DOT file.
+    graph.write(save_dot_path)
 
 
 def color_range_from_scalars(activations: dict) -> tuple[float, float]:
