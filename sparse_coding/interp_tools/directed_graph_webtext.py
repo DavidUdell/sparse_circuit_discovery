@@ -24,15 +24,17 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
 from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
-from sparse_coding.interp_tools.utils.hooks import hooks_manager
+from sparse_coding.interp_tools.utils.hooks import (
+    hooks_manager,
+    prepare_autoencoder_and_indices,
+    prepare_dim_indices,
+)
 from sparse_coding.utils.interface import (
     parse_slice,
     slice_to_range,
     load_yaml_constants,
     save_paths,
     sanitize_model_name,
-    load_layer_tensors,
-    load_layer_feature_indices,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
 
@@ -103,24 +105,17 @@ eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
 # Prepare all layer autoencoders and dim index lists up front.
-layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
-layer_dim_indices: dict[int, list[int]] = {}
-for layer_idx in layer_range:
-    layer_encoder, layer_bias = load_layer_tensors(
-        MODEL_DIR,
-        layer_idx,
-        ENCODER_FILE,
-        BIASES_FILE,
-        __file__,
-    )
-    layer_autoencoders[layer_idx] = (layer_encoder, layer_bias)
-    layer_dim_list = load_layer_feature_indices(
-        MODEL_DIR,
-        layer_idx,
-        TOP_K_INFO_FILE,
-        __file__,
-    )
-    layer_dim_indices[layer_idx] = layer_dim_list
+# layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
+# layer_dim_indices: dict[int, list[int]] = {}
+layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    ENCODER_FILE,
+    BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
 
 # %%
 # Collect base case data.
@@ -189,31 +184,13 @@ ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
 
 for ablate_layer_idx in ablate_layer_range:
-    ablate_dim_indices = layer_dim_indices[ablate_layer_idx]
-    # THINNING_FACTOR pruning of ablate_dim_indices.
-    if THINNING_FACTOR is not None:
-        np.random.seed(SEED)
-        ablate_dim_indices_thinned = np.random.choice(
-            ablate_dim_indices,
-            size=int(len(ablate_dim_indices) * THINNING_FACTOR),
-            replace=False,
-        ).tolist()
-
-    for x in ablate_dim_indices_thinned:
-        assert x in ablate_dim_indices, dedent(
-            f"Index {x} not in `ablate_dim_indices`."
-        )
-
-    # DIMS_PLOTTED_LIST will immediately override THINNING_FACTOR, if it was
-    # set.
-    if DIMS_PLOTTED_LIST is not None:
-        for i in DIMS_PLOTTED_LIST:
-            assert i in ablate_dim_indices, dedent(
-                f"Index {i} not in `ablate_dim_indices`."
-            )
-        ablate_dim_indices = DIMS_PLOTTED_LIST
-    else:
-        ablate_dim_indices = ablate_dim_indices_thinned
+    ablate_dim_indices: list[int] = prepare_dim_indices(
+        THINNING_FACTOR,
+        DIMS_PLOTTED_LIST,
+        layer_dim_indices[ablate_layer_idx],
+        ablate_layer_idx,
+        SEED,
+    )
 
     for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
         # Ablation run at top activating sequence positions. We use the -1

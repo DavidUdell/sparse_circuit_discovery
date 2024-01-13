@@ -3,8 +3,92 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
+from textwrap import dedent
 
+import numpy as np
 import torch as t
+
+from sparse_coding.utils.interface import (
+    load_layer_tensors,
+    load_layer_feature_indices,
+)
+
+
+def prepare_autoencoder_and_indices(
+        layer_range: range,
+        model_dir: str,
+        encoder_file: str,
+        biases_file: str,
+        top_k_info_file: str,
+        accelerator,
+        base_file,
+):
+    """Prepare all layer autoencoders and layer dim index lists up front."""
+
+    layer_autoencoders: dict[int, tuple[t.Tensor]] = {}
+    layer_dim_indices: dict[int, list[int]] = {}
+
+    for layer_idx in layer_range:
+        layer_encoder, layer_bias = load_layer_tensors(
+            model_dir,
+            layer_idx,
+            encoder_file,
+            biases_file,
+            base_file,
+        )
+        layer_encoder, layer_bias = accelerator.prepare(
+            layer_encoder, layer_bias
+        )
+        layer_autoencoders[layer_idx] = (layer_encoder, layer_bias)
+        layer_dim_list = load_layer_feature_indices(
+            model_dir,
+            layer_idx,
+            top_k_info_file,
+            base_file,
+        )
+        layer_dim_indices[layer_idx] = layer_dim_list
+
+    return layer_autoencoders, layer_dim_indices
+
+
+def prepare_dim_indices(
+        thinning_factor: float | None,
+        dims_plotted_list: list[int] | None,
+        ablate_dim_indices: list[int],
+        ablate_layer_idx: int,
+        seed: int,
+) -> list[int]:
+    """
+    Apply THINNING_FACTOR and/or DIMS_PLOTTED_LIST to ablate_dim_indices.
+
+    `dims_plotted_list` will override `thinning_factor`, if set.
+    """
+
+    if dims_plotted_list is not None:
+        for i in dims_plotted_list:
+            assert i in ablate_dim_indices, dedent(
+                f"Index {i} not in `ablate_dim_indices`."
+            )
+
+        return dims_plotted_list
+
+    if thinning_factor is not None:
+        np.random.seed(seed)
+        ablate_dim_indices_thinned: list[int] = np.random.choice(
+            ablate_dim_indices,
+            size=int(len(ablate_dim_indices) * thinning_factor),
+            replace=False,
+        ).tolist()
+
+        for i in ablate_dim_indices_thinned:
+            assert i in ablate_dim_indices, dedent(
+                f"""Index {i} not in layer {ablate_layer_idx} feature
+                    indices."""
+            )
+
+        return ablate_dim_indices_thinned
+
+    return ablate_dim_indices
 
 
 def rasp_ablate_hook_fac(neuron_index: int):
