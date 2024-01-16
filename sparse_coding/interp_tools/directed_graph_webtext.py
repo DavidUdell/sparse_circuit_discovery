@@ -54,7 +54,7 @@ GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 COEFFICIENT = config.get("COEFFICIENT", 0.0)
-THINNING_FACTOR = config.get("THINNING_FACTOR", None)
+INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PLOTTED_DICT = config.get("DIMS_PLOTTED_DICT", None)
 SEED = config.get("SEED", 0)
@@ -182,16 +182,18 @@ for i in base_activations_all_positions:
 # Run ablations at top sequence positions.
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
+ablate_dim_indices: list[int] = []
 
 for ablate_layer_idx in ablate_layer_range:
-    ablate_dim_indices: list[int] = prepare_dim_indices(
-        THINNING_FACTOR,
-        DIMS_PLOTTED_DICT,
-        layer_dim_indices[ablate_layer_idx],
-        ablate_layer_idx,
-        layer_range,
-        SEED,
-    )
+    if ablate_layer_idx == ablate_layer_range[0] or BRANCHING_FACTOR is None:
+        ablate_dim_indices: list[int] = prepare_dim_indices(
+            INIT_THINNING_FACTOR,
+            DIMS_PLOTTED_DICT,
+            layer_dim_indices[ablate_layer_idx],
+            ablate_layer_idx,
+            layer_range,
+            SEED,
+        )
 
     for ablate_dim_idx in tqdm(
         ablate_dim_indices, desc="Dim Ablations Progress"
@@ -270,12 +272,35 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
-    for abl_neuron in ablated_activations[ablate_layer_idx]:
-        brick = t.stack(
-            tuple(ablated_activations[ablate_layer_idx][abl_neuron].values()),
-        )
-        brick_mean = t.mean(t.abs(brick), dim=2)
-        print(brick_mean.shape)
+    if BRANCHING_FACTOR is not None:
+        # Filter down to just the most affected downstream neurons.
+        ablate_dim_indices: list[int] = []
+        for ablate_neuron_idx in ablated_activations[ablate_layer_idx]:
+            brick = t.stack(
+                tuple(
+                    ablated_activations[ablate_layer_idx][
+                        ablate_neuron_idx
+                    ].values()
+                ),
+            )
+            brick_reduced = t.select(t.abs(brick), dim=2, index=-1).squeeze()
+            top_indices: tuple = t.topk(
+                brick_reduced,
+                k=BRANCHING_FACTOR,
+            )
+            for cache_neuron in ablated_activations[ablate_layer_idx][
+                ablate_neuron_idx
+            ]:
+                if cache_neuron in top_indices[1].tolist():
+                    ablate_dim_indices.append(cache_neuron)
+                    print(
+                        dedent(
+                            f"""
+                            Now ignoring cached effects at layer
+                            {ablate_layer_idx + 1} neuron {cache_neuron}.
+                            """
+                        )
+                    )
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices

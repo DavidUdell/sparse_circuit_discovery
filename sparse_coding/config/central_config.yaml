@@ -38,13 +38,13 @@ ACCUMULATE_GRAD_BATCHES: 4
 # Directed Graph
 # COEFFICIENT 0.0 means ablate features. BRANCHING_FACTOR: None and
 # DIMS_PLOTTED_DICT: None will plot everything in the directed graph.
-# THINNING_FACTOR only applies to the first layer in your slice.
+# INIT_THINNING_FACTOR only applies to the first layer in your slice.
 # DIMS_PLOTTED_DICT is a dict of layer key ints going to individual dim value
 # ints. Manually setting dims with DIMS_PLOTTED_DICT will override
-# THINNING_FACTOR.
+# INIT_THINNING_FACTOR.
 COEFFICIENT: 0.0
 BRANCHING_FACTOR: 2
-THINNING_FACTOR: 0.2
+INIT_THINNING_FACTOR: 0.2
 DIMS_PLOTTED_DICT:
 
 ## Stable Dev Constants
