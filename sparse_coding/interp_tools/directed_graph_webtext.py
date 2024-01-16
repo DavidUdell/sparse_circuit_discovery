@@ -166,9 +166,9 @@ for i in base_activations_all_positions:
             # tuple (ablate_layer_idx, None, base_cache_dim_index).
             activations_tensor = base_activations_all_positions[i][j][k]
 
-            fave_seq_pos_flat: int = t.argmax(
-                activations_tensor, dim=1
-            ).squeeze().item()
+            fave_seq_pos_flat: int = (
+                t.argmax(activations_tensor, dim=1).squeeze().item()
+            )
             max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
             min_val = max_val / 2.0
             mask = (activations_tensor >= min_val) & (
@@ -214,9 +214,9 @@ for ablate_layer_idx in ablate_layer_range:
                     max_length=MAX_SEQ_INTERPED_LEN,
                 )
                 if tok_seq["input_ids"].size(-1) < per_seq_position:
-                    per_seq_position = (
-                        per_seq_position - tok_seq["input_ids"].size(-1)
-                    )
+                    per_seq_position = per_seq_position - tok_seq[
+                        "input_ids"
+                    ].size(-1)
                     continue
                 truncated_tok_seqs.append(tok_seq)
                 truncated_seqs_final_indices.append(per_seq_position)
@@ -270,24 +270,12 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
-    # Drop indices from the next layer that weren't affected by these last
-    # ablations.
-    for j in ablated_activations[ablate_layer_idx]:
-        for k in ablated_activations[ablate_layer_idx][j]:
-            if BRANCHING_FACTOR is not None:
-                if not any(
-                    t.equal(
-                        ablated_activations[ablate_layer_idx][j][k],
-                        element,
-                    ) for element in sorted(
-                        ablated_activations[ablate_layer_idx][j].values(),
-                        key=lambda x: abs(x.item()),
-                        reverse=True,
-                    )[:BRANCHING_FACTOR]
-                ):
-                    print(f"Deleted {ablate_layer_idx}.{j}.{k}.")
-                    del base_activations_top_positions[ablate_layer_idx][j][k]
-                    del ablated_activations[ablate_layer_idx][j][k]
+    for abl_neuron in ablated_activations[ablate_layer_idx]:
+        brick = t.stack(
+            tuple(ablated_activations[ablate_layer_idx][abl_neuron].values()),
+        )
+        brick_mean = t.mean(t.abs(brick), dim=2)
+        print(brick_mean.shape)
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
@@ -300,9 +288,7 @@ for i in ablated_activations:
             base_vec = base_activations_top_positions[i][j][k]
 
             assert (
-                ablate_vec.shape == base_vec.shape == (
-                    1, base_vec.size(1), 1
-                )
+                ablate_vec.shape == base_vec.shape == (1, base_vec.size(1), 1)
             ), dedent(
                 f"""
                 Shape mismatch between ablated and base vectors for ablate
@@ -316,7 +302,7 @@ for i in ablated_activations:
             act_diffs[i, j, k] = t.tensor([[0.0]])
             for x in truncated_seqs_final_indices:
                 act_diffs[i, j, k] += (
-                    ablate_vec[:, x-1, :] - base_vec[:, x-1, :]
+                    ablate_vec[:, x - 1, :] - base_vec[:, x - 1, :]
                 )
 
 # Check that there was any effect.
