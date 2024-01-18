@@ -19,7 +19,7 @@ def graph_and_log(
         act_diffs: dict[tuple[int, int, int], t.Tensor],
         layer_range: range,
         layer_dim_indices: dict[int, list[int]],
-        branching_factor: float,
+        branching_factor: int,
         model_dir: str,
         graph_file: str,
         graph_dot_file: str,
@@ -39,32 +39,14 @@ def graph_and_log(
 
     plotted_diffs = {}
     if branching_factor is not None:
-        # Keep only the top effects per ablation site i, j across all
-        # downstream indices k.
-        working_dict = {}
-
-        for address, effect in act_diffs.items():
-            ablation_site = address[:2]
-
-            # Avoids a defaultdict.
-            if ablation_site not in working_dict:
-                working_dict[ablation_site] = []
-
-            working_dict[ablation_site].append((address, effect))
-
-        for ablation_site, items in working_dict.items():
-            sorted_items = sorted(
-                items,
-                key=lambda x: abs(x[-1].item()),
-                reverse=True,
-            )
-            for (i, j, k), v in sorted_items[:branching_factor]:
-                if i == layer_range[0]:
-                    plotted_diffs[i, j, k] = v
-                # Only plot effects that are downstream of immediately prior
-                # ablation sites.
-                elif j in layer_dim_indices[i-1]:
-                    plotted_diffs[i, j, k] = v
+        for layer_idx in layer_range[:-1]:
+            for ablate_dim in layer_dim_indices[layer_idx]:
+                # This next line does the work of thinning the final graph to
+                # just trace paths through the layer range.
+                for cache_dim in layer_dim_indices[layer_idx + 1]:
+                    plotted_diffs[layer_idx, ablate_dim, cache_dim] = (
+                        act_diffs[layer_idx, ablate_dim, cache_dim]
+                    )
 
     else:
         plotted_diffs = act_diffs
@@ -239,16 +221,6 @@ def graph_causal_effects(
     graph.add_node(
         f"Fraction of effects not plotted: {excluded_fraction}%."
     )
-    graph.add_edge(
-        dedent(
-            f"""
-            {ablation_layer_idx}.{ablated_dim}:
-            {label_appendable(ablation_layer_idx, ablated_dim)}
-            """
-        ),
-        f"Fraction of all effects not plotted: {excluded_fraction*100}%.",
-    )
-
     # Assert no repeat edges.
     edges = graph.edges()
     assert len(edges) == len(set(edges)), "Repeat edges in graph."
@@ -266,6 +238,11 @@ def graph_causal_effects(
             graph.\n
             """
         )
+    )
+    graph.add_node(
+        f"Fraction of effects not plotted here: ~{excluded_fraction*100}%.",
+        fontname="times:italic",
+        shape="box",
     )
 
     return graph

@@ -182,11 +182,14 @@ for i in base_activations_all_positions:
 # Run ablations at top sequence positions.
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
-ablate_dim_indices: list[int] = []
 
 for ablate_layer_idx in ablate_layer_range:
-    if ablate_layer_idx == ablate_layer_range[0]:
-        ablate_dim_indices: list[int] = prepare_dim_indices(
+    # Thin the first layer indices or fix any indices, when requested.
+    if (
+        ablate_layer_idx == ablate_layer_range[0]
+        or DIMS_PLOTTED_DICT is not None
+    ):
+        layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
             DIMS_PLOTTED_DICT,
             layer_dim_indices[ablate_layer_idx],
@@ -196,7 +199,7 @@ for ablate_layer_idx in ablate_layer_range:
         )
 
     for ablate_dim_idx in tqdm(
-        ablate_dim_indices, desc="Dim Ablations Progress"
+        layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
     ):
         # Ablation run at top activating sequence positions. We use the -1
         # index from the initial top position collection.
@@ -272,10 +275,14 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
+    if BRANCHING_FACTOR is None:
+        break
+    assert isinstance(BRANCHING_FACTOR, int)
+
     working_dict = {}
     top_layer_dims = []
-
     a = ablate_layer_idx
+
     for j in ablated_activations[a]:
         for k in ablated_activations[a][j]:
             working_dict[a, j, k] = (
@@ -283,32 +290,29 @@ for ablate_layer_idx in ablate_layer_range:
                 - base_activations_top_positions[a][j][k]
             )
 
-            if BRANCHING_FACTOR is None:
-                top_dims = layer_dim_indices[a+1]
-            elif isinstance(BRANCHING_FACTOR, int):
-                top_dims = t.topk(
-                    abs(working_dict[a, j, k]).squeeze(),
-                    BRANCHING_FACTOR,
-                )
+            top_dims = t.topk(
+                abs(working_dict[a, j, k]).squeeze(),
+                BRANCHING_FACTOR,
+            )
             top_layer_dims.extend(top_dims[1].tolist())
 
     top_layer_dims = list(set(top_layer_dims))
     print(
         dedent(
             f"""
-            Number of top effected dims for the next layer, identified
-            independently of cached data: {len(top_layer_dims)}.
+            Number of dims independently found most affected in next layer:
+            {len(top_layer_dims)}.
             """
         )
     )
-    ablate_dim_indices = [
+    layer_dim_indices[a+1] = [
         x for x in top_layer_dims if x in layer_dim_indices[a+1]
     ]
     print(
         dedent(
             f"""
-            Intersection of top effected dims and cached, labeled dims has
-            length: {len(ablate_dim_indices)}.
+            Length of intersection of previously labeled and currently most
+            affected dims lists: {len(layer_dim_indices[a+1])}.
             """
         )
     )
