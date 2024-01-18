@@ -185,7 +185,7 @@ base_activations_top_positions = defaultdict(recursive_defaultdict)
 ablate_dim_indices: list[int] = []
 
 for ablate_layer_idx in ablate_layer_range:
-    if ablate_layer_idx == ablate_layer_range[0] or BRANCHING_FACTOR is None:
+    if ablate_layer_idx == ablate_layer_range[0]:
         ablate_dim_indices: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
             DIMS_PLOTTED_DICT,
@@ -272,35 +272,31 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
-    if BRANCHING_FACTOR is not None:
-        # Filter down to just the most affected downstream neurons.
-        ablate_dim_indices: list[int] = []
-        for ablate_neuron_idx in ablated_activations[ablate_layer_idx]:
-            brick = t.stack(
-                tuple(
-                    ablated_activations[ablate_layer_idx][
-                        ablate_neuron_idx
-                    ].values()
-                ),
+    working_dict = {}
+    top_layer_dims = []
+
+    a = ablate_layer_idx
+    for j in ablated_activations[a]:
+        for k in ablated_activations[a][j]:
+            working_dict[a, j, k] = (
+                ablated_activations[a][j][k]
+                - base_activations_top_positions[a][j][k]
             )
-            brick_reduced = t.select(t.abs(brick), dim=2, index=-1).squeeze()
-            top_indices: tuple = t.topk(
-                brick_reduced,
-                k=BRANCHING_FACTOR,
-            )
-            for cache_neuron in ablated_activations[ablate_layer_idx][
-                ablate_neuron_idx
-            ]:
-                if cache_neuron in top_indices[1].tolist():
-                    ablate_dim_indices.append(cache_neuron)
-                    print(
-                        dedent(
-                            f"""
-                            Now ignoring cached effects at layer
-                            {ablate_layer_idx + 1} neuron {cache_neuron}.
-                            """
-                        )
-                    )
+
+            if BRANCHING_FACTOR is None:
+                top_dims = layer_dim_indices[a+1]
+            elif isinstance(BRANCHING_FACTOR, int):
+                top_dims = t.topk(
+                    abs(working_dict[a, j, k]).squeeze(),
+                    BRANCHING_FACTOR,
+                )
+            top_layer_dims.extend(top_dims[1].tolist())
+    print(len(top_layer_dims))
+    top_layer_dims = list(set(top_layer_dims))
+
+    ablate_dim_indices = [
+        x for x in top_layer_dims if x in layer_dim_indices[a+1]
+    ]
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
