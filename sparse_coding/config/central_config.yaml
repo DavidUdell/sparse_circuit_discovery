@@ -46,6 +46,7 @@ COEFFICIENT: 0.0
 BRANCHING_FACTOR: 2
 INIT_THINNING_FACTOR: 0.2
 DIMS_PLOTTED_DICT:
+  1: 323
 
 ## Stable Dev Constants
 # `wandb` logging
