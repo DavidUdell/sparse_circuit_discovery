@@ -291,12 +291,27 @@ for ablate_layer_idx in ablate_layer_range:
                     BRANCHING_FACTOR,
                 )
             top_layer_dims.extend(top_dims[1].tolist())
-    print(len(top_layer_dims))
-    top_layer_dims = list(set(top_layer_dims))
 
+    top_layer_dims = list(set(top_layer_dims))
+    print(
+        dedent(
+            f"""
+            Number of top effected dims for the next layer, identified
+            independently of cached data: {len(top_layer_dims)}.
+            """
+        )
+    )
     ablate_dim_indices = [
         x for x in top_layer_dims if x in layer_dim_indices[a+1]
     ]
+    print(
+        dedent(
+            f"""
+            Intersection of top effected dims and cached, labeled dims has
+            length: {len(ablate_dim_indices)}.
+            """
+        )
+    )
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
