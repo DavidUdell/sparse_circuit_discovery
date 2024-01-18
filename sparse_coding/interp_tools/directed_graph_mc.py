@@ -17,6 +17,7 @@ You may need to have logged a HF access token, if applicable.
 
 import warnings
 from collections import defaultdict
+from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -183,15 +184,47 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
                 return_outputs=False,
             )
 
-    # Drop indices from the next layer that weren't affected by these last
-    # ablations.
-    for j in base_activations[ablate_layer_idx]:
-        for k in base_activations[ablate_layer_idx][j]:
-            if not isinstance(
-                base_activations[ablate_layer_idx][j][k], t.Tensor
-            ):
-                del base_activations[ablate_layer_idx][j][k]
-                del ablated_activations[ablate_layer_idx][j][k]
+    # Keep just the most affected indices for the next layer's ablations.
+    if BRANCHING_FACTOR is None:
+        break
+    assert isinstance(BRANCHING_FACTOR, int)
+
+    working_dict = {}
+    top_layer_dims = []
+    a = ablate_layer_idx
+
+    for j in ablated_activations[a]:
+        for k in ablated_activations[a][j]:
+            working_dict[a, j, k] = (
+                ablated_activations[a][j][k] - base_activations[a][j][k]
+            )
+
+            top_dims = t.topk(
+                abs(working_dict[a, j, k]).squeeze(),
+                BRANCHING_FACTOR,
+            )
+            top_layer_dims.extend(top_dims[1].tolist())
+
+    top_layer_dims = list(set(top_layer_dims))
+    print(
+        dedent(
+            f"""
+            Number of dims independently found most affected in next layer:
+            {len(top_layer_dims)}.
+            """
+        )
+    )
+    layer_dim_indices[a+1] = [
+        x for x in top_layer_dims if x in layer_dim_indices[a+1]
+    ]
+    print(
+        dedent(
+            f"""
+            Length of intersection of previously labeled and currently most
+            affected dims lists: {len(layer_dim_indices[a+1])}.
+            """
+        )
+    )
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices

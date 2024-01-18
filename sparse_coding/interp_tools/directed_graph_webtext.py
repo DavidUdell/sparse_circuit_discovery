@@ -275,6 +275,7 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
+    # Keep just the most affected indices for the next layer's ablations.
     if BRANCHING_FACTOR is None:
         break
     assert isinstance(BRANCHING_FACTOR, int)

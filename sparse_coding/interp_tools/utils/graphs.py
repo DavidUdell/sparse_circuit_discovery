@@ -42,7 +42,8 @@ def graph_and_log(
         for layer_idx in layer_range[:-1]:
             for ablate_dim in layer_dim_indices[layer_idx]:
                 # This next line does the work of thinning the final graph to
-                # just trace paths through the layer range.
+                # just trace paths through the layer range, leveraging the
+                # layer_dim_indices dict.
                 for cache_dim in layer_dim_indices[layer_idx + 1]:
                     plotted_diffs[layer_idx, ablate_dim, cache_dim] = (
                         act_diffs[layer_idx, ablate_dim, cache_dim]
