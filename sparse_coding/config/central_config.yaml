@@ -36,16 +36,13 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Directed Graph
-# COEFFICIENT 0.0 means ablate features. BRANCHING_FACTOR: None and
-# DIMS_PLOTTED_DICT: None will plot everything in the directed graph.
-# INIT_THINNING_FACTOR only applies to the first layer in your slice.
-# DIMS_PLOTTED_DICT is a dict of layer key ints going to individual dim value
-# ints. Manually setting dims with DIMS_PLOTTED_DICT will override
-# INIT_THINNING_FACTOR.
+# A coefficient of 0.0 means "ablate features." Disable branching and pinning
+# to plot every ablation effect. Dims are pinned by setting a layer and dim
+# index as keys and values.
 COEFFICIENT: 0.0
 BRANCHING_FACTOR: 2
 INIT_THINNING_FACTOR: 0.2
-DIMS_PLOTTED_DICT:
+DIMS_PINNED:
   1: 323
 
 ## Stable Dev Constants

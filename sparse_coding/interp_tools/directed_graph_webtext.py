@@ -56,7 +56,7 @@ MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
-DIMS_PLOTTED_DICT = config.get("DIMS_PLOTTED_DICT", None)
+DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
 SEED = config.get("SEED", 0)
 
 # %%
@@ -187,11 +187,11 @@ for ablate_layer_idx in ablate_layer_range:
     # Thin the first layer indices or fix any indices, when requested.
     if (
         ablate_layer_idx == ablate_layer_range[0]
-        or DIMS_PLOTTED_DICT.get(ablate_layer_idx) is not None
+        or DIMS_PINNED.get(ablate_layer_idx) is not None
     ):
         layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
-            DIMS_PLOTTED_DICT,
+            DIMS_PINNED,
             layer_dim_indices[ablate_layer_idx],
             ablate_layer_idx,
             layer_range,

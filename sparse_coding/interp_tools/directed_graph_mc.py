@@ -63,7 +63,7 @@ NUM_SHOT = config.get("NUM_SHOT", 6)
 COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
-DIMS_PLOTTED_DICT = config.get("DIMS_PLOTTED_DICT", None)
+DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
 SEED = config.get("SEED")
 
 # %%
@@ -127,7 +127,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
     # Ablation layer feature-dim indices.
     ablate_dim_indices: list[int] = prepare_dim_indices(
         INIT_THINNING_FACTOR,
-        DIMS_PLOTTED_DICT,
+        DIMS_PINNED,
         layer_dim_indices[ablate_layer_idx],
         ablate_layer_idx,
         layer_range,
