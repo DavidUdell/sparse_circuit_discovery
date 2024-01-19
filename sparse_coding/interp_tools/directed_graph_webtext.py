@@ -186,8 +186,9 @@ base_activations_top_positions = defaultdict(recursive_defaultdict)
 for ablate_layer_idx in ablate_layer_range:
     # Thin the first layer indices or fix any indices, when requested.
     if (
-        ablate_layer_idx == ablate_layer_range[0]
-        or DIMS_PINNED.get(ablate_layer_idx) is not None
+        ablate_layer_idx == ablate_layer_range[0] or
+        (DIMS_PINNED is not None 
+         and DIMS_PINNED.get(ablate_layer_idx) is not None)
     ):
         layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,

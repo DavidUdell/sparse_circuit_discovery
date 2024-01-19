@@ -93,7 +93,7 @@ model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
-ablate_range: range = layer_range[:-1]
+ablate_layer_range: range = layer_range[:-1]
 
 # %%
 # Run on the validation dataset with and without ablations.
@@ -123,11 +123,12 @@ layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
     __file__,
 )
 
-for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
+for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
     # Thin the first layer indices or fix any indices, when requested.
     if (
-        ablate_layer_idx == ablate_range[0]
-        or DIMS_PINNED.get(ablate_layer_idx) is not None
+        ablate_layer_idx == ablate_layer_range[0] or
+        (DIMS_PINNED is not None 
+         and DIMS_PINNED.get(ablate_layer_idx) is not None)
     ):
         layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
@@ -234,7 +235,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
 # Compute ablated effects minus base effects. Recursive defaultdict indices
 # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
 act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
-for i in ablate_range:
+for i in ablate_layer_range:
     for j in base_activations[i].keys():
         for k in base_activations[i][j].keys():
             act_diffs[i, j, k] = (
