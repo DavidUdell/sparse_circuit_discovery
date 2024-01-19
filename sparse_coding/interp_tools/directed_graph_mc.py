@@ -124,18 +124,22 @@ layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
 )
 
 for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_range):
-    # Ablation layer feature-dim indices.
-    ablate_dim_indices: list[int] = prepare_dim_indices(
-        INIT_THINNING_FACTOR,
-        DIMS_PINNED,
-        layer_dim_indices[ablate_layer_idx],
-        ablate_layer_idx,
-        layer_range,
-        SEED,
-    )
+    # Thin the first layer indices or fix any indices, when requested.
+    if (
+        ablate_layer_idx == ablate_range[0]
+        or DIMS_PINNED.get(ablate_layer_idx) is not None
+    ):
+        layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
+            INIT_THINNING_FACTOR,
+            DIMS_PINNED,
+            layer_dim_indices[ablate_layer_idx],
+            ablate_layer_idx,
+            layer_range,
+            SEED,
+        )
 
     for ablate_dim_idx in tqdm(
-        ablate_dim_indices, desc="Dim Ablations Progress"
+        layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
     ):
         np.random.seed(SEED)
         # Base run.
