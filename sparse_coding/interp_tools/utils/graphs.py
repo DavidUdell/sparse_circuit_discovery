@@ -205,7 +205,11 @@ def graph_causal_effects(
         (overall_effects - plotted_effects) / overall_effects, 2
     )
     overall_effects = round(overall_effects, 2)
-    graph.add_node(f"Fraction of effects not plotted: {excluded_fraction}%.")
+    graph.add_node(
+        f"Fraction of effects plotted: ~{(1.0-excluded_fraction)*100}%.",
+        shape="box",
+    )
+
     # Assert no repeat edges.
     edges = graph.edges()
     assert len(edges) == len(set(edges)), "Repeat edges in graph."
@@ -223,11 +227,6 @@ def graph_causal_effects(
             {zero_effects} zero effect(s) ignored.\n
             """
         )
-    )
-    graph.add_node(
-        f"Fraction of effects not plotted here: ~{excluded_fraction*100}%.",
-        fontname="times:italic",
-        shape="box",
     )
 
     return graph
