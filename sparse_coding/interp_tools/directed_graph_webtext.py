@@ -309,11 +309,13 @@ for ablate_layer_idx in ablate_layer_range:
         top_dims = [
             idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
         ][:BRANCHING_FACTOR]
+
         assert len(top_dims) <= BRANCHING_FACTOR
+
         keepers[a, j] = top_dims
         top_layer_dims.extend(top_dims)
-    top_layer_dims = list(set(top_layer_dims))
-    layer_dim_indices[a + 1] = top_layer_dims
+
+    layer_dim_indices[a + 1] = list(set(top_layer_dims))
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
@@ -337,6 +339,7 @@ for i in ablated_activations:
 
             # We just want the last position of each sequence.
             act_diffs[i, j, k] = ablate_vec[:, -1, :] - base_vec[:, -1, :]
+
             assert act_diffs[i, j, k].shape == (1, 1)
 
 # Check that there was any effect.

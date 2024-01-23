@@ -17,7 +17,6 @@ You may need to have logged a HF access token, if applicable.
 
 import warnings
 from collections import defaultdict
-from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -108,6 +107,7 @@ validation_indices: list = dataset_indices[starting_index:].tolist()
 
 base_activations = defaultdict(recursive_defaultdict)
 ablated_activations = defaultdict(recursive_defaultdict)
+keepers: dict[tuple[int, int], int] = {}
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
@@ -125,10 +125,9 @@ layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
 
 for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
     # Thin the first layer indices or fix any indices, when requested.
-    if (
-        ablate_layer_idx == ablate_layer_range[0] or
-        (DIMS_PINNED is not None 
-         and DIMS_PINNED.get(ablate_layer_idx) is not None)
+    if ablate_layer_idx == ablate_layer_range[0] or (
+        DIMS_PINNED is not None
+        and DIMS_PINNED.get(ablate_layer_idx) is not None
     ):
         layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
@@ -189,72 +188,69 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
                 return_outputs=False,
             )
 
-    # Keep just the most affected indices for the next layer's ablations.
     if BRANCHING_FACTOR is None:
         break
+
+    # Keep just the most affected indices for the next layer's ablations.
     assert isinstance(BRANCHING_FACTOR, int)
 
-    working_dict = {}
+    working_tensor = t.Tensor([[0.0]])
     top_layer_dims = []
     a = ablate_layer_idx
 
     for j in ablated_activations[a]:
         for k in ablated_activations[a][j]:
-            working_dict[a, j, k] = (
-                ablated_activations[a][j][k] - base_activations[a][j][k]
+            working_tensor = t.abs(
+                t.cat(
+                    [
+                        working_tensor,
+                        ablated_activations[a][j][k][:, -1, :]
+                        - base_activations[a][j][k][:, -1, :],
+                    ]
+                )
             )
 
-            top_dims = t.topk(
-                abs(working_dict[a, j, k]).squeeze(),
-                BRANCHING_FACTOR,
-            )
-            top_layer_dims.extend(top_dims[1].tolist())
+        _, ordered_dims = t.sort(
+            working_tensor.squeeze(),
+            descending=True,
+        )
+        ordered_dims = ordered_dims.tolist()
+        top_dims = [
+            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
+        ][:BRANCHING_FACTOR]
 
-    top_layer_dims = list(set(top_layer_dims))
-    print(
-        dedent(
-            f"""
-            Number of dims independently found most affected in next layer:
-            {len(top_layer_dims)}.
-            """
-        )
-    )
-    layer_dim_indices[a+1] = [
-        x for x in top_layer_dims if x in layer_dim_indices[a+1]
-    ]
-    print(
-        dedent(
-            f"""
-            Length of intersection of previously labeled and currently most
-            affected dims lists: {len(layer_dim_indices[a+1])}.
-            """
-        )
-    )
+        assert len(top_dims) <= BRANCHING_FACTOR
+
+        keepers[a, j] = top_dims
+        top_layer_dims.extend(top_dims)
+
+    layer_dim_indices[a + 1] = list(set(top_layer_dims))
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
 # are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
 act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
 for i in ablate_layer_range:
-    for j in base_activations[i].keys():
-        for k in base_activations[i][j].keys():
+    for j in base_activations[i]:
+        for k in base_activations[i][j]:
             act_diffs[i, j, k] = (
-                ablated_activations[i][j][k].sum(axis=1).squeeze()
-                - base_activations[i][j][k].sum(axis=1).squeeze()
+                ablated_activations[i][j][k][:, -1, :]
+                - base_activations[i][j][k][:, -1, :]
             )
+
+            assert act_diffs[i, j, k].shape == (1, 1)
 
 # Check that there was any effect.
 OVERALL_EFFECTS = 0.0
 for i, j, k in act_diffs:
-    OVERALL_EFFECTS += abs(act_diffs[i, j, k]).sum().item()
+    OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
 assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 
 # %%
 # Graph effects.
 graph_and_log(
     act_diffs,
-    layer_range,
-    layer_dim_indices,
+    keepers,
     BRANCHING_FACTOR,
     MODEL_DIR,
     GRAPH_FILE,
