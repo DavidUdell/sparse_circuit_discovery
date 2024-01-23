@@ -185,10 +185,9 @@ base_activations_top_positions = defaultdict(recursive_defaultdict)
 
 for ablate_layer_idx in ablate_layer_range:
     # Thin the first layer indices or fix any indices, when requested.
-    if (
-        ablate_layer_idx == ablate_layer_range[0] or
-        (DIMS_PINNED is not None 
-         and DIMS_PINNED.get(ablate_layer_idx) is not None)
+    if ablate_layer_idx == ablate_layer_range[0] or (
+        DIMS_PINNED is not None
+        and DIMS_PINNED.get(ablate_layer_idx) is not None
     ):
         layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
@@ -202,16 +201,14 @@ for ablate_layer_idx in ablate_layer_range:
     for ablate_dim_idx in tqdm(
         layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
     ):
-        # Ablation run at top activating sequence positions. We use the -1
-        # index from the initial top position collection.
-        per_seq_positions: list[int] = favorite_sequence_positions[
-            ablate_layer_idx - 1, None, ablate_dim_idx
-        ]
+        # Truncated means truncated to MAX_SEQ_INTERPED_LEN. This block does
+        # the work of further truncating to the top activating position length.
         truncated_tok_seqs = []
-        truncated_seqs_final_indices: list[int] = []
-        for per_seq_position in per_seq_positions:
-            # per_seq_position is an int idx for a flattened eval_set.
-            for sequence_idx, seq in enumerate(eval_set):
+
+        for fav_seq_pos in favorite_sequence_positions[
+            ablate_layer_idx - 1, None, ablate_dim_idx
+        ]:
+            for seq in eval_set:
                 # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
                 tok_seq = tokenizer(
                     seq,
@@ -219,20 +216,23 @@ for ablate_layer_idx in ablate_layer_range:
                     truncation=True,
                     max_length=MAX_SEQ_INTERPED_LEN,
                 )
-                if tok_seq["input_ids"].size(-1) < per_seq_position:
-                    per_seq_position = per_seq_position - tok_seq[
-                        "input_ids"
-                    ].size(-1)
+                # fav_seq_pos is the index for a flattened eval_set.
+                if tok_seq["input_ids"].size(-1) < fav_seq_pos:
+                    fav_seq_pos = fav_seq_pos - tok_seq["input_ids"].size(-1)
                     continue
-                truncated_tok_seqs.append(tok_seq)
-                truncated_seqs_final_indices.append(per_seq_position)
-                break
+                if tok_seq["input_ids"].size(-1) >= fav_seq_pos:
+                    tok_seq = tokenizer(
+                        seq,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=fav_seq_pos + 1,
+                    )
+                    truncated_tok_seqs.append(tok_seq)
+                    break
+                raise ValueError("fav_seq_pos out of range.")
 
         assert len(truncated_tok_seqs) > 0, dedent(
             f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
-        )
-        assert len(truncated_seqs_final_indices) > 0, dedent(
-            "No truncated sequence final indices were found."
         )
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
@@ -247,9 +247,10 @@ for ablate_layer_idx in ablate_layer_range:
             base_activations_top_positions,
             ablate_during_run=False,
         ):
-            for s in truncated_tok_seqs:
-                top_input = s.to(model.device)
+            for seq in truncated_tok_seqs:
+                top_input = seq.to(model.device)
                 _ = t.manual_seed(SEED)
+
                 try:
                     model(**top_input)
                 except RuntimeError:
@@ -267,9 +268,10 @@ for ablate_layer_idx in ablate_layer_range:
             ablate_during_run=True,
             coefficient=COEFFICIENT,
         ):
-            for s in truncated_tok_seqs:
-                top_input = s.to(model.device)
+            for seq in truncated_tok_seqs:
+                top_input = seq.to(model.device)
                 _ = t.manual_seed(SEED)
+
                 try:
                     model(**top_input)
                 except RuntimeError:
@@ -307,8 +309,8 @@ for ablate_layer_idx in ablate_layer_range:
             """
         )
     )
-    layer_dim_indices[a+1] = [
-        x for x in top_layer_dims if x in layer_dim_indices[a+1]
+    layer_dim_indices[a + 1] = [
+        x for x in top_layer_dims if x in layer_dim_indices[a + 1]
     ]
     print(
         dedent(
@@ -339,13 +341,9 @@ for i in ablated_activations:
                 """
             )
 
-            # The truncated seqs were all flattened. Now we just want what
-            # would be the last position of each sequence.
-            act_diffs[i, j, k] = t.tensor([[0.0]])
-            for x in truncated_seqs_final_indices:
-                act_diffs[i, j, k] += (
-                    ablate_vec[:, x - 1, :] - base_vec[:, x - 1, :]
-                )
+            # We just want the last position of each sequence.
+            act_diffs[i, j, k] = ablate_vec[:, -1, :] - base_vec[:, -1, :]
+            assert act_diffs[i, j, k].shape == (1, 1)
 
 # Check that there was any effect.
 OVERALL_EFFECTS = 0.0
