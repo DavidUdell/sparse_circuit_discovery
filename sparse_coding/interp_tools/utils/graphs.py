@@ -16,16 +16,15 @@ from sparse_coding.utils.interface import (
 
 
 def graph_and_log(
-        act_diffs: dict[tuple[int, int, int], t.Tensor],
-        layer_range: range,
-        layer_dim_indices: dict[int, list[int]],
-        branching_factor: int,
-        model_dir: str,
-        graph_file: str,
-        graph_dot_file: str,
-        top_k_info_file: str,
-        overall_effects: float,
-        base_file: str,
+    act_diffs: dict[tuple[int, int, int], t.Tensor],
+    keepers: dict[tuple[int, int], int],
+    branching_factor: int,
+    model_dir: str,
+    graph_file: str,
+    graph_dot_file: str,
+    top_k_info_file: str,
+    overall_effects: float,
+    base_file: str,
 ):
     """Graph and log the causal effects of ablations."""
 
@@ -39,15 +38,9 @@ def graph_and_log(
 
     plotted_diffs = {}
     if branching_factor is not None:
-        for layer_idx in layer_range[:-1]:
-            for ablate_dim in layer_dim_indices[layer_idx]:
-                # This next line does the work of thinning the final graph to
-                # just trace paths through the layer range, leveraging the
-                # layer_dim_indices dict.
-                for cache_dim in layer_dim_indices[layer_idx + 1]:
-                    plotted_diffs[layer_idx, ablate_dim, cache_dim] = (
-                        act_diffs[layer_idx, ablate_dim, cache_dim]
-                    )
+        for i, j in keepers:
+            for k in keepers[i, j]:
+                plotted_diffs[i, j, k] = act_diffs[i, j, k]
 
     else:
         plotted_diffs = act_diffs
@@ -78,10 +71,7 @@ def graph_and_log(
     )
 
     # Read the .svg into a `wandb` artifact.
-    artifact = wandb.Artifact(
-        "feature_graph",
-        type="directed_graph"
-    )
+    artifact = wandb.Artifact("feature_graph", type="directed_graph")
     artifact.add_file(save_plot_path)
     wandb.log_artifact(artifact)
 
@@ -110,11 +100,7 @@ def graph_causal_effects(
     """Graph the causal effects of ablations."""
 
     # Load preexistin graph, if applicable.
-    graph = load_preexisting_graph(
-        model_dir,
-        graph_dot_file,
-        base_file
-    )
+    graph = load_preexisting_graph(model_dir, graph_dot_file, base_file)
     if graph is None:
         graph = AGraph(directed=True)
     assert graph is not None, "Graph is None."
@@ -174,12 +160,14 @@ def graph_causal_effects(
 
     # Plot effect edges.
     plotted_effects: float = 0.0
+    zero_effects: int = 0
     for (
         ablation_layer_idx,
         ablated_dim,
         downstream_dim,
     ), effect in activations.items():
         if effect.item() == 0:
+            zero_effects += 1
             continue
         plotted_effects += abs(effect.item())
         # Blue means the intervention increased downstream firing, while
@@ -192,9 +180,7 @@ def graph_causal_effects(
             red = 255
             blue = 0
         alpha = int(
-            255
-            * abs(effect.item())
-            / (max(abs(max_scalar), abs(min_scalar)))
+            255 * abs(effect.item()) / (max(abs(max_scalar), abs(min_scalar)))
         )
         rgba_color = f"#{red:02x}00{blue:02x}{alpha:02x}"
 
@@ -219,9 +205,7 @@ def graph_causal_effects(
         (overall_effects - plotted_effects) / overall_effects, 2
     )
     overall_effects = round(overall_effects, 2)
-    graph.add_node(
-        f"Fraction of effects not plotted: {excluded_fraction}%."
-    )
+    graph.add_node(f"Fraction of effects not plotted: {excluded_fraction}%.")
     # Assert no repeat edges.
     edges = graph.edges()
     assert len(edges) == len(set(edges)), "Repeat edges in graph."
@@ -235,8 +219,8 @@ def graph_causal_effects(
     print(
         dedent(
             f"""
-            Dropped {unlinked_nodes} unlinked neuron(s) from directed
-            graph.\n
+            Dropped {unlinked_nodes} unlinked neuron(s) from graph.
+            {zero_effects} zero effect(s) ignored.\n
             """
         )
     )

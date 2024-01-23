@@ -14,7 +14,7 @@ MODEL_DIR: "EleutherAI/pythia-70m"
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "1:4"
+ACTS_LAYERS_SLICE: ":"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 10
@@ -40,8 +40,8 @@ ACCUMULATE_GRAD_BATCHES: 4
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
 COEFFICIENT: 0.0
-BRANCHING_FACTOR: 2
-INIT_THINNING_FACTOR: 0.2
+BRANCHING_FACTOR: 10
+INIT_THINNING_FACTOR: 0.01
 DIMS_PINNED:
   1: 323
 

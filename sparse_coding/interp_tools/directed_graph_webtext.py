@@ -182,6 +182,7 @@ for i in base_activations_all_positions:
 # Run ablations at top sequence positions.
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
+keepers: dict[tuple[int, int], int] = {}
 
 for ablate_layer_idx in ablate_layer_range:
     # Thin the first layer indices or fix any indices, when requested.
@@ -278,48 +279,41 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     model(**top_input)
 
-    # Keep just the most affected indices for the next layer's ablations.
     if BRANCHING_FACTOR is None:
         break
+
+    # Keep just the most affected indices for the next layer's ablations.
     assert isinstance(BRANCHING_FACTOR, int)
 
-    working_dict = {}
+    working_tensor = t.Tensor([[0.0]])
     top_layer_dims = []
     a = ablate_layer_idx
 
     for j in ablated_activations[a]:
         for k in ablated_activations[a][j]:
-            working_dict[a, j, k] = (
-                ablated_activations[a][j][k]
-                - base_activations_top_positions[a][j][k]
+            working_tensor = t.abs(
+                t.cat(
+                    [
+                        working_tensor,
+                        ablated_activations[a][j][k][:, -1, :]
+                        - base_activations_top_positions[a][j][k][:, -1, :],
+                    ]
+                )
             )
 
-            top_dims = t.topk(
-                abs(working_dict[a, j, k]).squeeze(),
-                BRANCHING_FACTOR,
-            )
-            top_layer_dims.extend(top_dims[1].tolist())
-
+        _, ordered_dims = t.sort(
+            working_tensor.squeeze(),
+            descending=True,
+        )
+        ordered_dims = ordered_dims.tolist()
+        top_dims = [
+            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
+        ][:BRANCHING_FACTOR]
+        assert len(top_dims) <= BRANCHING_FACTOR
+        keepers[a, j] = top_dims
+        top_layer_dims.extend(top_dims)
     top_layer_dims = list(set(top_layer_dims))
-    print(
-        dedent(
-            f"""
-            Number of dims independently found most affected in next layer:
-            {len(top_layer_dims)}.
-            """
-        )
-    )
-    layer_dim_indices[a + 1] = [
-        x for x in top_layer_dims if x in layer_dim_indices[a + 1]
-    ]
-    print(
-        dedent(
-            f"""
-            Length of intersection of previously labeled and currently most
-            affected dims lists: {len(layer_dim_indices[a+1])}.
-            """
-        )
-    )
+    layer_dim_indices[a + 1] = top_layer_dims
 
 # %%
 # Compute ablated effects minus base effects. Recursive defaultdict indices
@@ -355,8 +349,7 @@ assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
 # Graph effects.
 graph_and_log(
     act_diffs,
-    layer_range,
-    layer_dim_indices,
+    keepers,
     BRANCHING_FACTOR,
     MODEL_DIR,
     GRAPH_FILE,
