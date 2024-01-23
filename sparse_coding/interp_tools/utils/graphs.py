@@ -200,12 +200,6 @@ def graph_causal_effects(
             color=rgba_color,
         )
 
-    # Add an effects fraction excluded node.
-    excluded_fraction = round(
-        (overall_effects - plotted_effects) / overall_effects, 2
-    )
-    overall_effects = round(overall_effects, 2)
-
     # Assert no repeat edges.
     edges = graph.edges()
     assert len(edges) == len(set(edges)), "Repeat edges in graph."
@@ -217,9 +211,10 @@ def graph_causal_effects(
             graph.remove_node(node)
             unlinked_nodes += 1
 
+    included_fraction = round(plotted_effects / overall_effects, 2)
     # This must come after dropping nodes.
     graph.add_node(
-        f"Fraction of effects plotted: ~{(1.0-excluded_fraction)*100}%.",
+        f"Fraction of effects plotted: ~{included_fraction*100}%.",
         shape="box",
     )
 
