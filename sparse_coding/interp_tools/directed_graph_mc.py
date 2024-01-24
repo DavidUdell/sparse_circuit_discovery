@@ -26,6 +26,7 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
+from sparse_coding.interp_tools.utils.computations import calc_act_diffs
 from sparse_coding.interp_tools.utils.graphs import graph_and_log
 from sparse_coding.interp_tools.utils.hooks import (
     hooks_manager,
@@ -227,24 +228,11 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
     layer_dim_indices[a + 1] = list(set(top_layer_dims))
 
 # %%
-# Compute ablated effects minus base effects. Recursive defaultdict indices
-# are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
-act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
-for i in ablate_layer_range:
-    for j in base_activations[i]:
-        for k in base_activations[i][j]:
-            act_diffs[i, j, k] = (
-                ablated_activations[i][j][k][:, -1, :]
-                - base_activations[i][j][k][:, -1, :]
-            )
-
-            assert act_diffs[i, j, k].shape == (1, 1)
-
-# Check that there was any effect.
-OVERALL_EFFECTS = 0.0
-for i, j, k in act_diffs:
-    OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
-assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
+# Compute ablated effects minus base effects.
+act_diffs: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
+    ablated_activations,
+    base_activations,
+)
 
 # %%
 # Graph effects.
@@ -256,7 +244,6 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
-    OVERALL_EFFECTS,
     __file__,
 )
 

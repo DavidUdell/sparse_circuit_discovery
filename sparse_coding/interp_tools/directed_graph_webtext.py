@@ -23,6 +23,7 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
+from sparse_coding.interp_tools.utils.computations import calc_act_diffs
 from sparse_coding.interp_tools.utils.graphs import graph_and_log
 from sparse_coding.interp_tools.utils.hooks import (
     hooks_manager,
@@ -318,35 +319,11 @@ for ablate_layer_idx in ablate_layer_range:
     layer_dim_indices[a + 1] = list(set(top_layer_dims))
 
 # %%
-# Compute ablated effects minus base effects. Recursive defaultdict indices
-# are: [ablation_layer_idx][ablated_dim_idx][downstream_dim]
-act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
-for i in ablated_activations:
-    for j in ablated_activations[i]:
-        for k in ablated_activations[i][j]:
-            ablate_vec = ablated_activations[i][j][k]
-            base_vec = base_activations_top_positions[i][j][k]
-
-            assert (
-                ablate_vec.shape == base_vec.shape == (1, base_vec.size(1), 1)
-            ), dedent(
-                f"""
-                Shape mismatch between ablated and base vectors for ablate
-                layer {i}, ablate dim {j}, and cache dim {k}; ablate shape
-                {ablate_vec.shape} and base shape {base_vec.shape}.
-                """
-            )
-
-            # We just want the last position of each sequence.
-            act_diffs[i, j, k] = ablate_vec[:, -1, :] - base_vec[:, -1, :]
-
-            assert act_diffs[i, j, k].shape == (1, 1)
-
-# Check that there was any effect.
-OVERALL_EFFECTS = 0.0
-for i, j, k in act_diffs:
-    OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
-assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
+# Compute ablated effects minus base effects.
+act_diffs: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
+    ablated_activations,
+    base_activations_top_positions,
+)
 
 # %%
 # Graph effects.
@@ -358,7 +335,6 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
-    OVERALL_EFFECTS,
     __file__,
 )
 

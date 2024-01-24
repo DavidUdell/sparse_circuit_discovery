@@ -7,6 +7,7 @@ import torch as t
 import wandb
 from pygraphviz import AGraph
 
+from sparse_coding.interp_tools.utils.computations import calc_overall_effects
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
     load_preexisting_graph,
@@ -23,10 +24,12 @@ def graph_and_log(
     graph_file: str,
     graph_dot_file: str,
     top_k_info_file: str,
-    overall_effects: float,
     base_file: str,
 ):
     """Graph and log the causal effects of ablations."""
+
+    # Asserts that there was any overall effect before proceeding.
+    overall_effects: float = calc_overall_effects(act_diffs)
 
     # All other effect items are t.Tensors, but wandb plays nicer with floats.
     diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
