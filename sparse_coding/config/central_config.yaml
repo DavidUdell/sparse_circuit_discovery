@@ -66,14 +66,16 @@ SYNC_DIST_LOGGING: True
 DIMS_IN_BATCH: 2000
 TOP_K: 6
 
-# `feature_web_webtext.py`
+# `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
 NUM_SEQUENCES_INTERPED: 10
 MAX_SEQ_INTERPED_LEN: 100
 
-# `feature_web_mc.py`
-NUM_QUESTIONS_INTERPED: 10
+# `directed_graph_mc.py`
+# Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
+# are computational waste.
+NUM_QUESTIONS_INTERPED: 1
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6

@@ -48,11 +48,11 @@ SYNC_DIST_LOGGING: True
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# `feature_web_webtext.py`
+# `directed_graph_webtext.py`
 NUM_SEQUENCES_INTERPED: 1
 MAX_SEQ_INTERPED_LEN: 10
 
-# `feature_web_mc.py`
+# `directed_graph_mc.py`
 NUM_QUESTIONS_INTERPED: 1
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
