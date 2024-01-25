@@ -11,7 +11,7 @@ from accelerate import Accelerator
 from sparse_coding.utils.top_contexts import (
     context_activations,
     project_activations,
-    select_top_k_tokens,
+    top_k_contexts,
 )
 
 
@@ -150,7 +150,7 @@ def test_select_top_k_tokens():
 
     top_k: int = 3
 
-    mock_top_k_tokens = select_top_k_tokens(mock_effects, top_k)
+    mock_top_k_tokens = top_k_contexts(mock_effects, top_k)
     try:
         assert isinstance(mock_top_k_tokens, defaultdict)
         assert isinstance(mock_top_k_tokens[0], list)

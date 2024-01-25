@@ -127,7 +127,7 @@ class Encoder(t.nn.Module):
 # Tabulation functionality.
 def populate_table(
     _table,
-    contexts_and_effects,
+    contexts_and_effects: defaultdict[int, defaultdict[str, t.Tensor]],
     model_dir,
     top_k_info_file,
     layer_index,
@@ -230,13 +230,12 @@ for layer_idx in seq_layer_indices:
         feature_acts,
         model,
         tokenizer,
-        accelerator,
     )
 
     # Select just the top-k effects.
     truncated_effects: defaultdict[
         int, list[tuple[str, float]]
-    ] = top_contexts.select_top_k_tokens(effects, TOP_K)
+    ] = top_contexts.top_k_contexts(effects, TOP_K)
 
     populate_table(
         table,

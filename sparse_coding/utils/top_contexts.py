@@ -1,275 +1,42 @@
-"""Functions for processing autoencoders into top-k tokens."""
+"""Functions for processing autoencoders into top-k contexts."""
 
 
 from collections import defaultdict
-from math import ceil
 
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoTokenizer
-from tqdm.auto import tqdm
 
 
-# `per_input_token_effects` is a linchpin interpretability function. I break up
-# its functionality into several tacit dependency functions in this module so
-# that it's readable.
-def per_input_token_effects(
-    token_ids_by_q: list[list[int]],
-    encoder_activations_by_q: list[t.Tensor],
+def context_activations(
+    context_token_ids: list[list[int]],
+    context_acts: list[t.Tensor],
     encoder,
     tokenizer: AutoTokenizer,
-    accelerator: Accelerator,
-    dims_per_batch: int,
 ) -> defaultdict[int, defaultdict[str, float]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
-    # Begin pre-processing. Calulate the number of dimensional batches to run.
-    num_dim_batches: int = batching_setup(dims_per_batch, encoder)
+    contexts_and_activations = defaultdict(defaultdict_factory)
+    assert len(context_token_ids) == len(context_acts)
+    for context, activation in zip(context_token_ids, context_acts):
+        context = tokenizer.convert_ids_to_tokens(context)
+        context = "".join(context)
+        context = context.replace("\n", "\\n")
+        context = context.replace("Ġ", " ")
 
-    # Initialize the effects dictionary.
-    effect_scalar_by_dim_by_input_token = defaultdict(defaultdict_factory)
+        for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
+            contexts_and_activations[dim_idx][context] = activation[:, dim_idx]
 
-    # Pre-process `token_ids_by_q`.
-    flat_input_token_ids, unique_input_token_ids = pre_process_input_token_ids(
-        token_ids_by_q, encoder, accelerator
-    )
-
-    effect_scalar_by_dim_by_input_token = batches_loop(
-        num_dim_batches,
-        dims_per_batch,
-        encoder_activations_by_q,
-        encoder,
-        accelerator,
-        tokenizer,
-        effect_scalar_by_dim_by_input_token,
-        unique_input_token_ids,
-        flat_input_token_ids,
-    )
-
-    return effect_scalar_by_dim_by_input_token
-
-
-# Helper functions for `per_token_effects`.
-def modal_tensor_acceleration(
-    tensor: t.Tensor, encoder, accelerator: Accelerator
-) -> t.Tensor:
-    """Accelerate a tensor; directly move it where the accelerator fails."""
-
-    try:
-        tensor = accelerator.prepare(tensor)
-    except RuntimeError:
-        tensor = tensor.to(encoder.encoder_layer.weight.device)
-        tensor = accelerator.prepare(tensor)
-
-    return tensor
-
-
-def batching_setup(dims_per_batch: int, encoder) -> int:
-    """Determine the number of dimensional batches to be run."""
-    num_dim_batches: int = ceil(
-        encoder.encoder_layer.weight.shape[0] / dims_per_batch
-    )
-
-    return num_dim_batches
+    return contexts_and_activations
 
 
 def defaultdict_factory():
     """Factory for string defaultdicts."""
+
     return defaultdict(str)
 
 
-def pre_process_input_token_ids(
-    token_ids_by_q,
-    encoder,
-    accelerator: Accelerator,
-):
-    """Pre-process the `token_ids_by_q`."""
-
-    # Flatten the input token ids.
-    flat_input_token_ids = [
-        input_token_id
-        for question in token_ids_by_q
-        for input_token_id in question
-    ]
-
-    # Deduplicate the `flat_input_token_ids`.
-    unique_input_token_ids = list(set(flat_input_token_ids))
-
-    # Tensorize and accelerate `flat_input_token_ids`.
-    flat_input_token_ids = t.tensor(flat_input_token_ids)
-    flat_input_token_ids = modal_tensor_acceleration(
-        flat_input_token_ids, encoder, accelerator
-    )
-
-    return flat_input_token_ids, unique_input_token_ids
-
-
-def batches_loop(
-    num_dim_batches: int,
-    dims_per_batch: int,
-    encoder_activations_by_q,
-    encoder,
-    accelerator: Accelerator,
-    tokenizer: AutoTokenizer,
-    effect_scalar_by_dim_by_input_token,
-    unique_input_token_ids,
-    flat_input_token_ids,
-) -> defaultdict[int, defaultdict[str, float]]:
-    """Loop over the batches while printing current progress."""
-
-    starting_dim_index, ending_dim_index = 0, 0
-    features_progress_bar = tqdm(
-        total=encoder.encoder_layer.weight.shape[0],
-        desc="Dims Labeled Progress",
-    )
-
-    for batch in range(num_dim_batches):
-        ending_dim_index += dims_per_batch
-        if ending_dim_index > encoder.encoder_layer.weight.shape[0]:
-            ending_dim_index = encoder.encoder_layer.weight.shape[0]
-
-        if batch + 1 > num_dim_batches:
-            assert starting_dim_index - ending_dim_index == dims_per_batch
-        elif batch + 1 == num_dim_batches:
-            assert starting_dim_index - ending_dim_index <= dims_per_batch
-
-        # Note that `batched_dims_from_encoder_activations` has
-        # lost the question data that `encoder_activations_by_q` had.
-        batched_dims_from_encoder_activations = (
-            pre_process_encoder_activations_by_batch(
-                encoder_activations_by_q,
-                dims_per_batch,
-                encoder,
-                accelerator,
-                starting_dim_index,
-                ending_dim_index,
-            )
-        )
-
-        assert not t.isnan(batched_dims_from_encoder_activations).any()
-
-        for input_token_id in unique_input_token_ids:
-            input_token_string = tokenizer.convert_ids_to_tokens(
-                input_token_id
-            )
-            dims_from_encoder_activations_at_input_token_in_batch = (
-                filter_encoder_activations_by_input_token(
-                    flat_input_token_ids,
-                    input_token_id,
-                    batched_dims_from_encoder_activations,
-                )
-            )
-            averaged_dim_from_encoder_activations_at_input_token_in_batch = (
-                average_encoder_activations_at_input_token(
-                    dims_from_encoder_activations_at_input_token_in_batch,
-                )
-            )
-
-            # Add the averaged activations on to the effects dictionary.
-            for dim_in_batch, averaged_activation_per_dim in enumerate(
-                averaged_dim_from_encoder_activations_at_input_token_in_batch
-            ):
-                effect_scalar_by_dim_by_input_token[
-                    starting_dim_index + dim_in_batch
-                ][input_token_string] = averaged_activation_per_dim.item()
-
-        # Manually closed, because there isn't a natural iterable for tqdm.
-        features_progress_bar.update(ending_dim_index - starting_dim_index)
-        # Update `starting_dim_index` for the next batch.
-        starting_dim_index = ending_dim_index
-
-    features_progress_bar.close()
-
-    return effect_scalar_by_dim_by_input_token
-
-
-def pre_process_encoder_activations_by_batch(
-    encoder_activations_by_q,
-    dims_per_batch,
-    encoder,
-    accelerator,
-    starting_dim_index,
-    ending_dim_index,
-) -> t.Tensor:
-    """Pre-process the `encoder_activations_by_q` for each batch."""
-    batched_dims_from_encoder_activations: list = []
-
-    for question_block in encoder_activations_by_q:
-        batched_dims_from_encoder_activations.append(
-            question_block[:, starting_dim_index:ending_dim_index]
-        )
-
-    batched_dims_from_encoder_activations = accelerator.prepare(
-        batched_dims_from_encoder_activations
-    )
-    # Remove the question data.
-    batched_dims_from_encoder_activations: t.Tensor = t.cat(
-        batched_dims_from_encoder_activations, dim=0
-    )
-
-    assert batched_dims_from_encoder_activations.shape[1] <= dims_per_batch
-
-    # Accelerate `batched_dims_from_encoder_activations`.
-    batched_dims_from_encoder_activations = modal_tensor_acceleration(
-        batched_dims_from_encoder_activations,
-        encoder,
-        accelerator,
-    )
-
-    return batched_dims_from_encoder_activations
-
-
-# Remember that dimensional batch slicing is already done coming in.
-def filter_encoder_activations_by_input_token(
-    flat_input_token_ids: t.Tensor,
-    input_token_id: int,
-    batched_dims_from_encoder_activations: t.Tensor,
-):
-    """Isolate just the activations at an input token id."""
-    indices_of_encoder_activations_at_input_token = t.nonzero(
-        flat_input_token_ids == input_token_id
-    )
-    # Flatten in-place.
-    indices_of_encoder_activations_at_input_token = (
-        indices_of_encoder_activations_at_input_token.squeeze(dim=1)
-    )
-
-    # Fancy index along dim=0.
-    dims_from_encoder_activations_at_input_token_in_batch = (
-        batched_dims_from_encoder_activations[
-            indices_of_encoder_activations_at_input_token
-        ]
-    )
-
-    return dims_from_encoder_activations_at_input_token_in_batch
-
-
-def average_encoder_activations_at_input_token(
-    dims_from_encoder_activations_at_input_token_in_batch,
-):
-    """Average over encoder activations at a common input token."""
-
-    # Average across dimensional instances.
-    averaged_dim_from_encoder_activations_at_input_token_in_batch = t.mean(
-        dims_from_encoder_activations_at_input_token_in_batch, dim=0
-    )
-
-    assert (
-        len(
-            averaged_dim_from_encoder_activations_at_input_token_in_batch.shape
-        )
-        == 1
-    ), "Tensor has more than one dimension! It should be a vector."
-
-    assert not t.isnan(
-        averaged_dim_from_encoder_activations_at_input_token_in_batch
-    ).any(), "Processed tensor contains NaNs!"
-
-    return averaged_dim_from_encoder_activations_at_input_token_in_batch
-
-
-# All other `top-k` functions below.
 def project_activations(
     acts_list: list[t.Tensor],
     projector,
@@ -296,22 +63,22 @@ def project_activations(
     return projected_activations
 
 
-def select_top_k_tokens(
-    effects_dict: defaultdict[int, defaultdict[str, float]],
+def top_k_contexts(
+    contexts_and_activations: defaultdict[int, defaultdict[str, t.Tensor]],
     top_k: int,
-) -> defaultdict[int, list[tuple[str, float]]]:
+) -> defaultdict[int, list[tuple[str, t.Tensor]]]:
     """Select the top-k tokens for each feature."""
-    tp_k_tokens = defaultdict(list)
+    top_k_contexts_acts = defaultdict(list)
 
-    for feature_dim, tokens_dict in effects_dict.items():
-        # Sort tokens by their dimension activations.
-        sorted_effects: list[tuple[str, float]] = sorted(
-            tokens_dict.items(), key=lambda x: x[1], reverse=True
+    for dim_idx, contexts_acts in contexts_and_activations.items():
+        ordered_contexts_acts: list[tuple[str, t.Tensor]] = sorted(
+            contexts_acts.items(),
+            key=lambda x: x[-1].sum().item(),
+            reverse=True,
         )
-        # Add the top-k tokens.
-        tp_k_tokens[feature_dim] = sorted_effects[:top_k]
+        top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
 
-    return tp_k_tokens
+    return top_k_contexts_acts
 
 
 def unpad_activations(
