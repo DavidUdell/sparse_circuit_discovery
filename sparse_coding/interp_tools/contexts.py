@@ -9,8 +9,6 @@ Requires a HF access token to get `Llama-2`'s tokenizer.
 import warnings
 import csv
 from collections import defaultdict
-from math import isnan
-from typing import Union
 
 import numpy as np
 import prettytable
@@ -160,11 +158,13 @@ def populate_table(
         writer = csv.writer(file)
         writer.writerows(csv_rows)
         wandb.log(
-            {f"layer {layer_index} top-k tokens": wandb.Table(
-                columns=csv_rows[0],
-                data=csv_rows[1:],
-                allow_mixed_types=True,
-            )}
+            {
+                f"layer {layer_index} top-k tokens": wandb.Table(
+                    columns=csv_rows[0],
+                    data=csv_rows[1:],
+                    allow_mixed_types=True,
+                )
+            }
         )
 
 
