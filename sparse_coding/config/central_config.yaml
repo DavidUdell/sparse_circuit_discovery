@@ -61,7 +61,7 @@ LOG_EVERY_N_STEPS: 1
 EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
-# `top_tokens.py`
+# `labels.py`
 DIMS_IN_BATCH: 2000
 TOP_K: 6
 
