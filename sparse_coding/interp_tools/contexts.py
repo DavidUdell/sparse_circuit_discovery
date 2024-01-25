@@ -127,7 +127,7 @@ class Encoder(t.nn.Module):
 # Tabulation functionality.
 def populate_table(
     _table,
-    contexts_and_effects: defaultdict[int, defaultdict[str, t.Tensor]],
+    contexts_and_effects: defaultdict[int, list[tuple[str, float]]],
     model_dir,
     top_k_info_file,
     layer_index,
@@ -138,14 +138,21 @@ def populate_table(
         ["Dimension", "Top Tokens", "Top-Token Activations"]
     ]
 
-    for i in contexts_and_effects:
-        if contexts_and_effects[i][0][-1].sum().item() == 0.0:
-            continue
+    for dim_idx in contexts_and_effects:
+        top_k_contexts = []
+        top_activations = []
+        for context, acts in contexts_and_effects[dim_idx]:
+            if acts.sum().item == 0.0:
+                continue
+
+            top_k_contexts += context
+            top_activations += acts
+        top_k_contexts = "\n".join(top_k_contexts)
 
         processed_row = [
-            f"{i}",
-            ", ".join(contexts_and_effects[i][0][0]),
-            contexts_and_effects[i][0][-1],
+            dim_idx,
+            top_k_contexts,
+            top_activations,
         ]
         _table.add_row(processed_row)
         csv_rows.append(processed_row)
@@ -157,15 +164,16 @@ def populate_table(
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerows(csv_rows)
-        wandb.log(
-            {
-                f"layer {layer_index} top-k tokens": wandb.Table(
-                    columns=csv_rows[0],
-                    data=csv_rows[1:],
-                    allow_mixed_types=True,
-                )
-            }
-        )
+
+        # wandb.log(
+        #     {
+        #         f"layer {layer_index} top-k tokens": wandb.Table(
+        #             columns=csv_rows[0],
+        #             data=csv_rows[1:],
+        #             allow_mixed_types=True,
+        #         )
+        #     }
+        # )
 
 
 # %%

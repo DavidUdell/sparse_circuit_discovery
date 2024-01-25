@@ -22,8 +22,8 @@ def context_activations(
     for context, activation in zip(context_token_ids, context_acts):
         context = tokenizer.convert_ids_to_tokens(context)
         context = "".join(context)
-        context = context.replace("\n", "\\n")
         context = context.replace("Ġ", " ")
+        context = context.replace("\n", "\\n")
 
         for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
             contexts_and_activations[dim_idx][context] = activation[:, dim_idx]
