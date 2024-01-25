@@ -8,8 +8,8 @@ import torch as t
 import transformers
 from accelerate import Accelerator
 
-from sparse_coding.utils.top_k import (
-    per_input_token_effects,
+from sparse_coding.utils.top_contexts import (
+    context_activations,
     project_activations,
     select_top_k_tokens,
 )
@@ -73,7 +73,7 @@ def test_per_input_token_effects(  # pylint: disable=redefined-outer-name
 
     dims_in_batch = 200
 
-    mock_effects = per_input_token_effects(
+    mock_effects = context_activations(
         question_token_ids,
         feature_activations,
         mock_encoder,
