@@ -217,7 +217,7 @@ def graph_causal_effects(
     included_fraction = round(plotted_effects / overall_effects, 2)
     # This must come after dropping nodes.
     graph.add_node(
-        f"Fraction of effects plotted: ~{included_fraction*100}%.",
+        f"Effects plotted out of collected: ~{included_fraction*100}%.",
         shape="box",
     )
 
