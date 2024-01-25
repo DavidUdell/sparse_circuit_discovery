@@ -101,7 +101,7 @@ def test_smoke_sparse_coding(
     for script in [
         "collect_acts",
         "train_autoencoder",
-        "interp_tools.labels",
+        "interp_tools.contexts",
         "interp_tools.directed_graph_mc",
         "interp_tools.directed_graph_webtext",
     ]:
