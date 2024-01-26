@@ -11,7 +11,6 @@ import csv
 from collections import defaultdict
 
 import numpy as np
-import prettytable
 import torch as t
 import transformers
 import wandb
@@ -126,16 +125,15 @@ class Encoder(t.nn.Module):
 # %%
 # Tabulation functionality.
 def populate_table(
-    _table,
     contexts_and_effects: defaultdict[int, list[tuple[str, float]]],
     model_dir,
     top_k_info_file,
     layer_index,
 ) -> None:
-    """Put the results in the table and save to csv."""
+    """Save results to a csv table."""
 
     csv_rows: list[list] = [
-        ["Dimension", "Top Tokens", "Top-Token Activations"]
+        ["Dimension Index", "Top-Activating Contexts", "Context Activations"]
     ]
 
     for dim_idx in contexts_and_effects:
@@ -145,7 +143,7 @@ def populate_table(
             if acts.sum().item == 0.0:
                 continue
 
-            top_k_contexts += context
+            top_k_contexts.append(context)
             top_activations += acts
         top_k_contexts = "\n".join(top_k_contexts)
 
@@ -154,26 +152,16 @@ def populate_table(
             top_k_contexts,
             top_activations,
         ]
-        _table.add_row(processed_row)
         csv_rows.append(processed_row)
 
     top_k_info_path: str = save_paths(
         __file__,
         f"{sanitize_model_name(model_dir)}/{layer_index}/{top_k_info_file}",
     )
+
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerows(csv_rows)
-
-        # wandb.log(
-        #     {
-        #         f"layer {layer_index} top-k tokens": wandb.Table(
-        #             columns=csv_rows[0],
-        #             data=csv_rows[1:],
-        #             allow_mixed_types=True,
-        #         )
-        #     }
-        # )
 
 
 # %%
@@ -223,13 +211,6 @@ for layer_idx in seq_layer_indices:
         unpadded_acts, model, accelerator
     )
 
-    table = prettytable.PrettyTable()
-    table.field_names = [
-        "Dimension Index",
-        "Top-Activating Contexts",
-        "Context Activations",
-    ]
-
     # Calculate per-input-token summed activation, for each feature dimension.
     effects: defaultdict[
         int, defaultdict[str, float]
@@ -246,15 +227,11 @@ for layer_idx in seq_layer_indices:
     ] = top_contexts.top_k_contexts(effects, TOP_K)
 
     populate_table(
-        table,
         truncated_effects,
         MODEL_DIR,
         TOP_K_INFO_FILE,
         layer_idx,
     )
-
-    print(table)
-    accelerator.free_memory()
 
 # %%
 # Wrap up logging.

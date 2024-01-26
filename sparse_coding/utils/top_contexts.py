@@ -6,6 +6,7 @@ from collections import defaultdict
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoTokenizer
+from tqdm.auto import tqdm
 
 
 def context_activations(
