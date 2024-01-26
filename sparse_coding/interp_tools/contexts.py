@@ -22,6 +22,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
+from tqdm.auto import tqdm
 
 from sparse_coding.utils import top_contexts
 from sparse_coding.utils.interface import (
@@ -132,36 +133,38 @@ def populate_table(
 ) -> None:
     """Save results to a csv table."""
 
-    csv_rows: list[list] = [
-        ["Dimension Index", "Top-Activating Contexts", "Context Activations"]
-    ]
-
-    for dim_idx in contexts_and_effects:
-        top_k_contexts = []
-        top_activations = []
-        for context, acts in contexts_and_effects[dim_idx]:
-            if acts.sum().item == 0.0:
-                continue
-
-            top_k_contexts.append(context)
-            top_activations += acts
-        top_k_contexts = "\n".join(top_k_contexts)
-
-        processed_row = [
-            dim_idx,
-            top_k_contexts,
-            top_activations,
-        ]
-        csv_rows.append(processed_row)
-
     top_k_info_path: str = save_paths(
         __file__,
         f"{sanitize_model_name(model_dir)}/{layer_index}/{top_k_info_file}",
     )
 
+    header: list = [
+        "Dimension Index",
+        "Top-Activating Contexts",
+        "Context Activations",
+    ]
+
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerows(csv_rows)
+        writer.writerow(header)
+
+        for dim_idx in tqdm(contexts_and_effects, desc="Features Labeled"):
+            top_k_contexts = []
+            top_activations = []
+            for context, acts in contexts_and_effects[dim_idx]:
+                if acts.sum().item == 0.0:
+                    continue
+
+                top_k_contexts.append(context)
+                top_activations.extend(acts.cpu())
+            top_k_contexts = "\n".join(top_k_contexts)
+
+            row = [
+                dim_idx,
+                top_k_contexts,
+                top_activations,
+            ]
+            writer.writerow(row)
 
 
 # %%

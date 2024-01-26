@@ -62,7 +62,6 @@ EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
 # `contexts.py`
-DIMS_IN_BATCH: 2000
 TOP_K: 6
 
 # `directed_graph_webtext.py`
