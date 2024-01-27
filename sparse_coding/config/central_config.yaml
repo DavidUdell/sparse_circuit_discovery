@@ -43,6 +43,7 @@ COEFFICIENT: 0.0
 BRANCHING_FACTOR: 10
 INIT_THINNING_FACTOR: 0.01
 DIMS_PINNED:
+  1: 0
 
 ## Stable Dev Constants
 # `wandb` logging

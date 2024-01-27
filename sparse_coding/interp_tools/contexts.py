@@ -152,12 +152,14 @@ def populate_table(
             top_k_contexts = []
             top_activations = []
             for context, acts in contexts_and_effects[dim_idx]:
-                if acts.sum().item == 0.0:
+                if sum(acts) == 0.0:
                     continue
 
                 top_k_contexts.append(context)
-                top_activations.extend(acts.cpu())
-            top_k_contexts = "\n".join(top_k_contexts)
+                top_activations.append(acts)
+
+            if not top_k_contexts:
+                continue
 
             row = [
                 dim_idx,

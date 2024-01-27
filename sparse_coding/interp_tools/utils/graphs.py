@@ -24,6 +24,7 @@ def graph_and_log(
     graph_file: str,
     graph_dot_file: str,
     top_k_info_file: str,
+    tokenizer,
     base_file: str,
 ):
     """Graph and log the causal effects of ablations."""
@@ -63,6 +64,7 @@ def graph_and_log(
         top_k_info_file,
         graph_dot_file,
         overall_effects,
+        tokenizer,
         base_file,
     )
 
@@ -91,12 +93,49 @@ def color_range_from_scalars(activations: dict) -> tuple[float, float]:
     return min_scalar, max_scalar
 
 
+def label_highlighting(
+    layer_idx,
+    neuron_idx,
+    model_dir,
+    top_k_info_file,
+    tokenizer,
+    base_file
+):
+    """Highlight contexts using cached activation data."""
+
+    contexts, acts = load_layer_feature_labels(
+        model_dir,
+        layer_idx,
+        neuron_idx,
+        top_k_info_file,
+        base_file,
+    )
+    labels = []
+    for context, act in zip(contexts, acts):
+        context = tokenizer.convert_ids_to_tokens(context)
+
+        label = ""
+        max_a = max(act)
+        for idx, token in enumerate(context):
+            if act[idx] <= 0.0:
+                continue
+            if act[idx] >= max_a:
+                blue_prop = act[idx] / max_a
+                color = f"#0000{int(255*blue_prop):02x}"
+                span = f"<span style=\"background-color: {color}\">"
+                label += f"<span>{span}{token}</span>"
+        labels.append(label)
+
+    return labels
+
+
 def graph_causal_effects(
     activations: dict[tuple, t.Tensor],
     model_dir: str,
     top_k_info_file: str,
     graph_dot_file: str,
     overall_effects: float,
+    tokenizer,
     base_file: str,
     rasp=False,
 ) -> AGraph:
@@ -127,15 +166,6 @@ def graph_causal_effects(
 
         return graph
 
-    def label_appendable(layer_idx, neuron_idx):
-        return load_layer_feature_labels(
-            model_dir,
-            layer_idx,
-            neuron_idx,
-            top_k_info_file,
-            base_file,
-        )
-
     # Plot neuron nodes.
     for (
         ablation_layer_idx,
@@ -146,7 +176,14 @@ def graph_causal_effects(
             dedent(
                 f"""
                 {ablation_layer_idx}.{ablated_dim}:
-                {label_appendable(ablation_layer_idx, ablated_dim)}
+                {label_highlighting(
+                    ablation_layer_idx,
+                    ablated_dim,
+                    model_dir,
+                    top_k_info_file,
+                    tokenizer,
+                    base_file,
+                )}
                 """
             )
         )
@@ -154,7 +191,14 @@ def graph_causal_effects(
             dedent(
                 f"""
                 {ablation_layer_idx + 1}.{downstream_dim}:
-                {label_appendable(ablation_layer_idx + 1, downstream_dim)}
+                {label_highlighting(
+                    ablation_layer_idx + 1,
+                    downstream_dim,
+                    model_dir,
+                    top_k_info_file,
+                    tokenizer,
+                    base_file,
+                )}
                 """
             )
         )
@@ -191,13 +235,27 @@ def graph_causal_effects(
             dedent(
                 f"""
                 {ablation_layer_idx}.{ablated_dim}:
-                {label_appendable(ablation_layer_idx, ablated_dim)}
+                {label_highlighting(
+                    ablation_layer_idx,
+                    ablated_dim,
+                    model_dir,
+                    top_k_info_file,
+                    tokenizer,
+                    base_file,
+                )}
                 """
             ),
             dedent(
                 f"""
                 {ablation_layer_idx + 1}.{downstream_dim}:
-                {label_appendable(ablation_layer_idx + 1, downstream_dim)}
+                {label_highlighting(
+                    ablation_layer_idx + 1,
+                    downstream_dim,
+                    model_dir,
+                    top_k_info_file,
+                    tokenizer,
+                    base_file,
+                )}
                 """
             ),
             color=rgba_color,

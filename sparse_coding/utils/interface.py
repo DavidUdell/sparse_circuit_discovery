@@ -322,7 +322,7 @@ def load_layer_feature_labels(
     feature_idx: int,
     top_k_info_file: str,
     base_file: str,
-) -> list[str]:
+) -> tuple[list[str], list[list[float]]]:
     """
     Return the top-k input token labels for an encoder layer feature.
 
@@ -349,7 +349,33 @@ def load_layer_feature_labels(
 
         for row in reader:
             if int(row[0]) == feature_idx:
-                return row[1]
+                context_ints = []
+                context_str = row[1]
+                context_sublists = context_str.split("], ")
+
+                for list_str in context_sublists:
+                    list_int = []
+                    list_str = list_str.replace("[", "").replace("]", "")
+                    list_str = list_str.split(", ")
+                    for integer in list_str:
+                        integer = int(integer)
+                        list_int.append(integer)
+                    context_ints.append(list_int)
+
+                act_floats = []
+                acts_str = row[-1]
+                acts_sublists = acts_str.split("], ")
+
+                for list_str in acts_sublists:
+                    list_flt = []
+                    list_str = list_str.replace("[", "").replace("]", "")
+                    list_str = list_str.split(", ")
+                    for flt in list_str:
+                        flt = float(flt)
+                        list_flt.append(flt)
+                    act_floats.append(list_flt)
+
+                return (context_ints, act_floats)
 
         raise ValueError(
             dedent(

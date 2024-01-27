@@ -335,6 +335,7 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
+    tokenizer,
     __file__,
 )
 

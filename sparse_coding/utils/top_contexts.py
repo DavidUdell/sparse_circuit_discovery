@@ -6,7 +6,6 @@ from collections import defaultdict
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoTokenizer
-from tqdm.auto import tqdm
 
 
 def context_activations(
@@ -21,13 +20,12 @@ def context_activations(
     contexts_and_activations = defaultdict(defaultdict_factory)
     assert len(context_token_ids) == len(context_acts)
     for context, activation in zip(context_token_ids, context_acts):
-        context = tokenizer.convert_ids_to_tokens(context)
-        context = "".join(context)
-        context = context.replace("Ġ", " ")
-        context = context.replace("\n", "\\n")
 
         for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
-            contexts_and_activations[dim_idx][context] = activation[:, dim_idx]
+            context = str(context)
+            contexts_and_activations[dim_idx][context] = activation[
+                :, dim_idx
+                ].tolist()
 
     return contexts_and_activations
 
@@ -65,16 +63,16 @@ def project_activations(
 
 
 def top_k_contexts(
-    contexts_and_activations: defaultdict[int, defaultdict[str, t.Tensor]],
+    contexts_and_activations: defaultdict[int, defaultdict[str, list[float]]],
     top_k: int,
 ) -> defaultdict[int, list[tuple[str, t.Tensor]]]:
     """Select the top-k tokens for each feature."""
     top_k_contexts_acts = defaultdict(list)
 
     for dim_idx, contexts_acts in contexts_and_activations.items():
-        ordered_contexts_acts: list[tuple[str, t.Tensor]] = sorted(
+        ordered_contexts_acts: list[tuple[str, list[float]]] = sorted(
             contexts_acts.items(),
-            key=lambda x: x[-1].sum().item(),
+            key=lambda x: sum(x[-1]),
             reverse=True,
         )
         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
