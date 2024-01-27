@@ -358,7 +358,7 @@ def load_layer_feature_labels(
                     list_str = list_str.replace("[", "").replace("]", "")
                     list_str = list_str.split(", ")
                     for integer in list_str:
-                        integer = int(integer)
+                        integer = int(integer.strip("\'"))
                         list_int.append(integer)
                     context_ints.append(list_int)
 

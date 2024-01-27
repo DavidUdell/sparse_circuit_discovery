@@ -116,11 +116,11 @@ def label_highlighting(
 
         label = ""
         max_a = max(act)
-        for idx, token in enumerate(context):
-            if act[idx] <= 0.0:
+        for token, flt in zip(context, act):
+            if flt <= 0.0:
                 continue
-            if act[idx] >= max_a:
-                blue_prop = act[idx] / max_a
+            if flt >= max_a:
+                blue_prop = flt / max_a
                 color = f"#0000{int(255*blue_prop):02x}"
                 span = f"<span style=\"background-color: {color}\">"
                 label += f"<span>{span}{token}</span>"

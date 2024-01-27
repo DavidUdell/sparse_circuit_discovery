@@ -126,7 +126,7 @@ class Encoder(t.nn.Module):
 # %%
 # Tabulation functionality.
 def populate_table(
-    contexts_and_effects: defaultdict[int, list[tuple[str, float]]],
+    contexts_and_effects: defaultdict[int, list[tuple[str, list[float]]]],
     model_dir,
     top_k_info_file,
     layer_index,
@@ -151,9 +151,11 @@ def populate_table(
         for dim_idx in tqdm(contexts_and_effects, desc="Features Labeled"):
             top_k_contexts = []
             top_activations = []
+            # Context here has been stringified, so its length is not its token
+            # length, for the time being.
             for context, acts in contexts_and_effects[dim_idx]:
                 if sum(acts) == 0.0:
-                    continue
+                    break
 
                 top_k_contexts.append(context)
                 top_activations.append(acts)
@@ -223,7 +225,6 @@ for layer_idx in seq_layer_indices:
         unpacked_prompts_ids,
         feature_acts,
         model,
-        tokenizer,
     )
 
     # Select just the top-k effects.

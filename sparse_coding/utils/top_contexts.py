@@ -5,14 +5,12 @@ from collections import defaultdict
 
 import torch as t
 from accelerate import Accelerator
-from transformers import AutoTokenizer
 
 
 def context_activations(
     context_token_ids: list[list[int]],
-    context_acts: list[t.Tensor],
+    context_acts: list[list[float]],
     encoder,
-    tokenizer: AutoTokenizer,
 ) -> defaultdict[int, defaultdict[str, float]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
@@ -20,7 +18,6 @@ def context_activations(
     contexts_and_activations = defaultdict(defaultdict_factory)
     assert len(context_token_ids) == len(context_acts)
     for context, activation in zip(context_token_ids, context_acts):
-
         for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
             context = str(context)
             contexts_and_activations[dim_idx][context] = activation[
