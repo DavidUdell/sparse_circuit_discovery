@@ -100,7 +100,7 @@ def label_highlighting(
     top_k_info_file,
     tokenizer,
     base_file
-):
+) -> str:
     """Highlight contexts using cached activation data."""
 
     contexts, acts = load_layer_feature_labels(
@@ -110,21 +110,20 @@ def label_highlighting(
         top_k_info_file,
         base_file,
     )
-    labels = []
+    labels = '<table border="0" cellborder="0" cellspacing="0"><TR>'
     for context, act in zip(contexts, acts):
         context = tokenizer.convert_ids_to_tokens(context)
 
-        label = ""
         max_a = max(act)
         for token, flt in zip(context, act):
             if flt <= 0.0:
-                continue
-            if flt >= max_a:
+                labels += f"<TD>{token}</TD>"
+            elif flt >= max_a:
                 blue_prop = flt / max_a
                 color = f"#0000{int(255*blue_prop):02x}"
-                span = f"<span style=\"background-color: {color}\">"
-                label += f"<span>{span}{token}</span>"
-        labels.append(label)
+                cell = f"<TD BGCOLOR=\"{color}\">"
+                labels += f"{cell}{token}</TD>"
+        labels += "</TR><TR>"
 
     return labels
 
