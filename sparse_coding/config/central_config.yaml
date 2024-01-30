@@ -41,9 +41,9 @@ ACCUMULATE_GRAD_BATCHES: 4
 # index as keys and values.
 COEFFICIENT: 0.0
 BRANCHING_FACTOR: 10
-INIT_THINNING_FACTOR: 0.01
+INIT_THINNING_FACTOR: 0.005
 DIMS_PINNED:
-  1: 0
+
 
 ## Stable Dev Constants
 # `wandb` logging
