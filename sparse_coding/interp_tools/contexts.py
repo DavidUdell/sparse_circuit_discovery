@@ -59,6 +59,7 @@ HIDDEN_DIM = tsfm_config.hidden_size
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
 TOP_K = config.get("TOP_K", 6)
+VIEW = config.get("VIEW", 5)
 # None means "round to int", in SIG_FIGS.
 SIG_FIGS = config.get("SIG_FIGS", None)
 # DIMS_IN_BATCH is tunable, to fit in GPU memory.
@@ -230,7 +231,7 @@ for layer_idx in seq_layer_indices:
     # Select just the top-k effects.
     truncated_effects: defaultdict[
         int, list[tuple[str, float]]
-    ] = top_contexts.top_k_contexts(effects, TOP_K)
+    ] = top_contexts.top_k_contexts(effects, VIEW, TOP_K)
 
     populate_table(
         truncated_effects,

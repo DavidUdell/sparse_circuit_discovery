@@ -64,6 +64,7 @@ SYNC_DIST_LOGGING: True
 
 # `contexts.py`
 TOP_K: 6
+VIEW: 5
 
 # `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as

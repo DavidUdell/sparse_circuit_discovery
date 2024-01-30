@@ -9,20 +9,19 @@ from accelerate import Accelerator
 
 def context_activations(
     context_token_ids: list[list[int]],
-    context_acts: list[list[float]],
+    context_acts: list[t.Tensor],
     encoder,
-) -> defaultdict[int, defaultdict[str, float]]:
+) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
-    contexts_and_activations = defaultdict(defaultdict_factory)
+    contexts_and_activations = defaultdict(list)
     assert len(context_token_ids) == len(context_acts)
+
     for context, activation in zip(context_token_ids, context_acts):
         for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
-            context = str(context)
-            contexts_and_activations[dim_idx][context] = activation[
-                :, dim_idx
-                ].tolist()
+            acts = activation[:, dim_idx].tolist()
+            contexts_and_activations[dim_idx] = (context, acts)
 
     return contexts_and_activations
 
@@ -60,21 +59,42 @@ def project_activations(
 
 
 def top_k_contexts(
-    contexts_and_activations: defaultdict[int, defaultdict[str, list[float]]],
+    contexts_and_activations: defaultdict[
+        int, list[tuple[list[str], list[float]]]
+    ],
+    view: int,
     top_k: int,
-) -> defaultdict[int, list[tuple[str, t.Tensor]]]:
-    """Select the top-k tokens for each feature."""
+) -> defaultdict[int, list[tuple[str, list[float]]]]:
+    """
+    Select the top-k contexts for each feature.
+
+    The contexts are sorted by their max activation values, and are trimmed to
+    a specified distance around each top activating token. Then, we only keep
+    the top-k of those trimmed contexts.
+    """
+
     top_k_contexts_acts = defaultdict(list)
+    top_k_views = defaultdict(list)
 
     for dim_idx, contexts_acts in contexts_and_activations.items():
-        ordered_contexts_acts: list[tuple[str, list[float]]] = sorted(
-            contexts_acts.items(),
-            key=lambda x: sum(x[-1]),
+        print(contexts_acts)
+        ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
+            contexts_acts,
+            key=lambda x: max(x[-1]),
             reverse=True,
         )
         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
 
-    return top_k_contexts_acts
+        for context, acts in top_k_contexts_acts[dim_idx]:
+            # index() should always return a unique index. It will prioritize
+            # the first, in case of collisions.
+            max_position = acts.index(max(acts))
+            view_slice = slice(max_position - view, max_position + view)
+            top_k_views[dim_idx].append(
+                (context[view_slice], acts[view_slice])
+            )
+
+    return top_k_views
 
 
 def unpad_activations(

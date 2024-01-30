@@ -131,7 +131,7 @@ def label_highlighting(
 
             elif act >= max_a:
                 blue_prop = act / max_a
-                shade = f"#0000{int(255*blue_prop):02x}"
+                shade = f"#6060{int(255*blue_prop):02x}"
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
         label += "</tr>"
@@ -152,7 +152,7 @@ def graph_causal_effects(
 ) -> AGraph:
     """Graph the causal effects of ablations."""
 
-    # Load preexistin graph, if applicable.
+    # Load preexisting graph, if applicable.
     graph = load_preexisting_graph(model_dir, graph_dot_file, base_file)
     if graph is None:
         graph = AGraph(directed=True)

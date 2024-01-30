@@ -358,7 +358,7 @@ def load_layer_feature_labels(
                     list_str = list_str.replace("[", "").replace("]", "")
                     list_str = list_str.split(", ")
                     for integer in list_str:
-                        integer = int(integer.strip("\'"))
+                        integer = int(integer.strip("'"))
                         list_int.append(integer)
                     context_ints.append(list_int)
 
@@ -401,11 +401,7 @@ def load_preexisting_graph(
     try:
         graph_rel_path = save_paths(
             base_file,
-            (
-                sanitize_model_name(model_dir)
-                + "/"
-                + graph_dot_file
-            ),
+            (sanitize_model_name(model_dir) + "/" + graph_dot_file),
         )
         graph = AGraph(graph_rel_path)
         assert graph is not None, "Newly loaded graph is None."
