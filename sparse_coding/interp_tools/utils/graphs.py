@@ -102,7 +102,7 @@ def label_highlighting(
     model_dir,
     top_k_info_file,
     tokenizer,
-    neuron_address: str,
+    address: str,
     logit_diffs,
     base_file,
 ) -> str:
@@ -117,7 +117,7 @@ def label_highlighting(
     )
     label = '<<table border="0" cellborder="0" cellspacing="0">'
     label += (
-        f'<tr><td><font point-size="16"><b>{neuron_address}</b></font></td></tr>'
+        f'<tr><td><font point-size="16"><b>{address}</b></font></td></tr>'
     )
     for context, act in zip(contexts, acts):
         label += "<tr>"
@@ -165,6 +165,7 @@ def graph_causal_effects(
     graph_dot_file: str,
     overall_effects: float,
     tokenizer,
+    logit_diffs,
     base_file: str,
     rasp=False,
 ) -> AGraph:
