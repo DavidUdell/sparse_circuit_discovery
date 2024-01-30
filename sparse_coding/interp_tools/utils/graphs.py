@@ -113,7 +113,9 @@ def label_highlighting(
         base_file,
     )
     label = '<<table border="0" cellborder="0" cellspacing="0">'
-    label += f"<tr><td><b>{appendable}</b></td></tr>"
+    label += (
+        f'<tr><td><font point-size="16"><b>{appendable}</b></font></td></tr>'
+    )
     for context, act in zip(contexts, acts):
         label += "<tr>"
 

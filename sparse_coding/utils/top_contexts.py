@@ -87,7 +87,8 @@ def top_k_contexts(
             # index() should always return a unique index. It will prioritize
             # the first, in case of collisions.
             max_position = acts.index(max(acts))
-            view_slice = slice(max_position - view, max_position + view)
+            # To complete the open end of the slice, we add 1 to that side.
+            view_slice = slice(max_position-view, max_position+view+1)
             top_k_views[dim_idx].append(
                 (context[view_slice], acts[view_slice])
             )
