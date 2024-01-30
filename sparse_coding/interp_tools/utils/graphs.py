@@ -26,6 +26,7 @@ def graph_and_log(
     graph_dot_file: str,
     top_k_info_file: str,
     tokenizer,
+    logit_diffs,
     base_file: str,
 ):
     """Graph and log the causal effects of ablations."""
@@ -66,6 +67,7 @@ def graph_and_log(
         graph_dot_file,
         overall_effects,
         tokenizer,
+        logit_diffs,
         base_file,
     )
 
@@ -100,7 +102,8 @@ def label_highlighting(
     model_dir,
     top_k_info_file,
     tokenizer,
-    appendable: str,
+    neuron_address: str,
+    logit_diffs,
     base_file,
 ) -> str:
     """Highlight contexts using cached activation data."""
@@ -114,7 +117,7 @@ def label_highlighting(
     )
     label = '<<table border="0" cellborder="0" cellspacing="0">'
     label += (
-        f'<tr><td><font point-size="16"><b>{appendable}</b></font></td></tr>'
+        f'<tr><td><font point-size="16"><b>{neuron_address}</b></font></td></tr>'
     )
     for context, act in zip(contexts, acts):
         label += "<tr>"
@@ -137,6 +140,19 @@ def label_highlighting(
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
         label += "</tr>"
+
+    # Add logit diffs.
+    if (layer_idx, neuron_idx) in logit_diffs:
+        label += "<tr>"
+        top_tokens_affected = (
+            logit_diffs[layer_idx, neuron_idx].topk(5).indices.tolist()
+        )
+        for token in top_tokens_affected:
+            token = tokenizer.convert_tokens_to_string([token])
+            token = html.escape(token)
+            label += f"<td><i>{token}</i></td>"
+        label += "</tr>"
+
     label += "</table>>"
 
     return label
@@ -194,6 +210,7 @@ def graph_causal_effects(
                 top_k_info_file,
                 tokenizer,
                 f"{ablation_layer_idx}.{ablated_dim}",
+                logit_diffs,
                 base_file,
             ),
             shape="box",
@@ -207,6 +224,7 @@ def graph_causal_effects(
                 top_k_info_file,
                 tokenizer,
                 f"{ablation_layer_idx + 1}.{downstream_dim}",
+                logit_diffs,
                 base_file,
             ),
             shape="box",

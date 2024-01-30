@@ -124,6 +124,8 @@ layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
     __file__,
 )
 
+logit_diffs = {}
+
 for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
     # Thin the first layer indices or fix any indices, when requested.
     if ablate_layer_idx == ablate_layer_range[0] or (
@@ -154,15 +156,14 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
             base_activations,
             ablate_during_run=False,
         ):
-            multiple_choice_task(
+            base_logits = multiple_choice_task(
                 dataset,
                 validation_indices,
                 model,
                 tokenizer,
                 accelerator,
                 NUM_SHOT,
-                ACTS_LAYERS_SLICE,
-                return_outputs=False,
+                return_logits=True,
             )
 
         np.random.seed(SEED)
@@ -178,16 +179,18 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
             ablate_during_run=True,
             coefficient=COEFFICIENT,
         ):
-            multiple_choice_task(
+            altered_logits = multiple_choice_task(
                 dataset,
                 validation_indices,
                 model,
                 tokenizer,
                 accelerator,
                 NUM_SHOT,
-                ACTS_LAYERS_SLICE,
-                return_outputs=False,
+                return_logits=True,
             )
+
+        logit_diff = t.abs(altered_logits - base_logits)
+        logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
 
     if BRANCHING_FACTOR is None:
         break
@@ -217,7 +220,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
         )
         ordered_dims = ordered_dims.tolist()
         top_dims = [
-            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
+            idx for idx in ordered_dims if idx in layer_dim_indices[a+1]
         ][:BRANCHING_FACTOR]
 
         assert len(top_dims) <= BRANCHING_FACTOR
@@ -245,6 +248,7 @@ graph_and_log(
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
     tokenizer,
+    logit_diffs,
     __file__,
 )
 
