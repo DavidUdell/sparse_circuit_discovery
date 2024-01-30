@@ -11,7 +11,7 @@ def context_activations(
     context_token_ids: list[list[int]],
     context_acts: list[t.Tensor],
     encoder,
-) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
+) -> defaultdict[int, list[tuple[list[int], list[float]]]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
