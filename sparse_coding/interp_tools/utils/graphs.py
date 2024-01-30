@@ -113,7 +113,7 @@ def label_highlighting(
         base_file,
     )
     label = '<<table border="0" cellborder="0" cellspacing="0">'
-    label += f"<tr><td><i>{appendable}</i></td></tr>"
+    label += f"<tr><td><b>{appendable}</b></td></tr>"
     for context, act in zip(contexts, acts):
         label += "<tr>"
 
@@ -123,6 +123,7 @@ def label_highlighting(
         )
 
         for token, act in zip(context, act):
+            token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
 
             if act <= 0.0:
@@ -193,6 +194,7 @@ def graph_causal_effects(
                 f"{ablation_layer_idx}.{ablated_dim}",
                 base_file,
             ),
+            shape="box",
         )
         graph.add_node(
             f"{ablation_layer_idx + 1}.{downstream_dim}",
@@ -205,6 +207,7 @@ def graph_causal_effects(
                 f"{ablation_layer_idx + 1}.{downstream_dim}",
                 base_file,
             ),
+            shape="box",
         )
 
     min_scalar, max_scalar = color_range_from_scalars(activations)
@@ -255,8 +258,7 @@ def graph_causal_effects(
     included_fraction = round(plotted_effects / overall_effects, 2)
     # This must come after dropping nodes.
     graph.add_node(
-        f"Effects plotted out of collected: ~{included_fraction*100}%.",
-        shape="box",
+        f"Effects plotted out of collected: ~{included_fraction*100}%."
     )
 
     print(
