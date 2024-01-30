@@ -21,7 +21,7 @@ def context_activations(
     for context, activation in zip(context_token_ids, context_acts):
         for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
             acts = activation[:, dim_idx].tolist()
-            contexts_and_activations[dim_idx] = (context, acts)
+            contexts_and_activations[dim_idx].append((context, acts))
 
     return contexts_and_activations
 
@@ -77,14 +77,12 @@ def top_k_contexts(
     top_k_views = defaultdict(list)
 
     for dim_idx, contexts_acts in contexts_and_activations.items():
-        print(contexts_acts)
         ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
             contexts_acts,
             key=lambda x: max(x[-1]),
             reverse=True,
         )
         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
-
         for context, acts in top_k_contexts_acts[dim_idx]:
             # index() should always return a unique index. It will prioritize
             # the first, in case of collisions.
