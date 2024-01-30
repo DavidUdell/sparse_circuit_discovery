@@ -1,6 +1,7 @@
 """Graph the causal effects of ablations."""
 
 
+import html
 from textwrap import dedent
 
 import torch as t
@@ -99,7 +100,8 @@ def label_highlighting(
     model_dir,
     top_k_info_file,
     tokenizer,
-    base_file
+    appendable: str,
+    base_file,
 ) -> str:
     """Highlight contexts using cached activation data."""
 
@@ -110,22 +112,31 @@ def label_highlighting(
         top_k_info_file,
         base_file,
     )
-    labels = '<table border="0" cellborder="0" cellspacing="0"><TR>'
+    label = '<<table border="0" cellborder="0" cellspacing="0">'
+    label += f"<tr><td><i>{appendable}</i></td></tr>"
     for context, act in zip(contexts, acts):
-        context = tokenizer.convert_ids_to_tokens(context)
+        label += "<tr>"
 
         max_a = max(act)
-        for token, flt in zip(context, act):
-            if flt <= 0.0:
-                labels += f"<TD>{token}</TD>"
-            elif flt >= max_a:
-                blue_prop = flt / max_a
-                color = f"#0000{int(255*blue_prop):02x}"
-                cell = f"<TD BGCOLOR=\"{color}\">"
-                labels += f"{cell}{token}</TD>"
-        labels += "</TR><TR>"
+        context = tokenizer.convert_ids_to_tokens(
+            context,
+        )
 
-    return labels
+        for token, act in zip(context, act):
+            token = html.escape(token)
+
+            if act <= 0.0:
+                label += f"<td>{token}</td>"
+
+            elif act >= max_a:
+                blue_prop = act / max_a
+                shade = f"#0000{int(255*blue_prop):02x}"
+                cell_tag = f'<td bgcolor="{shade}">'
+                label += f"{cell_tag}{token}</td>"
+        label += "</tr>"
+    label += "</table>>"
+
+    return label
 
 
 def graph_causal_effects(
@@ -172,34 +183,28 @@ def graph_causal_effects(
         downstream_dim,
     ) in activations.keys():
         graph.add_node(
-            dedent(
-                f"""
-                {ablation_layer_idx}.{ablated_dim}:
-                {label_highlighting(
-                    ablation_layer_idx,
-                    ablated_dim,
-                    model_dir,
-                    top_k_info_file,
-                    tokenizer,
-                    base_file,
-                )}
-                """
-            )
+            f"{ablation_layer_idx}.{ablated_dim}",
+            label=label_highlighting(
+                ablation_layer_idx,
+                ablated_dim,
+                model_dir,
+                top_k_info_file,
+                tokenizer,
+                f"{ablation_layer_idx}.{ablated_dim}",
+                base_file,
+            ),
         )
         graph.add_node(
-            dedent(
-                f"""
-                {ablation_layer_idx + 1}.{downstream_dim}:
-                {label_highlighting(
-                    ablation_layer_idx + 1,
-                    downstream_dim,
-                    model_dir,
-                    top_k_info_file,
-                    tokenizer,
-                    base_file,
-                )}
-                """
-            )
+            f"{ablation_layer_idx + 1}.{downstream_dim}",
+            label=label_highlighting(
+                ablation_layer_idx,
+                ablated_dim,
+                model_dir,
+                top_k_info_file,
+                tokenizer,
+                f"{ablation_layer_idx + 1}.{downstream_dim}",
+                base_file,
+            ),
         )
 
     min_scalar, max_scalar = color_range_from_scalars(activations)
@@ -231,32 +236,8 @@ def graph_causal_effects(
         rgba_color = f"#{red:02x}00{blue:02x}{alpha:02x}"
 
         graph.add_edge(
-            dedent(
-                f"""
-                {ablation_layer_idx}.{ablated_dim}:
-                {label_highlighting(
-                    ablation_layer_idx,
-                    ablated_dim,
-                    model_dir,
-                    top_k_info_file,
-                    tokenizer,
-                    base_file,
-                )}
-                """
-            ),
-            dedent(
-                f"""
-                {ablation_layer_idx + 1}.{downstream_dim}:
-                {label_highlighting(
-                    ablation_layer_idx + 1,
-                    downstream_dim,
-                    model_dir,
-                    top_k_info_file,
-                    tokenizer,
-                    base_file,
-                )}
-                """
-            ),
+            f"{ablation_layer_idx}.{ablated_dim}",
+            f"{ablation_layer_idx + 1}.{downstream_dim}",
             color=rgba_color,
         )
 
