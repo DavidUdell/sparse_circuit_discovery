@@ -201,8 +201,8 @@ def graph_causal_effects(
         graph.add_node(
             f"{ablation_layer_idx + 1}.{downstream_dim}",
             label=label_highlighting(
-                ablation_layer_idx,
-                ablated_dim,
+                ablation_layer_idx+1,
+                downstream_dim,
                 model_dir,
                 top_k_info_file,
                 tokenizer,
