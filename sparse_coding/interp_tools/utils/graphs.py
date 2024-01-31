@@ -147,15 +147,26 @@ def label_highlighting(
     # Add logit diffs.
     if (layer_idx, neuron_idx) in logit_diffs:
         label += "<tr>"
-        top_tokens_affected = (
-            t.abs(logit_diffs[layer_idx, neuron_idx]).topk(logit_tokens).indices
-        )
+        top_tokens_affected = t.abs(
+                logit_diffs[layer_idx, neuron_idx]
+        ).topk(logit_tokens).indices
+
         top_tokens_affected = top_tokens_affected.squeeze().tolist()
         for token in top_tokens_affected:
+
+            if logit_diffs[layer_idx, neuron_idx][:, token].item() > 0.0:
+                shade = "#6060ff"
+                cell_tag = f'<td border="1" bgcolor="{shade}">'
+            elif logit_diffs[layer_idx, neuron_idx][:, token].item() < 0.0:
+                shade = "#ff6060"
+                cell_tag = f'<td border="1" bgcolor="{shade}">'
+            else:
+                cell_tag = '<td border="1">'
+
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
-            label += f"<td><i>{token}</i></td>"
+            label += f'{cell_tag}<i>{token}</i></td>'
         label += "</tr>"
 
     label += "</table>>"
