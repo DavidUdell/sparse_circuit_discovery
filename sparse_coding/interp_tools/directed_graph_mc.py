@@ -64,6 +64,7 @@ COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
+LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
 # %%
@@ -109,6 +110,7 @@ validation_indices: list = dataset_indices[starting_index:].tolist()
 base_activations = defaultdict(recursive_defaultdict)
 ablated_activations = defaultdict(recursive_defaultdict)
 keepers: dict[tuple[int, int], int] = {}
+logit_diffs = {}
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
@@ -123,8 +125,6 @@ layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
     accelerator,
     __file__,
 )
-
-logit_diffs = {}
 
 for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
     # Thin the first layer indices or fix any indices, when requested.
@@ -189,7 +189,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
                 return_logits=True,
             )
 
-        logit_diff = t.abs(altered_logits - base_logits)
+        logit_diff = altered_logits - base_logits
         logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
 
     if BRANCHING_FACTOR is None:
@@ -247,6 +247,7 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
+    LOGIT_TOKENS,
     tokenizer,
     logit_diffs,
     __file__,

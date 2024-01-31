@@ -58,6 +58,7 @@ COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
+LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
 
 # %%
@@ -184,6 +185,7 @@ for i in base_activations_all_positions:
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
 keepers: dict[tuple[int, int], int] = {}
+logit_diffs = {}
 
 for ablate_layer_idx in ablate_layer_range:
     # Thin the first layer indices or fix any indices, when requested.
@@ -335,7 +337,9 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
+    LOGIT_TOKENS,
     tokenizer,
+    logit_diffs,
     __file__,
 )
 

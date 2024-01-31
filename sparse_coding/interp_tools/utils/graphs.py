@@ -25,6 +25,7 @@ def graph_and_log(
     graph_file: str,
     graph_dot_file: str,
     top_k_info_file: str,
+    logit_tokens: int,
     tokenizer,
     logit_diffs,
     base_file: str,
@@ -66,6 +67,7 @@ def graph_and_log(
         top_k_info_file,
         graph_dot_file,
         overall_effects,
+        logit_tokens,
         tokenizer,
         logit_diffs,
         base_file,
@@ -101,6 +103,7 @@ def label_highlighting(
     neuron_idx,
     model_dir,
     top_k_info_file,
+    logit_tokens: int,
     tokenizer,
     address: str,
     logit_diffs,
@@ -145,7 +148,7 @@ def label_highlighting(
     if (layer_idx, neuron_idx) in logit_diffs:
         label += "<tr>"
         top_tokens_affected = (
-            logit_diffs[layer_idx, neuron_idx].topk(10).indices
+            t.abs(logit_diffs[layer_idx, neuron_idx]).topk(logit_tokens).indices
         )
         top_tokens_affected = top_tokens_affected.squeeze().tolist()
         for token in top_tokens_affected:
@@ -166,6 +169,7 @@ def graph_causal_effects(
     top_k_info_file: str,
     graph_dot_file: str,
     overall_effects: float,
+    logit_tokens: int,
     tokenizer,
     logit_diffs,
     base_file: str,
@@ -211,6 +215,7 @@ def graph_causal_effects(
                 ablated_dim,
                 model_dir,
                 top_k_info_file,
+                logit_tokens,
                 tokenizer,
                 f"{ablation_layer_idx}.{ablated_dim}",
                 logit_diffs,
@@ -225,6 +230,7 @@ def graph_causal_effects(
                 downstream_dim,
                 model_dir,
                 top_k_info_file,
+                logit_tokens,
                 tokenizer,
                 f"{ablation_layer_idx + 1}.{downstream_dim}",
                 logit_diffs,
