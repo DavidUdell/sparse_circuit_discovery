@@ -55,7 +55,7 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 100
+NUM_SEQUENCES_EVALED: 500
 MAX_SEQ_LEN: 500
 
 # `train_autoencoder.py`
@@ -71,7 +71,7 @@ VIEW: 5
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
 NUM_SEQUENCES_INTERPED: 100
-MAX_SEQ_INTERPED_LEN: 200
+MAX_SEQ_INTERPED_LEN: 100
 
 # `directed_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
