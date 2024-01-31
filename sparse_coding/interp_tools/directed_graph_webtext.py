@@ -241,6 +241,7 @@ for ablate_layer_idx in ablate_layer_range:
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
         # run one ablated and once not.
+        base_logits = None
         with hooks_manager(
             ablate_layer_idx,
             ablate_dim_idx,
@@ -256,11 +257,18 @@ for ablate_layer_idx in ablate_layer_range:
                 _ = t.manual_seed(SEED)
 
                 try:
-                    model(**top_input)
+                    output = model(**top_input)
                 except RuntimeError:
                     gc.collect()
-                    model(**top_input)
+                    output = model(**top_input)
 
+                logit = output.logits[:, -1, :]
+                if base_logits is None:
+                    base_logits = logit
+                elif isinstance(base_logits, t.Tensor):
+                    base_logits = t.cat([base_logits, logit], dim=0)
+
+        altered_logits = None
         with hooks_manager(
             ablate_layer_idx,
             ablate_dim_idx,
@@ -277,10 +285,19 @@ for ablate_layer_idx in ablate_layer_range:
                 _ = t.manual_seed(SEED)
 
                 try:
-                    model(**top_input)
+                    output = model(**top_input)
                 except RuntimeError:
                     gc.collect()
-                    model(**top_input)
+                    output = model(**top_input)
+
+                logit = output.logits[:, -1, :]
+                if altered_logits is None:
+                    altered_logits = logit
+                elif isinstance(altered_logits, t.Tensor):
+                    altered_logits = t.cat([altered_logits, logit], dim=0)
+
+        logit_diff = altered_logits - base_logits
+        logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
 
     if BRANCHING_FACTOR is None:
         break

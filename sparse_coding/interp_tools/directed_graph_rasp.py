@@ -100,6 +100,9 @@ graph_causal_effects(
     TOP_K_INFO_FILE,
     GRAPH_DOT_FILE,
     0.0,
+    None,
+    None,
+    None,
     __file__,
     rasp=True,
 ).draw(
