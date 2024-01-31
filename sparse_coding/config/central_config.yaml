@@ -14,7 +14,7 @@ MODEL_DIR: "EleutherAI/pythia-70m"
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "1:3"
+ACTS_LAYERS_SLICE: "1:"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 10
@@ -42,7 +42,7 @@ ACCUMULATE_GRAD_BATCHES: 4
 COEFFICIENT: 0.0
 BRANCHING_FACTOR: 10
 INIT_THINNING_FACTOR: 0.005
-LOGIT_TOKENS: 8
+LOGIT_TOKENS: 10
 DIMS_PINNED:
 
 
@@ -55,8 +55,8 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 50
-MAX_SEQ_LEN: 50
+NUM_SEQUENCES_EVALED: 100
+MAX_SEQ_LEN: 500
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
@@ -70,8 +70,8 @@ VIEW: 5
 # `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 200
-MAX_SEQ_INTERPED_LEN: 100
+NUM_SEQUENCES_INTERPED: 100
+MAX_SEQ_INTERPED_LEN: 200
 
 # `directed_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
