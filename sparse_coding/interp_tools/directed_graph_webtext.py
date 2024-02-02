@@ -262,7 +262,7 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     output = model(**top_input)
 
-                logit = output.logits[:, -1, :]
+                logit = output.logits[:, -1, :].cpu()
                 if base_logits is None:
                     base_logits = logit
                 elif isinstance(base_logits, t.Tensor):
@@ -290,7 +290,7 @@ for ablate_layer_idx in ablate_layer_range:
                     gc.collect()
                     output = model(**top_input)
 
-                logit = output.logits[:, -1, :]
+                logit = output.logits[:, -1, :].cpu()
                 if altered_logits is None:
                     altered_logits = logit
                 elif isinstance(altered_logits, t.Tensor):

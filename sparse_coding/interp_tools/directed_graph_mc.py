@@ -190,7 +190,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
             )
 
         logit_diff = altered_logits - base_logits
-        logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
+        logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff.cpu()
 
     if BRANCHING_FACTOR is None:
         break
@@ -220,7 +220,7 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
         )
         ordered_dims = ordered_dims.tolist()
         top_dims = [
-            idx for idx in ordered_dims if idx in layer_dim_indices[a+1]
+            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
         ][:BRANCHING_FACTOR]
 
         assert len(top_dims) <= BRANCHING_FACTOR

@@ -55,8 +55,8 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 500
-MAX_SEQ_LEN: 500
+NUM_SEQUENCES_EVALED: 1000
+MAX_SEQ_LEN: 1000
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
