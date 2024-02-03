@@ -1,6 +1,5 @@
 """Install dependencies for `sparse_circuit_discovery`."""
 
-
 from setuptools import setup, find_packages
 
 
@@ -24,8 +23,6 @@ setup(
         "scikit-learn",
         "PyYAML",
         "pytest",
-        "circuitsvis",
-        "prettytable",
         "einops",
         "pygraphviz",
         "transformer_lens",
