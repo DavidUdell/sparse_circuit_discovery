@@ -138,7 +138,12 @@ def hooks_manager(
         def ablate_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
         ) -> None:
-            """Project activation vectors; ablate them; project them back."""
+            """
+            Project activation vectors; ablate them; project them back.
+
+            I am worried that a messy transform here is mangling data; to that
+            end, I am implementing a residual connection.
+            """
 
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
@@ -166,7 +171,7 @@ def hooks_manager(
             )
             # We must preserve the attention data in `output[1]`.
             return (
-                ablated_activations,
+                ablated_activations + output[0],
                 output[1],
             )
 
