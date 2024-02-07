@@ -9,7 +9,7 @@
 # "meta-llama/Llama-2-7b-hf"
 # "meta-llama/Llama-2-70b-hf"
 # "rasp"
-MODEL_DIR: "EleutherAI/pythia-70m"
+MODEL_DIR: "openai-community/gpt2"
 
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
@@ -17,13 +17,15 @@ MODEL_DIR: "EleutherAI/pythia-70m"
 ACTS_LAYERS_SLICE: "1:4"
 
 # Autoencoder Size
-PROJECTION_FACTOR: 10
+PROJECTION_FACTOR: 32
 
 # Save Files
 PROMPT_IDS_FILE: "activations_prompt_ids.npy"
 ACTS_DATA_FILE: "activations_dataset.pt"
 ENCODER_FILE: "learned_encoder.pt"
-BIASES_FILE: "learned_biases.pt"
+ENC_BIASES_FILE: "learned_enc_biases.pt"
+DECODER_FILE: "learned_decoder.pt"
+DEC_BIASES_FILE: "learned_dec_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
 GRAPH_FILE: "feature_graph.svg"
 GRAPH_DOT_FILE: "feature_graph.dot"

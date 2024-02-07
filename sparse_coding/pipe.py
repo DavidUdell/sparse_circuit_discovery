@@ -1,12 +1,15 @@
 """Run the main sparse coding pipeline in one command."""
 
-
 from runpy import run_module
 
 
+print(
+    "For the time being, model_dir must be openai-community/gpt2 and projection_factor must be 32."
+)
+
 for script in [
     "collect_acts",
-    "train_autoencoder",
+    "load_autoencoder",
     "interp_tools.contexts",
     "interp_tools.directed_graph_webtext",
 ]:
