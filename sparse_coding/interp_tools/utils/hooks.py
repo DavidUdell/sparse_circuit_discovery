@@ -154,14 +154,16 @@ def hooks_manager(
             # Project activations through the encoder.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    output[0],
+                    output[0] + dec_biases.to(model.device),
                     encoder.T.to(model.device),
                     bias=enc_biases.to(model.device),
                 )
             ).to(model.device)
+
             projected_acts = t.nn.functional.relu(
-                projected_acts_unrec, inplace=False
-            ) + dec_biases.to(model.device)
+                projected_acts_unrec,
+                inplace=False,
+            )
             # Ablate the activation at dim_idx. Modify here to scale in
             # different ways besides ablation.
             projected_acts[:, -1, dim_idx] = (

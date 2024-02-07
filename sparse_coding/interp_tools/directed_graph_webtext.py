@@ -77,7 +77,7 @@ wandb.init(
 )
 
 # %%
-# Load model, etc.
+# Load and prepare the model.
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
@@ -92,8 +92,7 @@ layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 ablate_layer_range: range = layer_range[:-1]
 
 # %%
-# Load the complementary `openwebtext` dataset subset, relative to
-# `collect_acts_webtext`.
+# Load the `openwebtext` validation set.
 dataset: list[list[str]] = load_dataset(
     "Elriggs/openwebtext-100k",
     split="train",
