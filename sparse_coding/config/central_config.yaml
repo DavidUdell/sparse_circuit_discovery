@@ -72,8 +72,8 @@ VIEW: 5
 # `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 100
-MAX_SEQ_INTERPED_LEN: 100
+NUM_SEQUENCES_INTERPED: 50
+MAX_SEQ_INTERPED_LEN: 50
 
 # `directed_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
