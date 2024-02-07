@@ -9,7 +9,7 @@ print(
     dedent(
         """
         For the time being, model_dir must be openai-community/gpt2 and
-        projection_factor must be 32.
+        projection_factor must be 32, and only ablations are performed.
         """
     )
 )
