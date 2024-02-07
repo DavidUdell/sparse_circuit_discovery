@@ -151,18 +151,17 @@ def hooks_manager(
             end, I am implementing a residual connection.
             """
 
-            # Project activations through the encoder/bias.
+            # Project activations through the encoder.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0],
                     encoder.T.to(model.device),
                     bias=enc_biases.to(model.device),
                 )
-            )
-            projected_acts = projected_acts_unrec.to(model.device)
+            ).to(model.device)
             projected_acts = t.nn.functional.relu(
                 projected_acts_unrec, inplace=False
-            )
+            ) + dec_biases.to(model.device)
             # Ablate the activation at dim_idx. Modify here to scale in
             # different ways besides ablation.
             projected_acts[:, -1, dim_idx] = (
@@ -173,12 +172,12 @@ def hooks_manager(
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
                     decoder.T.to(model.device),
-                    bias=dec_biases.to(model.device),
+                    bias=-dec_biases.to(model.device),
                 )
             )
             # We must preserve the attention data in `output[1]`.
             return (
-                ablated_activations + output[0],
+                0.5 * ablated_activations + 0.5 * output[0],
                 output[1],
             )
 
