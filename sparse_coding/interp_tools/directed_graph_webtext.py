@@ -48,7 +48,7 @@ WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
-BIASES_FILE = config.get("BIASES_FILE")
+ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
 GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
@@ -113,7 +113,7 @@ layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
     ENCODER_FILE,
-    BIASES_FILE,
+    ENC_BIASES_FILE,
     TOP_K_INFO_FILE,
     accelerator,
     __file__,

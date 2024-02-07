@@ -1,6 +1,5 @@
 """Ablation and caching hooks."""
 
-
 from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
@@ -15,13 +14,13 @@ from sparse_coding.utils.interface import (
 
 
 def prepare_autoencoder_and_indices(
-        layer_range: range,
-        model_dir: str,
-        encoder_file: str,
-        biases_file: str,
-        top_k_info_file: str,
-        accelerator,
-        base_file,
+    layer_range: range,
+    model_dir: str,
+    encoder_file: str,
+    biases_file: str,
+    top_k_info_file: str,
+    accelerator,
+    base_file,
 ):
     """Prepare all layer autoencoders and layer dim index lists up front."""
 
@@ -52,12 +51,12 @@ def prepare_autoencoder_and_indices(
 
 
 def prepare_dim_indices(
-        thinning_factor: float | None,
-        dims_plotted_dict: dict[int, int] | None,
-        ablate_dim_indices: list[int],
-        ablate_layer_idx: int,
-        layer_range: range,
-        seed: int,
+    thinning_factor: float | None,
+    dims_plotted_dict: dict[int, int] | None,
+    ablate_dim_indices: list[int],
+    ablate_layer_idx: int,
+    layer_range: range,
+    seed: int,
 ) -> list[int]:
     """
     Apply DIMS_PLOTTED_LIST and/or THINNING_FACTOR to ablate_dim_indices.
@@ -196,7 +195,7 @@ def hooks_manager(
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0],
-                    encoder.to(model.device),
+                    encoder.T.to(model.device),
                     bias=biases.to(model.device),
                 )
             )
@@ -211,9 +210,7 @@ def hooks_manager(
                 ]
                 # A defaultdict here means no cached data yet.
                 if isinstance(extant_data, defaultdict):
-                    cache_dict[ablate_layer_idx][ablate_dim_idx][
-                        cache_dim
-                    ] = (
+                    cache_dict[ablate_layer_idx][ablate_dim_idx][cache_dim] = (
                         projected_acts[:, :, cache_dim]
                         .unsqueeze(-1)
                         .detach()
@@ -221,17 +218,17 @@ def hooks_manager(
                     )
                 # We concat if there's an existing tensor.
                 elif isinstance(extant_data, t.Tensor):
-                    cache_dict[ablate_layer_idx][ablate_dim_idx][
-                        cache_dim
-                    ] = t.cat(
-                        (
-                            extant_data,
-                            projected_acts[:, :, cache_dim]
-                            .unsqueeze(-1)
-                            .detach()
-                            .cpu(),
-                        ),
-                        dim=1,
+                    cache_dict[ablate_layer_idx][ablate_dim_idx][cache_dim] = (
+                        t.cat(
+                            (
+                                extant_data,
+                                projected_acts[:, :, cache_dim]
+                                .unsqueeze(-1)
+                                .detach()
+                                .cpu(),
+                            ),
+                            dim=1,
+                        )
                     )
                 else:
                     raise ValueError(
@@ -246,14 +243,14 @@ def hooks_manager(
     # Just the Pythia layer syntax, for now.
     if ablate_during_run:
         ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]
-        ablate_hook_handle = model.gpt_neox.layers[
+        ablate_hook_handle = model.transformer.h[
             ablate_layer_idx
         ].register_forward_hook(
             ablate_hook_fac(ablate_dim_idx, ablate_encoder, ablate_bias)
         )
 
     cache_encoder, cache_bias = tensors_per_layer[cache_layer_idx]
-    cache_hook_handle = model.gpt_neox.layers[
+    cache_hook_handle = model.transformer.h[
         cache_layer_idx
     ].register_forward_hook(
         cache_hook_fac(
