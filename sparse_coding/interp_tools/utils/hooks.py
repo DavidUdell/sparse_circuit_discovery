@@ -191,6 +191,7 @@ def hooks_manager(
         ablate_layer_idx: int,
         encoder: t.Tensor,
         enc_biases: t.Tensor,
+        dec_biases: t.Tensor,
         cache_dict: defaultdict,
     ):
         """Create hooks that cache the projected activations."""
@@ -203,7 +204,7 @@ def hooks_manager(
             # Project activations through the encoder/bias.
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    output[0],
+                    output[0] + dec_biases.to(model.device),
                     encoder.T.to(model.device),
                     bias=enc_biases.to(model.device),
                 )
@@ -270,7 +271,8 @@ def hooks_manager(
             )
         )
 
-    cache_encoder, cache_bias = enc_tensors_per_layer[cache_layer_idx]
+    cache_encoder, cache_enc_bias = enc_tensors_per_layer[cache_layer_idx]
+    _, cache_dec_bias = dec_tensors_per_layer[cache_layer_idx]
     cache_hook_handle = model.transformer.h[
         cache_layer_idx
     ].register_forward_hook(
@@ -279,7 +281,8 @@ def hooks_manager(
             cache_dim_indices[cache_layer_idx],
             ablate_layer_idx,
             cache_encoder,
-            cache_bias,
+            cache_enc_bias,
+            cache_dec_bias,
             activations_dict,
         )
     )
