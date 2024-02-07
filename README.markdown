@@ -1,7 +1,7 @@
 # Sparse Circuit Discovery
 ![Feature graph](header.png)
 
-Automatic circuit discovery in large language models, using sparse coding.
+Automatic circuit discovery in GPT-2 small, using sparse coding.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -49,6 +49,9 @@ with:
 `python3 pipe.py`
 
 ### Notes:
+- For the time being, only GPT-2 small and a projection factor of 32 are
+  supported, to use preexisting sparse autoencoders.
+
 - A highly interpretable sparse autoencoder will have an L^0 value of 10-100 at
   convergence. Manually tune the `LAMBDA_L1` and `LEARNING_RATE` training
   hyperparameters to get this L^0.

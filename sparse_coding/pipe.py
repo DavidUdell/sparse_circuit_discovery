@@ -1,10 +1,17 @@
 """Run the main sparse coding pipeline in one command."""
 
+from textwrap import dedent
+
 from runpy import run_module
 
 
 print(
-    "For the time being, model_dir must be openai-community/gpt2 and projection_factor must be 32."
+    dedent(
+        """
+        For the time being, model_dir must be openai-community/gpt2 and
+        projection_factor must be 32.
+        """
+    )
 )
 
 for script in [
