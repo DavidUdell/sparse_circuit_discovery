@@ -119,7 +119,8 @@ def hooks_manager(
     model_layer_range: range,
     cache_dim_indices: dict[int, list[int]],
     model,
-    tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
     ablate_during_run: bool = True,
     coefficient: float = 0.0,
@@ -131,7 +132,13 @@ def hooks_manager(
     effects.
     """
 
-    def ablate_hook_fac(dim_idx: int, encoder: t.Tensor, biases: t.Tensor):
+    def ablate_hook_fac(
+        dim_idx: int,
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        decoder,
+        dec_biases,
+    ):
         """Create hooks that zero a projected neuron and project it back."""
 
         def ablate_hook(  # pylint: disable=unused-argument, redefined-builtin
@@ -149,7 +156,7 @@ def hooks_manager(
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0],
                     encoder.T.to(model.device),
-                    bias=biases.to(model.device),
+                    bias=enc_biases.to(model.device),
                 )
             )
             projected_acts = projected_acts_unrec.to(model.device)
@@ -165,7 +172,8 @@ def hooks_manager(
             ablated_activations = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
-                    encoder.to(model.device),
+                    decoder.T.to(model.device),
+                    bias=dec_biases.to(model.device),
                 )
             )
             # We must preserve the attention data in `output[1]`.
@@ -181,7 +189,7 @@ def hooks_manager(
         cache_dims: list[int],
         ablate_layer_idx: int,
         encoder: t.Tensor,
-        biases: t.Tensor,
+        enc_biases: t.Tensor,
         cache_dict: defaultdict,
     ):
         """Create hooks that cache the projected activations."""
@@ -196,7 +204,7 @@ def hooks_manager(
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0],
                     encoder.T.to(model.device),
-                    bias=biases.to(model.device),
+                    bias=enc_biases.to(model.device),
                 )
             )
             projected_acts = t.nn.functional.relu(
@@ -240,16 +248,28 @@ def hooks_manager(
     if ablate_layer_idx == model_layer_range[-1]:
         raise ValueError("Cannot ablate and cache from the last layer.")
     cache_layer_idx: int = ablate_layer_idx + 1
-    # Just the Pythia layer syntax, for now.
+    # Just the GPT-2 small layer syntax, for now.
     if ablate_during_run:
-        ablate_encoder, ablate_bias = tensors_per_layer[ablate_layer_idx]
+        ablate_encoder, ablate_enc_bias = enc_tensors_per_layer[
+            ablate_layer_idx
+        ]
+        ablate_decoder, ablate_dec_bias = dec_tensors_per_layer[
+            ablate_layer_idx
+        ]
+
         ablate_hook_handle = model.transformer.h[
             ablate_layer_idx
         ].register_forward_hook(
-            ablate_hook_fac(ablate_dim_idx, ablate_encoder, ablate_bias)
+            ablate_hook_fac(
+                ablate_dim_idx,
+                ablate_encoder,
+                ablate_enc_bias,
+                ablate_decoder,
+                ablate_dec_bias,
+            )
         )
 
-    cache_encoder, cache_bias = tensors_per_layer[cache_layer_idx]
+    cache_encoder, cache_bias = enc_tensors_per_layer[cache_layer_idx]
     cache_hook_handle = model.transformer.h[
         cache_layer_idx
     ].register_forward_hook(

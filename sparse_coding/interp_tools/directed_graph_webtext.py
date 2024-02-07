@@ -49,6 +49,8 @@ MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
+DECODER_FILE = config.get("DECODER_FILE")
+DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
 GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
@@ -107,13 +109,22 @@ eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
-# layer_autoencoders: dict[int, tuple[t.Tensor]]
+# layer_encoders: dict[int, tuple[t.Tensor]]
 # layer_dim_indices: dict[int, list[int]]
-layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
+layer_encoders, layer_dim_indices = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
     ENCODER_FILE,
     ENC_BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
+layer_decoders, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    DECODER_FILE,
+    DEC_BIASES_FILE,
     TOP_K_INFO_FILE,
     accelerator,
     __file__,
@@ -132,7 +143,8 @@ for ablate_layer_idx in ablate_layer_range:
         [ablate_layer_idx],
         layer_dim_indices,
         model,
-        layer_autoencoders,
+        layer_encoders,
+        layer_decoders,
         base_activations_all_positions,
         ablate_during_run=False,
     ):
@@ -241,14 +253,15 @@ for ablate_layer_idx in ablate_layer_range:
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
         # run one ablated and once not.
-        base_logits = None
+        BASE_LOGITS = None
         with hooks_manager(
             ablate_layer_idx,
             ablate_dim_idx,
             layer_range,
             layer_dim_indices,
             model,
-            layer_autoencoders,
+            layer_encoders,
+            layer_decoders,
             base_activations_top_positions,
             ablate_during_run=False,
         ):
@@ -263,19 +276,20 @@ for ablate_layer_idx in ablate_layer_range:
                     output = model(**top_input)
 
                 logit = output.logits[:, -1, :].cpu()
-                if base_logits is None:
-                    base_logits = logit
-                elif isinstance(base_logits, t.Tensor):
-                    base_logits = t.cat([base_logits, logit], dim=0)
+                if BASE_LOGITS is None:
+                    BASE_LOGITS = logit
+                elif isinstance(BASE_LOGITS, t.Tensor):
+                    BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
 
-        altered_logits = None
+        ALTERED_LOGITS = None
         with hooks_manager(
             ablate_layer_idx,
             ablate_dim_idx,
             layer_range,
             layer_dim_indices,
             model,
-            layer_autoencoders,
+            layer_encoders,
+            layer_decoders,
             ablated_activations,
             ablate_during_run=True,
             coefficient=COEFFICIENT,
@@ -291,12 +305,12 @@ for ablate_layer_idx in ablate_layer_range:
                     output = model(**top_input)
 
                 logit = output.logits[:, -1, :].cpu()
-                if altered_logits is None:
-                    altered_logits = logit
-                elif isinstance(altered_logits, t.Tensor):
-                    altered_logits = t.cat([altered_logits, logit], dim=0)
+                if ALTERED_LOGITS is None:
+                    ALTERED_LOGITS = logit
+                elif isinstance(ALTERED_LOGITS, t.Tensor):
+                    ALTERED_LOGITS = t.cat([ALTERED_LOGITS, logit], dim=0)
 
-        logit_diff = altered_logits - base_logits
+        logit_diff = ALTERED_LOGITS - BASE_LOGITS
         logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
 
     if BRANCHING_FACTOR is None:
