@@ -148,7 +148,7 @@ def hooks_manager(
             projected_acts_unrec = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0],
-                    encoder.to(model.device),
+                    encoder.T.to(model.device),
                     bias=biases.to(model.device),
                 )
             )
@@ -165,7 +165,7 @@ def hooks_manager(
             ablated_activations = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
-                    encoder.T.to(model.device),
+                    encoder.to(model.device),
                 )
             )
             # We must preserve the attention data in `output[1]`.
