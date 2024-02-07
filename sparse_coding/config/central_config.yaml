@@ -57,8 +57,8 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 700
-MAX_SEQ_LEN: 700
+NUM_SEQUENCES_EVALED: 100
+MAX_SEQ_LEN: 100
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
@@ -72,7 +72,7 @@ VIEW: 5
 # `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 300
+NUM_SEQUENCES_INTERPED: 100
 MAX_SEQ_INTERPED_LEN: 100
 
 # `directed_graph_mc.py`

@@ -51,7 +51,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ENCODER_FILE = config.get("ENCODER_FILE")
-BIASES_FILE = config.get("BIASES_FILE")
+ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 SEED = config.get("SEED")
 tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
@@ -62,17 +62,11 @@ TOP_K = config.get("TOP_K", 6)
 VIEW = config.get("VIEW", 5)
 # None means "round to int", in SIG_FIGS.
 SIG_FIGS = config.get("SIG_FIGS", None)
-# DIMS_IN_BATCH is tunable, to fit in GPU memory.
-DIMS_IN_BATCH = config.get("DIMS_IN_BATCH", 200)
 
 if config.get("N_DIMS_PRINTED_OVERRIDE") is not None:
     N_DIMS_PRINTED = config.get("N_DIMS_PRINTED_OVERRIDE")
 else:
     N_DIMS_PRINTED = PROJECTION_DIM
-
-assert (
-    0 < DIMS_IN_BATCH <= PROJECTION_DIM
-), "DIMS_IN_BATCH must be at least 1 and at most PROJECTION_DIM."
 
 # %%
 # Reproducibility.
@@ -189,9 +183,10 @@ for layer_idx in seq_layer_indices:
         f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENCODER_FILE}",
     )
     BIASES_PATH = save_paths(
-        __file__, f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{BIASES_FILE}"
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENC_BIASES_FILE}",
     )
-    imported_weights: t.Tensor = t.load(ENCODER_PATH)
+    imported_weights: t.Tensor = t.load(ENCODER_PATH).T
     imported_biases: t.Tensor = t.load(BIASES_PATH)
 
     # Initialize a concrete encoder for this layer.
@@ -220,18 +215,18 @@ for layer_idx in seq_layer_indices:
     )
 
     # Calculate per-input-token summed activation, for each feature dimension.
-    effects: defaultdict[
-        int, defaultdict[str, float]
-    ] = top_contexts.context_activations(
-        unpacked_prompts_ids,
-        feature_acts,
-        model,
+    effects: defaultdict[int, defaultdict[str, float]] = (
+        top_contexts.context_activations(
+            unpacked_prompts_ids,
+            feature_acts,
+            model,
+        )
     )
 
     # Select just the top-k effects.
-    truncated_effects: defaultdict[
-        int, list[tuple[str, float]]
-    ] = top_contexts.top_k_contexts(effects, VIEW, TOP_K)
+    truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
+        top_contexts.top_k_contexts(effects, VIEW, TOP_K)
+    )
 
     populate_table(
         truncated_effects,
