@@ -64,7 +64,7 @@ with:
   Toolkit 12.2 or newer.
 
 ## Project Status
-Current version is 1.0.0.
+Current version is 0.2.0.
 
 The `sae_training` directory is Joseph Bloom's, used for importing his
 pretrained sparse autoencoders from HF Hub.
