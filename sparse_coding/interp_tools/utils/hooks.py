@@ -146,13 +146,10 @@ def hooks_manager(
         ) -> None:
             """
             Project activation vectors; ablate them; project them back.
-
-            I am worried that a messy transform here is mangling data; to that
-            end, I am implementing a residual connection.
             """
 
-            # Project activations through the encoder.
-            projected_acts_unrec = (
+            # Project through the encoder.
+            projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0] + dec_biases.to(model.device),
                     encoder.T.to(model.device),
@@ -160,26 +157,31 @@ def hooks_manager(
                 )
             ).to(model.device)
 
-            projected_acts = t.nn.functional.relu(
-                projected_acts_unrec,
-                inplace=False,
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
             )
-            # Ablate the activation at dim_idx. Modify here to scale in
-            # different ways besides ablation.
-            projected_acts[:, -1, dim_idx] = (
-                projected_acts[:, -1, dim_idx] * coefficient
+
+            # We will ablate the activation at dim_idx by subtracting only that
+            # dim value.
+            projected_acts[:, -1, :dim_idx] = (
+                t.zeros_like(projected_acts[:, -1, :dim_idx])
             )
-            # Project back to activation space.
-            ablated_activations = (
+            projected_acts[:, -1, dim_idx+1:] = (
+                t.zeros_like(projected_acts[:, -1, dim_idx+1:])
+            )
+
+            projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
                     decoder.T.to(model.device),
                     bias=-dec_biases.to(model.device),
                 )
             )
-            # We must preserve the attention data in `output[1]`.
+            # Perform the ablation. We must also preserve the attention data in
+            # `output[1]`.
             return (
-                0.5 * ablated_activations + 0.5 * output[0],
+                output[0] - projected_acts,
                 output[1],
             )
 
