@@ -13,6 +13,7 @@ setup(
     license="MIT",
     packages=find_packages(),
     install_requires=[
+        "bleach",
         "jupyter",
         "numpy",
         "torch",
