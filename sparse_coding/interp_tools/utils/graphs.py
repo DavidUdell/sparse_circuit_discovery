@@ -1,9 +1,9 @@
 """Graph the causal effects of ablations."""
 
 
-import html
 from textwrap import dedent
 
+import bleach
 import torch as t
 import wandb
 from pygraphviz import AGraph
@@ -132,7 +132,7 @@ def label_highlighting(
 
         for token, act in zip(context, act):
             token = tokenizer.convert_tokens_to_string([token])
-            token = html.escape(token)
+            token = bleach.clean(token)
 
             if act <= 0.0:
                 label += f"<td>{token}</td>"
@@ -168,10 +168,7 @@ def label_highlighting(
 
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
-            token = html.escape(token)
-            token = token.replace("##", " ")
-            token = token.replace("[", " ")
-            token = token.replace("]", " ")
+            token = bleach.clean(token)
             label += f'{cell_tag}{token}</td>'
         label += "</tr>"
 

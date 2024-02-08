@@ -83,7 +83,10 @@ with warnings.catch_warnings():
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR, token=HF_ACCESS_TOKEN
     )
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_DIR,
+    token=HF_ACCESS_TOKEN,
+    )
 accelerator: Accelerator = Accelerator()
 model = accelerator.prepare(model)
 model.eval()
