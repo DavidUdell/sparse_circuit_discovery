@@ -169,7 +169,9 @@ def label_highlighting(
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
-            token = token.replace('"', '\\"')
+            token = token.replace("##", " ")
+            token = token.replace("[", " ")
+            token = token.replace("]", " ")
             label += f'{cell_tag}{token}</td>'
         label += "</tr>"
 
