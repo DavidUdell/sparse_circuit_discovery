@@ -37,7 +37,8 @@ Once you save `central_config.yaml`, run the interpretability pipeline with:
 ### Notes:
 - For the time being, only GPT-2 small and a projection factor of 32 are
   supported, to take advantage of set of preexisting sparse autoencoders for
-  those values.
+  those values. Additionally, only ablations (rather than feature scaling by
+  arbitrary coefficients) are supported.
 
 - If you're encountering cryptic env variable bugs, ensure you're running CUDA
   Toolkit 12.2 or newer.
