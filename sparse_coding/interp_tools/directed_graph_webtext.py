@@ -23,16 +23,17 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 
-from sparse_coding.interp_tools.utils.graphs import graph_causal_effects
-from sparse_coding.interp_tools.utils.hooks import hooks_manager
+from sparse_coding.interp_tools.utils.computations import calc_act_diffs
+from sparse_coding.interp_tools.utils.graphs import graph_and_log
+from sparse_coding.interp_tools.utils.hooks import (
+    hooks_manager,
+    prepare_autoencoder_and_indices,
+    prepare_dim_indices,
+)
 from sparse_coding.utils.interface import (
+    load_yaml_constants,
     parse_slice,
     slice_to_range,
-    load_yaml_constants,
-    save_paths,
-    sanitize_model_name,
-    load_layer_tensors,
-    load_layer_feature_indices,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
 
@@ -47,13 +48,19 @@ WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
-BIASES_FILE = config.get("BIASES_FILE")
+ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
+DECODER_FILE = config.get("DECODER_FILE")
+DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
+GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
-DIMS_PLOTTED_LIST = config.get("DIMS_PLOTTED_LIST", None)
+COEFFICIENT = config.get("COEFFICIENT", 0.0)
+INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
+DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
+LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
 
 # %%
@@ -70,63 +77,65 @@ wandb.init(
 )
 
 # %%
-# Load model, etc.
+# Load and prepare the model.
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR, token=HF_ACCESS_TOKEN
     )
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_DIR,
+    token=HF_ACCESS_TOKEN,
+    )
 accelerator: Accelerator = Accelerator()
 model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 ablate_layer_range: range = layer_range[:-1]
-cache_layer_range: range = layer_range[1:]
 
 # %%
-# Load the complementary `openwebtext` dataset subset, relative to
-# `collect_acts_webtext`.
+# Load the `openwebtext` validation set.
 dataset: list[list[str]] = load_dataset(
     "Elriggs/openwebtext-100k",
     split="train",
 )["text"]
 dataset_indices: np.ndarray = np.random.choice(
-    len(dataset), size=len(dataset), replace=False
+    len(dataset),
+    size=len(dataset),
+    replace=False,
 )
 STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
 eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
 # %%
+# Prepare all layer autoencoders and layer dim index lists up front.
+# layer_encoders: dict[int, tuple[t.Tensor]]
+# layer_dim_indices: dict[int, list[int]]
+layer_encoders, layer_dim_indices = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    ENCODER_FILE,
+    ENC_BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
+layer_decoders, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    DECODER_FILE,
+    DEC_BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
+
+# %%
 # Collect base case data.
 base_activations_all_positions = defaultdict(recursive_defaultdict)
-
 for ablate_layer_idx in ablate_layer_range:
-    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-        MODEL_DIR,
-        ablate_layer_idx,
-        ENCODER_FILE,
-        BIASES_FILE,
-        __file__,
-    )
-    ablation_layer_autoencoder = {
-        ablate_layer_idx: (
-            ablate_layer_encoder,
-            ablate_layer_bias,
-        ),
-    }
-    ablate_dims = load_layer_feature_indices(
-        MODEL_DIR,
-        ablate_layer_idx,
-        TOP_K_INFO_FILE,
-        __file__,
-        [],
-    )
-    base_cache_dim_index: dict[int, list[int]] = {
-        ablate_layer_idx: ablate_dims
-    }
     # Base run, to determine top activating sequence positions. I'm
     # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
     # layer, by using its interface in a hacky way.
@@ -134,9 +143,10 @@ for ablate_layer_idx in ablate_layer_range:
         ablate_layer_idx - 1,
         None,
         [ablate_layer_idx],
-        base_cache_dim_index,
+        layer_dim_indices,
         model,
-        ablation_layer_autoencoder,
+        layer_encoders,
+        layer_decoders,
         base_activations_all_positions,
         ablate_during_run=False,
     ):
@@ -172,8 +182,10 @@ for i in base_activations_all_positions:
             # tuple (ablate_layer_idx, None, base_cache_dim_index).
             activations_tensor = base_activations_all_positions[i][j][k]
 
-            favorite_seq_pos = t.argmax(activations_tensor, dim=1).squeeze()
-            max_val = activations_tensor[:, favorite_seq_pos, :].unsqueeze(1)
+            fave_seq_pos_flat: int = (
+                t.argmax(activations_tensor, dim=1).squeeze().item()
+            )
+            max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
             min_val = max_val / 2.0
             mask = (activations_tensor >= min_val) & (
                 activations_tensor <= max_val
@@ -182,77 +194,39 @@ for i in base_activations_all_positions:
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
             favorite_sequence_positions[i, j, k] = top_indices.tolist()
 
-
 # %%
 # Run ablations at top sequence positions.
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
+keepers: dict[tuple[int, int], int] = {}
+logit_diffs = {}
 
 for ablate_layer_idx in ablate_layer_range:
-    ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-        MODEL_DIR,
-        ablate_layer_idx,
-        ENCODER_FILE,
-        BIASES_FILE,
-        __file__,
-    )
-    ablate_dim_indices = load_layer_feature_indices(
-        MODEL_DIR,
-        ablate_layer_idx,
-        TOP_K_INFO_FILE,
-        __file__,
-        [],
-    )
-    # Optionally pare down to a target subset of ablate dims.
-    if DIMS_PLOTTED_LIST is not None:
-        for i in DIMS_PLOTTED_LIST:
-            assert i in ablate_dim_indices, dedent(
-                f"Index {i} not in `ablate_dim_indices`."
-            )
-        ablate_dim_indices = DIMS_PLOTTED_LIST
+    # Thin the first layer indices or fix any indices, when requested.
+    if ablate_layer_idx == ablate_layer_range[0] or (
+        DIMS_PINNED is not None
+        and DIMS_PINNED.get(ablate_layer_idx) is not None
+    ):
+        layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
+            INIT_THINNING_FACTOR,
+            DIMS_PINNED,
+            layer_dim_indices[ablate_layer_idx],
+            ablate_layer_idx,
+            layer_range,
+            SEED,
+        )
 
-    for ablate_dim in tqdm(ablate_dim_indices, desc="Dim Ablations Progress"):
-        # This inner loop is all setup; it doesn't loop over the forward
-        # passes.
-        for cache_layer_idx in cache_layer_range:
-            ablate_layer_encoder, ablate_layer_bias = load_layer_tensors(
-                MODEL_DIR,
-                cache_layer_idx,
-                ENCODER_FILE,
-                BIASES_FILE,
-                __file__,
-            )
-            per_layer_autoencoders: dict[int, tuple[t.Tensor]] = {
-                ablate_layer_idx: (
-                    ablate_layer_encoder,
-                    ablate_layer_bias,
-                ),
-                cache_layer_idx: (
-                    ablate_layer_encoder,
-                    ablate_layer_bias,
-                ),
-            }
-            cache_dims = load_layer_feature_indices(
-                MODEL_DIR,
-                cache_layer_idx,
-                TOP_K_INFO_FILE,
-                __file__,
-                [],
-            )
-            base_cache_dim_index: dict[int, list[int]] = {
-                cache_layer_idx: cache_dims,
-            }
-
-        # Ablation run at top activating sequence positions. We use the -1
-        # index from the initial top position collection.
-        per_seq_positions: list[int] = favorite_sequence_positions[
-            ablate_layer_idx - 1, None, ablate_dim
-        ]
+    for ablate_dim_idx in tqdm(
+        layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
+    ):
+        # Truncated means truncated to MAX_SEQ_INTERPED_LEN. This block does
+        # the work of further truncating to the top activating position length.
         truncated_tok_seqs = []
-        truncated_seqs_final_indices: list[int] = []
-        for per_seq_position in per_seq_positions:
-            # per_seq_position is an int idx for a flattened eval_set.
-            for sequence_idx, seq in enumerate(eval_set):
+
+        for fav_seq_pos in favorite_sequence_positions[
+            ablate_layer_idx - 1, None, ablate_dim_idx
+        ]:
+            for seq in eval_set:
                 # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
                 tok_seq = tokenizer(
                     seq,
@@ -260,141 +234,147 @@ for ablate_layer_idx in ablate_layer_range:
                     truncation=True,
                     max_length=MAX_SEQ_INTERPED_LEN,
                 )
-                if len(tok_seq["input_ids"]) < per_seq_position:
-                    per_seq_position = per_seq_position - len(
-                        tok_seq["input_ids"]
-                    )
+                # fav_seq_pos is the index for a flattened eval_set.
+                if tok_seq["input_ids"].size(-1) < fav_seq_pos:
+                    fav_seq_pos = fav_seq_pos - tok_seq["input_ids"].size(-1)
                     continue
-                truncated_tok_seqs.append(tok_seq)
-                truncated_seqs_final_indices.append(per_seq_position)
-                break
+                if tok_seq["input_ids"].size(-1) >= fav_seq_pos:
+                    tok_seq = tokenizer(
+                        seq,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=fav_seq_pos + 1,
+                    )
+                    truncated_tok_seqs.append(tok_seq)
+                    break
+                raise ValueError("fav_seq_pos out of range.")
 
+        assert len(truncated_tok_seqs) > 0, dedent(
+            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
+        )
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
         # run one ablated and once not.
+        BASE_LOGITS = None
         with hooks_manager(
             ablate_layer_idx,
-            ablate_dim,
+            ablate_dim_idx,
             layer_range,
-            base_cache_dim_index,
+            layer_dim_indices,
             model,
-            per_layer_autoencoders,
+            layer_encoders,
+            layer_decoders,
             base_activations_top_positions,
             ablate_during_run=False,
         ):
-            for s in truncated_tok_seqs:
-                top_input = s.to(model.device)
+            for seq in truncated_tok_seqs:
+                top_input = seq.to(model.device)
                 _ = t.manual_seed(SEED)
+
                 try:
-                    model(**top_input)
+                    output = model(**top_input)
                 except RuntimeError:
                     gc.collect()
-                    model(**top_input)
+                    output = model(**top_input)
 
+                logit = output.logits[:, -1, :].cpu()
+                if BASE_LOGITS is None:
+                    BASE_LOGITS = logit
+                elif isinstance(BASE_LOGITS, t.Tensor):
+                    BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
+
+        ALTERED_LOGITS = None
         with hooks_manager(
             ablate_layer_idx,
-            ablate_dim,
+            ablate_dim_idx,
             layer_range,
-            base_cache_dim_index,
+            layer_dim_indices,
             model,
-            per_layer_autoencoders,
+            layer_encoders,
+            layer_decoders,
             ablated_activations,
             ablate_during_run=True,
+            coefficient=COEFFICIENT,
         ):
-            for s in truncated_tok_seqs:
-                top_input = s.to(model.device)
+            for seq in truncated_tok_seqs:
+                top_input = seq.to(model.device)
                 _ = t.manual_seed(SEED)
+
                 try:
-                    model(**top_input)
+                    output = model(**top_input)
                 except RuntimeError:
                     gc.collect()
-                    model(**top_input)
+                    output = model(**top_input)
 
-# %%
-# Compute diffs. Recursive defaultdict indices are:
-# [ablate_layer_idx][ablate_dim_idx][cache_dim_idx]
-act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
-for i in ablated_activations:
-    for j in ablated_activations[i]:
-        for k in ablated_activations[i][j]:
-            ablate_vec = ablated_activations[i][j][k]
-            base_vec = base_activations_top_positions[i][j][k]
+                logit = output.logits[:, -1, :].cpu()
+                if ALTERED_LOGITS is None:
+                    ALTERED_LOGITS = logit
+                elif isinstance(ALTERED_LOGITS, t.Tensor):
+                    ALTERED_LOGITS = t.cat([ALTERED_LOGITS, logit], dim=0)
 
-            assert (
-                ablate_vec.shape == base_vec.shape == (1, base_vec.size(1), 1)
-            ), dedent(
-                f"""
-                Shape mismatch between ablated and base vectors for ablate
-                layer {i}, ablate dim {j}, and cache dim {k}; ablate shape
-                {ablate_vec.shape} and base shape {base_vec.shape}.
-                """
+        logit_diff = ALTERED_LOGITS - BASE_LOGITS
+        logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
+
+    if BRANCHING_FACTOR is None:
+        break
+
+    # Keep just the most affected indices for the next layer's ablations.
+    assert isinstance(BRANCHING_FACTOR, int)
+
+    working_tensor = t.Tensor([[0.0]])
+    top_layer_dims = []
+    a = ablate_layer_idx
+
+    for j in ablated_activations[a]:
+        for k in ablated_activations[a][j]:
+            working_tensor = t.abs(
+                t.cat(
+                    [
+                        working_tensor,
+                        ablated_activations[a][j][k][:, -1, :]
+                        - base_activations_top_positions[a][j][k][:, -1, :],
+                    ]
+                )
             )
 
-            # The truncated seqs were all flattened. Now we just want what
-            # would be the last position of each sequence.
-            act_diffs[i, j, k] = t.tensor([[0.0]])
-            for x in truncated_seqs_final_indices:
-                act_diffs[i, j, k] += ablate_vec[:, x, :] - base_vec[:, x, :]
-
-# There should be any overall effect.
-OVERALL_EFFECTS = 0.0
-for i, j, k in act_diffs:
-    OVERALL_EFFECTS += abs(act_diffs[i, j, k].item())
-assert OVERALL_EFFECTS != 0.0, "Ablate hook effects sum to exactly zero."
-
-# All other effects should be t.Tensors, but wandb plays nicer with floats.
-diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
-for i, j, k in act_diffs:
-    key: str = f"{i}.{j}->{i+1}.{k}"
-    value: float = act_diffs[i, j, k].item()
-    diffs_table.add_data(key, value)
-wandb.log({"Effects": diffs_table})
-
-plotted_diffs = {}
-if BRANCHING_FACTOR is not None:
-    # Keep only the top effects per ablation site i, j across all downstream
-    # indices k.
-    working_dict = {}
-
-    for key, effect in act_diffs.items():
-        site = key[:2]
-        if site not in working_dict:
-            working_dict[site] = []
-        working_dict[site].append((key, effect))
-
-    for site, items in working_dict.items():
-        sorted_items = sorted(
-            items,
-            key=lambda x: abs(x[-1].item()),
-            reverse=True,
+        _, ordered_dims = t.sort(
+            working_tensor.squeeze(),
+            descending=True,
         )
-        for k, v in sorted_items[:BRANCHING_FACTOR]:
-            plotted_diffs[k] = v
+        ordered_dims = ordered_dims.tolist()
+        top_dims = [
+            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
+        ][:BRANCHING_FACTOR]
 
-else:
-    plotted_diffs = act_diffs
+        assert len(top_dims) <= BRANCHING_FACTOR
 
-save_path: str = save_paths(
-    __file__,
-    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",    
+        keepers[a, j] = top_dims
+        top_layer_dims.extend(top_dims)
+
+    layer_dim_indices[a + 1] = list(set(top_layer_dims))
+
+# %%
+# Compute ablated effects minus base effects.
+act_diffs: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
+    ablated_activations,
+    base_activations_top_positions,
 )
 
-graph_causal_effects(
-    plotted_diffs,
+# %%
+# Graph effects.
+graph_and_log(
+    act_diffs,
+    keepers,
+    BRANCHING_FACTOR,
     MODEL_DIR,
+    GRAPH_FILE,
+    GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
-    OVERALL_EFFECTS,
+    LOGIT_TOKENS,
+    tokenizer,
+    logit_diffs,
     __file__,
-).draw(
-    save_path,
-    format="svg",
-    prog="dot",
 )
-
-# Read the .svg into a `wandb` artifact.
-artifact = wandb.Artifact("feature_graph", type="directed_graph")
-artifact.add_file(save_path)
-wandb.log_artifact(artifact)
 
 # %%
 # Wrap up logging.

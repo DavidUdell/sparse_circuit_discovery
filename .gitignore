@@ -6,8 +6,9 @@
 *.csv
 
 # Causal graph files
-feature_web.png
+rasp_feature_graph.png
 *.svg
+*.dot
 
 # `lightning` and `wandb` local logging
 *.ckpt

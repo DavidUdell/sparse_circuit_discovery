@@ -8,10 +8,10 @@ import torch as t
 import transformers
 from accelerate import Accelerator
 
-from sparse_coding.utils.top_k import (
-    per_input_token_effects,
+from sparse_coding.utils.top_contexts import (
+    context_activations,
     project_activations,
-    select_top_k_tokens,
+    top_k_contexts,
 )
 
 
@@ -62,49 +62,34 @@ def mock_data():
     return input_token_ids_by_q, encoder_activations_by_q_block
 
 
-def test_per_input_token_effects(  # pylint: disable=redefined-outer-name
+def test_context_activations(  # pylint: disable=redefined-outer-name
     mock_autoencoder, mock_data
 ):
-    """Test `per_input_token_effects`."""
+    """Test `context_activations`."""
 
     # Pytest fixture injections.
-    mock_encoder, tokenizer, accelerator = mock_autoencoder
+    mock_encoder, _, _ = mock_autoencoder
     question_token_ids, feature_activations = mock_data
 
-    dims_in_batch = 200
-
-    mock_effects = per_input_token_effects(
+    mock_effects: defaultdict[
+        int, list[tuple[list[int], list[float]]]
+    ] = context_activations(
         question_token_ids,
         feature_activations,
         mock_encoder,
-        tokenizer,
-        accelerator,
-        dims_in_batch,
     )
 
-    try:
-        # Structural asserts.
-        assert isinstance(mock_effects, defaultdict)
-        assert isinstance(mock_effects[0], defaultdict)
-        assert len(mock_effects) == 1024  # 1024 encoder dimensions.
-        assert len(mock_effects[0]) == 9  # 9 unique tokens.
-        # Semantic asserts.
-        assert mock_effects[0]["Just"] == (7 + 11) / 2
-        assert mock_effects[100]["Ġsay"] == (7 + 11) / 2
-        assert mock_effects[200][","] == (7 + 11) / 2
-
-        assert mock_effects[0]["Ġo"] == 7
-        assert mock_effects[100]["ops"] == 7
-        assert mock_effects[200]["."] == 7
-
-        assert mock_effects[0]["Ġhello"] == 11
-        assert mock_effects[100]["Ġworld"] == 11
-        assert mock_effects[200]["!"] == 11
-
-    except Exception as e:  # pylint: disable=broad-except
-        pytest.fail(
-            f"`per_input_token_effects` failed unit test with error: {e}"
-        )
+    assert isinstance(mock_effects, defaultdict)
+    assert isinstance(mock_effects[0], list)
+    assert isinstance(mock_effects[0][0], tuple)
+    assert isinstance(mock_effects[0][0][0], list)
+    assert isinstance(mock_effects[0][0][0][0], int)
+    assert isinstance(mock_effects[0][0][1], list)
+    assert isinstance(mock_effects[0][0][1][0], float)
+    assert len(mock_effects) == 1024  # 1024 encoder dims
+    assert len(mock_effects[0]) == 2  # context and activations
+    assert len(mock_effects[0][0][0]) == 6  # 6 tokens
+    assert len(mock_effects[0][0][1]) == 6
 
 
 def test_project_activations(  # pylint: disable=redefined-outer-name
@@ -119,46 +104,46 @@ def test_project_activations(  # pylint: disable=redefined-outer-name
         acts_list, mock_encoder, accelerator
     )
 
-    try:
-        assert isinstance(mock_projections, list)
-        assert isinstance(mock_projections[0], t.Tensor)
-        assert mock_projections[0].shape == (5, 1024)
-    except Exception as e:  # pylint: disable=broad-except
-        pytest.fail(f"`project_activations` failed unit test with error: {e}")
+    assert isinstance(mock_projections, list)
+    assert isinstance(mock_projections[0], t.Tensor)
+    assert mock_projections[0].shape == (5, 1024)
 
 
-def test_select_top_k_tokens():
-    """Test `select_top_k_tokens`."""
+def test_top_k_contexts():
+    """Test `top_k_contexts`."""
 
-    def inner_defaultdict():
-        """Return a new inner defaultdict."""
-        return defaultdict(str)
+    mock_effects: defaultdict[
+        int, list[tuple[list[int], list[float]]]
+    ] = defaultdict(list)
+    mock_effects[0].append(([0, 1, 2], [0.1, 0.2, 0.3]))
+    mock_effects[0].append(([1, 1, 2], [0.4, 0.5, 0.6]))
+    mock_effects[0].append(([2, 2, 2], [0.7, 0.8, 0.9]))
+    mock_effects[0].append(([3, 5, 3], [0.10, 0.11, 0.12]))
+    mock_effects[0].append(([5, 4, 3], [0.13, 0.14, 0.15]))
+    mock_effects[0].append(([5, 5, 2], [0.16, 0.17, 0.18]))
+    mock_effects[0].append(([4, 2, 1], [0.19, 0.20, 0.21]))
 
-    mock_effects: defaultdict[int, defaultdict[str, float]] = defaultdict(
-        inner_defaultdict
-    )
-    mock_effects[0]["a"] = 1.0
-    mock_effects[0]["b"] = 0.5
-    mock_effects[0]["c"] = 0.25
-    mock_effects[0]["d"] = 0.125
-    mock_effects[0]["e"] = 0.0625
-    mock_effects[1]["a"] = 0.5
-    mock_effects[1]["b"] = 0.25
-    mock_effects[1]["c"] = 0.125
-    mock_effects[1]["d"] = 0.0625
-    mock_effects[1]["e"] = 0.03125
+    mock_effects[1].append(([12, 2, 5], [0.1, 0.2, 0.3]))
+    mock_effects[1].append(([4, 5, 23], [0.4, 0.5, 0.6]))
+    mock_effects[1].append(([12, 12, 5], [0.7, 0.8, 0.9]))
+    mock_effects[1].append(([2, 1, 1], [0.10, 0.11, 0.12]))
+    mock_effects[1].append(([11, 25, 43], [0.13, 0.14, 0.15]))
+    mock_effects[1].append(([1, 1, 55], [0.16, 0.17, 0.18]))
+    mock_effects[1].append(([5, 4, 90], [0.19, 0.20, 0.21]))
 
+    view: int = 2
     top_k: int = 3
 
-    mock_top_k_tokens = select_top_k_tokens(mock_effects, top_k)
-    try:
-        assert isinstance(mock_top_k_tokens, defaultdict)
-        assert isinstance(mock_top_k_tokens[0], list)
-        assert isinstance(mock_top_k_tokens[0][0], tuple)
-        assert isinstance(mock_top_k_tokens[0][0][0], str)
-        assert isinstance(mock_top_k_tokens[0][0][1], float)
-        assert len(mock_top_k_tokens) == 2
-        assert len(mock_top_k_tokens[0]) == 3
-        assert len(mock_top_k_tokens[1]) == 3
-    except Exception as e:  # pylint: disable=broad-except
-        pytest.fail(f"`select_top_k_tokens` failed unit test with error: {e}")
+    mock_top_k_contexts = top_k_contexts(mock_effects, view, top_k)
+
+    assert isinstance(mock_top_k_contexts, defaultdict)
+    assert isinstance(mock_top_k_contexts[0], list)
+    assert isinstance(mock_top_k_contexts[0][0], tuple)
+    assert isinstance(mock_top_k_contexts[0][0][0], list)
+    assert isinstance(mock_top_k_contexts[0][0][0][0], int)
+    assert isinstance(mock_top_k_contexts[0][0][1], list)
+    assert isinstance(mock_top_k_contexts[0][0][1][0], float)
+
+    assert len(mock_top_k_contexts) == 2
+    assert len(mock_top_k_contexts[0]) == 3
+    assert len(mock_top_k_contexts[1]) == 3

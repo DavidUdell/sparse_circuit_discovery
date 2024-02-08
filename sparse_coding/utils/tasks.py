@@ -5,7 +5,6 @@ from collections import defaultdict
 
 import numpy as np
 import torch as t
-from tqdm.auto import tqdm
 
 
 def shuffle_answers(choices, labels_one_hot):
@@ -31,21 +30,14 @@ def multiple_choice_task(
     tokenizer,
     accelerator,
     num_shot: int,
-    acts_layers_slice: slice,
-    return_outputs: bool = True,
-) -> tuple[list, dict, list] | None:
+    return_logits: bool = True,
+) -> t.LongTensor | None:
     """
     The model does the `truthful_qa multiple-choice 1` task.
-
-    `return_outputs = False` runs the task without returning any outputs, for
-    activation collection purposes.
     """
+    logits = []
 
-    activations = []
-    answers_with_rubric = {}
-    prompts_ids = []
-
-    for question_idx in tqdm(indices, desc="Questions progress", leave=False):
+    for question_idx in indices:
         multishot = ""
         # The multishot part of the prompt should not include the current
         # question.
@@ -91,7 +83,7 @@ def multiple_choice_task(
         unshuffled_labels_current: list = dataset["validation"]["mc1_targets"][
             question_idx
         ]["labels"]
-        shuffled_choices_current, shuffled_labels_current = shuffle_answers(
+        shuffled_choices_current, _ = shuffle_answers(
             unshuffled_choices_current, unshuffled_labels_current
         )
         for option_num, shuffled_option in enumerate(shuffled_choices_current):
@@ -105,7 +97,6 @@ def multiple_choice_task(
         input_ids: t.Tensor = tokenizer.encode(
             multishot + question, return_tensors="pt"
         )
-        prompts_ids.append(input_ids)
 
         # `accelerate` parallelization can fail with small models.
         try:
@@ -116,23 +107,15 @@ def multiple_choice_task(
             input_ids = accelerator.prepare(input_ids)
             outputs = model(input_ids)
 
-        if not return_outputs:
+        if not return_logits:
             continue
-        # We want the answer stream's logits, so we pass
-        # `outputs.logits[:,-1,:]`. `dim=-1` means greedy sampling over the
-        # token dim.
-        answer_id: t.LongTensor = t.argmax(outputs.logits[:, -1, :], dim=-1)
-        model_answer: str = tokenizer.decode(answer_id)
 
-        # Cut the completion down to just its answer integer.
-        model_answer = model_answer.split("\n")[-1]
-        model_answer = model_answer.replace("A: (", "")
+        q_logit: t.LongTensor = outputs.logits[:, -1, :]
+        logits.append(q_logit)
 
-        ground_truth: int = unhot(shuffled_labels_current)
-        answers_with_rubric[question_idx] = [int(model_answer), ground_truth]
-        activations.append(outputs.hidden_states[acts_layers_slice])
-
-    return activations, answers_with_rubric, prompts_ids
+    if return_logits:
+        logits = t.cat(logits, dim=0)
+        return logits
 
 
 def recursive_defaultdict():

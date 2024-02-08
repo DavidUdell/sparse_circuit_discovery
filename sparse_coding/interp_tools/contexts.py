@@ -1,6 +1,6 @@
 # %%
 """
-Print the top affected tokens per dimension of a learned decoder.
+Log top-activating contexts of an autoencoder.
 
 Requires a HF access token to get `Llama-2`'s tokenizer.
 """
@@ -9,11 +9,8 @@ Requires a HF access token to get `Llama-2`'s tokenizer.
 import warnings
 import csv
 from collections import defaultdict
-from math import isnan
-from typing import Union
 
 import numpy as np
-import prettytable
 import torch as t
 import transformers
 import wandb
@@ -25,8 +22,9 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
+from tqdm.auto import tqdm
 
-from sparse_coding.utils import top_k
+from sparse_coding.utils import top_contexts
 from sparse_coding.utils.interface import (
     parse_slice,
     slice_to_range,
@@ -53,7 +51,7 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ENCODER_FILE = config.get("ENCODER_FILE")
-BIASES_FILE = config.get("BIASES_FILE")
+ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 SEED = config.get("SEED")
 tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
@@ -61,19 +59,14 @@ HIDDEN_DIM = tsfm_config.hidden_size
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
 TOP_K = config.get("TOP_K", 6)
+VIEW = config.get("VIEW", 5)
 # None means "round to int", in SIG_FIGS.
 SIG_FIGS = config.get("SIG_FIGS", None)
-# DIMS_IN_BATCH is tunable, to fit in GPU memory.
-DIMS_IN_BATCH = config.get("DIMS_IN_BATCH", 200)
 
 if config.get("N_DIMS_PRINTED_OVERRIDE") is not None:
     N_DIMS_PRINTED = config.get("N_DIMS_PRINTED_OVERRIDE")
 else:
     N_DIMS_PRINTED = PROJECTION_DIM
-
-assert (
-    0 < DIMS_IN_BATCH <= PROJECTION_DIM
-), "DIMS_IN_BATCH must be at least 1 and at most PROJECTION_DIM."
 
 # %%
 # Reproducibility.
@@ -109,6 +102,7 @@ class Encoder(t.nn.Module):
 
     def __init__(self, layer_weights: t.Tensor, layer_biases: t.Tensor):
         """Initialize the encoder."""
+
         super().__init__()
         self.encoder_layer = t.nn.Linear(HIDDEN_DIM, PROJECTION_DIM)
         self.encoder_layer.weight.data = layer_weights
@@ -119,72 +113,57 @@ class Encoder(t.nn.Module):
     def forward(self, inputs):
         """Project to the sparse latent space."""
 
-        # Apparently unneeded patch for `accelerate` with small models:
-        # inputs = inputs.to(self.encoder_layer.weight.device)
+        # Apparently unneeded patch for `accelerate` with small models: inputs
+        # = inputs.to(self.encoder_layer.weight.device)
         return self.encoder(inputs)
 
 
 # %%
-# Tabluation functionality.
-def round_floats(num: Union[float, int]) -> Union[float, int]:
-    """Round floats to number decimal places."""
-    if isnan(num):
-        print(f"{num} is NaN.")
-        return num
-    return round(num, SIG_FIGS)
-
-
+# Tabulation functionality.
 def populate_table(
-    _table, top_k_tokes, model_dir, top_k_info_file, layer_index
+    contexts_and_effects: defaultdict[int, list[tuple[str, list[float]]]],
+    model_dir,
+    top_k_info_file,
+    layer_index,
 ) -> None:
-    """Put the results in the table _and_ save to csv."""
-    csv_rows: list[list] = [
-        ["Dimension", "Top Tokens", "Top-Token Activations"]
-    ]
-
-    for feature_dim, tokens_list in list(top_k_tokes.items())[:N_DIMS_PRINTED]:
-        # Replace the tokenizer's special space char with a space literal.
-        top_tokens = [str(t).replace("Ġ", " ") for t, _ in tokens_list[:TOP_K]]
-        top_values = [round_floats(v) for _, v in tokens_list[:TOP_K]]
-
-        # Skip the dimension if its activations are all zeroed out.
-        if top_values[0] == 0:
-            continue
-
-        keeper_tokens = []
-        keeper_values = []
-
-        # Omit tokens _within a dimension_ with no activation.
-        for top_t, top_v in zip(top_tokens, top_values):
-            if top_v != 0:
-                keeper_tokens.append(top_t)
-                keeper_values.append(top_v)
-
-        # Cast survivors to string.
-        keeper_values = [str(v) for v in keeper_values]
-
-        processed_row = [
-            f"{feature_dim}",
-            ", ".join(keeper_tokens),
-            ", ".join(keeper_values),
-        ]
-        _table.add_row(processed_row)
-        csv_rows.append(processed_row)
+    """Save results to a csv table."""
 
     top_k_info_path: str = save_paths(
         __file__,
         f"{sanitize_model_name(model_dir)}/{layer_index}/{top_k_info_file}",
     )
+
+    header: list = [
+        "Dimension Index",
+        "Top-Activating Contexts",
+        "Context Activations",
+    ]
+
     with open(top_k_info_path, "w", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerows(csv_rows)
-        wandb.log(
-            {f"layer {layer_index} top-k tokens": wandb.Table(
-                columns=csv_rows[0],
-                data=csv_rows[1:],
-                allow_mixed_types=True,
-            )}
-        )
+        writer.writerow(header)
+
+        for dim_idx in tqdm(contexts_and_effects, desc="Features Labeled"):
+            top_k_contexts = []
+            top_activations = []
+            # Context here has been stringified, so its length is not its token
+            # length, for the time being.
+            for context, acts in contexts_and_effects[dim_idx]:
+                if sum(acts) == 0.0:
+                    break
+
+                top_k_contexts.append(context)
+                top_activations.append(acts)
+
+            if not top_k_contexts:
+                continue
+
+            row = [
+                dim_idx,
+                top_k_contexts,
+                top_activations,
+            ]
+            writer.writerow(row)
 
 
 # %%
@@ -195,6 +174,7 @@ with warnings.catch_warnings():
         MODEL_DIR,
         token=HF_ACCESS_TOKEN,
     )
+
 seq_layer_indices: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 for layer_idx in seq_layer_indices:
@@ -203,9 +183,10 @@ for layer_idx in seq_layer_indices:
         f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENCODER_FILE}",
     )
     BIASES_PATH = save_paths(
-        __file__, f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{BIASES_FILE}"
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENC_BIASES_FILE}",
     )
-    imported_weights: t.Tensor = t.load(ENCODER_PATH)
+    imported_weights: t.Tensor = t.load(ENCODER_PATH).T
     imported_biases: t.Tensor = t.load(BIASES_PATH)
 
     # Initialize a concrete encoder for this layer.
@@ -222,46 +203,37 @@ for layer_idx in seq_layer_indices:
     # Note that activations are stored as a list of question tensors from this
     # function on out. Functions may internally unpack that into individual
     # activations, but that's the general protocol between functions.
-    unpadded_acts: list[t.Tensor] = top_k.unpad_activations(
+    unpadded_acts: list[t.Tensor] = top_contexts.unpad_activations(
         layer_acts_data, unpacked_prompts_ids
     )
 
     # If you want to _directly_ interpret the model's activations, assign
     # `feature_acts` directly to `unpadded_acts` and ensure constants are set
     # to the model's embedding dimensionality.
-    feature_acts: list[t.Tensor] = top_k.project_activations(
+    feature_acts: list[t.Tensor] = top_contexts.project_activations(
         unpadded_acts, model, accelerator
     )
 
-    table = prettytable.PrettyTable()
-    table.field_names = [
-        "Dimension",
-        "Top Tokens",
-        "Top-Token Activations",
-    ]
     # Calculate per-input-token summed activation, for each feature dimension.
-    effects: defaultdict[
-        int, defaultdict[str, float]
-    ] = top_k.per_input_token_effects(
-        unpacked_prompts_ids,
-        feature_acts,
-        model,
-        tokenizer,
-        accelerator,
-        DIMS_IN_BATCH,
+    effects: defaultdict[int, defaultdict[str, float]] = (
+        top_contexts.context_activations(
+            unpacked_prompts_ids,
+            feature_acts,
+            model,
+        )
     )
 
     # Select just the top-k effects.
-    truncated_effects: defaultdict[
-        int, list[tuple[str, float]]
-    ] = top_k.select_top_k_tokens(effects, TOP_K)
+    truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
+        top_contexts.top_k_contexts(effects, VIEW, TOP_K)
+    )
 
     populate_table(
-        table, truncated_effects, MODEL_DIR, TOP_K_INFO_FILE, layer_idx
+        truncated_effects,
+        MODEL_DIR,
+        TOP_K_INFO_FILE,
+        layer_idx,
     )
-    print(table)
-
-    accelerator.free_memory()
 
 # %%
 # Wrap up logging.

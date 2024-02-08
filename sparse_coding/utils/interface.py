@@ -11,6 +11,7 @@ import yaml
 import numpy as np
 import torch as t
 from transformers import PreTrainedModel
+from pygraphviz import AGraph
 
 
 def parse_slice(slice_string: str) -> slice:
@@ -282,13 +283,14 @@ def load_layer_feature_indices(
     layer_idx: int,
     top_k_info_file: str,
     base_file: str,
-    indices: list,
 ) -> list[int]:
     """
     Return the meaningful feature indices for a model layer.
 
     `base_file` should be `__file__` in the calling module.
     """
+
+    indices = []
 
     with open(
         save_paths(
@@ -320,7 +322,7 @@ def load_layer_feature_labels(
     feature_idx: int,
     top_k_info_file: str,
     base_file: str,
-) -> list[str]:
+) -> tuple[list[str], list[list[float]]]:
     """
     Return the top-k input token labels for an encoder layer feature.
 
@@ -347,7 +349,33 @@ def load_layer_feature_labels(
 
         for row in reader:
             if int(row[0]) == feature_idx:
-                return row[1]
+                context_ints = []
+                context_str = row[1]
+                context_sublists = context_str.split("], ")
+
+                for list_str in context_sublists:
+                    list_int = []
+                    list_str = list_str.replace("[", "").replace("]", "")
+                    list_str = list_str.split(", ")
+                    for integer in list_str:
+                        integer = int(integer.strip("'"))
+                        list_int.append(integer)
+                    context_ints.append(list_int)
+
+                act_floats = []
+                acts_str = row[-1]
+                acts_sublists = acts_str.split("], ")
+
+                for list_str in acts_sublists:
+                    list_flt = []
+                    list_str = list_str.replace("[", "").replace("]", "")
+                    list_str = list_str.split(", ")
+                    for flt in list_str:
+                        flt = float(flt)
+                        list_flt.append(flt)
+                    act_floats.append(list_flt)
+
+                return (context_ints, act_floats)
 
         raise ValueError(
             dedent(
@@ -357,6 +385,29 @@ def load_layer_feature_labels(
                 """
             )
         )
+
+
+def load_preexisting_graph(
+    model_dir: str,
+    graph_dot_file: str,
+    base_file: str,
+) -> AGraph | None:
+    """
+    Load a preexisting graph from disk.
+
+    `base_file` should be `__file__` in the calling module.
+    """
+
+    try:
+        graph_rel_path = save_paths(
+            base_file,
+            (sanitize_model_name(model_dir) + "/" + graph_dot_file),
+        )
+        graph = AGraph(graph_rel_path)
+        assert graph is not None, "Newly loaded graph is None."
+        return graph
+    except FileNotFoundError:
+        return None
 
 
 def pad_activations(

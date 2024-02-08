@@ -4,7 +4,6 @@ Smoke integration test for `sparse_coding.py`.
 Note that this integration test will necessarily be somewhat slow.
 """
 
-
 import os
 from runpy import run_module
 
@@ -100,8 +99,8 @@ def test_smoke_sparse_coding(
     """Run the submodule scripts in sequence."""
     for script in [
         "collect_acts",
-        "train_autoencoder",
-        "interp_tools.top_tokens",
+        "load_autoencoder",
+        "interp_tools.contexts",
         "interp_tools.directed_graph_mc",
         "interp_tools.directed_graph_webtext",
     ]:

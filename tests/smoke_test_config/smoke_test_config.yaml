@@ -3,7 +3,7 @@
 MODEL_DIR: "EleutherAI/pythia-70m"
 
 # Layers Slice to Cache Activations From
-ACTS_LAYERS_SLICE: "1:3"
+ACTS_LAYERS_SLICE: "1:4"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 1
@@ -14,7 +14,8 @@ ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
 ENCODER_FILE: "smoke_test_learned_encoder.pt"
 BIASES_FILE: "smoke_test_learned_biases.pt"
 TOP_K_INFO_FILE: "smoke_test_token_info.csv"
-GRAPH_FILE: "feature_graph.svg"
+GRAPH_FILE: "smoke_test_graph.svg"
+GRAPH_DOT_FILE: "smoke_test_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-4
@@ -24,15 +25,19 @@ NUM_WORKERS: 0
 ACCUMULATE_GRAD_BATCHES: 1
 
 # Directed Graph
+COEFFICIENT: 0.0
 BRANCHING_FACTOR: 5
-DIMS_PLOTTED_LIST: [1]
+INIT_THINNING_FACTOR: 0.2
+LOGIT_TOKENS: 8
+DIMS_PINNED:
+  1: 1
 
 
 ## Stable Smoke Test Constants
 # Reproducibility
 SEED: 0
 
-# `collect_acts_webtext.py`
+# `collect_acts.py`
 NUM_SEQUENCES_EVALED: 5
 MAX_SEQ_LEN: 5
 
@@ -41,15 +46,15 @@ LOG_EVERY_N_STEPS: 1
 EPOCHS: 2
 SYNC_DIST_LOGGING: True
 
-# `top_tokens.py`
+# `contexts.py`
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# `feature_web_webtext.py`
+# `directed_graph_webtext.py`
 NUM_SEQUENCES_INTERPED: 1
 MAX_SEQ_INTERPED_LEN: 10
 
-# `feature_web_mc.py`
+# `directed_graph_mc.py`
 NUM_QUESTIONS_INTERPED: 1
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1

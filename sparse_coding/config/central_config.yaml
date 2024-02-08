@@ -9,23 +9,26 @@
 # "meta-llama/Llama-2-7b-hf"
 # "meta-llama/Llama-2-70b-hf"
 # "rasp"
-MODEL_DIR: "EleutherAI/pythia-70m"
+MODEL_DIR: "openai-community/gpt2"
 
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "1:3"
+ACTS_LAYERS_SLICE: "1:4"
 
 # Autoencoder Size
-PROJECTION_FACTOR: 2
+PROJECTION_FACTOR: 32
 
 # Save Files
 PROMPT_IDS_FILE: "activations_prompt_ids.npy"
 ACTS_DATA_FILE: "activations_dataset.pt"
 ENCODER_FILE: "learned_encoder.pt"
-BIASES_FILE: "learned_biases.pt"
+ENC_BIASES_FILE: "learned_enc_biases.pt"
+DECODER_FILE: "learned_decoder.pt"
+DEC_BIASES_FILE: "learned_dec_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
 GRAPH_FILE: "feature_graph.svg"
+GRAPH_DOT_FILE: "feature_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
@@ -35,10 +38,13 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Directed Graph
-# None at BRANCHING_FACTOR and DIMS_PLOTTED_LIST will plot everything in the
-# directed graph.
-BRANCHING_FACTOR: 5
-DIMS_PLOTTED_LIST:
+# A coefficient of 0.0 means "ablate features." Disable branching and pinning
+# to plot every ablation effect. Dims are pinned by setting a layer and dim
+# index as keys and values.
+BRANCHING_FACTOR: 10
+INIT_THINNING_FACTOR: 0.003
+LOGIT_TOKENS: 10
+DIMS_PINNED:
 
 
 ## Stable Dev Constants
@@ -49,27 +55,29 @@ WANDB_ENTITY: "davidudell"
 # Reproducibility
 SEED: 0
 
-# `collect_acts_webtext.py`
-NUM_SEQUENCES_EVALED: 1000
-MAX_SEQ_LEN: 1000
+# `collect_acts.py`
+NUM_SEQUENCES_EVALED: 400
+MAX_SEQ_LEN: 400
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
 EPOCHS: 150
 SYNC_DIST_LOGGING: True
 
-# `top_tokens.py`
-DIMS_IN_BATCH: 1000
+# `contexts.py`
 TOP_K: 6
+VIEW: 5
 
-# `feature_web_webtext.py`
+# `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
-# NUM_SEQUENCES_EVALED in `collect_acts_webtext.py`.
-NUM_SEQUENCES_INTERPED: 10
-MAX_SEQ_INTERPED_LEN: 100
+# NUM_SEQUENCES_EVALED in `collect_acts.py`.
+NUM_SEQUENCES_INTERPED: 1000
+MAX_SEQ_INTERPED_LEN: 1000
 
-# `feature_web_mc.py`
-NUM_QUESTIONS_INTERPED: 10
+# `directed_graph_mc.py`
+# Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
+# are computational waste.
+NUM_QUESTIONS_INTERPED: 1
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1
 NUM_SHOT: 6

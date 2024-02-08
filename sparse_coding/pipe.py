@@ -1,13 +1,23 @@
 """Run the main sparse coding pipeline in one command."""
 
+from textwrap import dedent
 
 from runpy import run_module
 
 
+print(
+    dedent(
+        """
+        For the time being, model_dir must be openai-community/gpt2 and
+        projection_factor must be 32, and only ablations are performed.
+        """
+    )
+)
+
 for script in [
     "collect_acts",
-    "train_autoencoder",
-    "interp_tools.top_tokens",
+    "load_autoencoder",
+    "interp_tools.contexts",
     "interp_tools.directed_graph_webtext",
 ]:
     try:
