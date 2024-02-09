@@ -14,7 +14,7 @@ MODEL_DIR: "openai-community/gpt2"
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "1:4"
+ACTS_LAYERS_SLICE: "2:4"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
@@ -45,7 +45,7 @@ BRANCHING_FACTOR: 10
 INIT_THINNING_FACTOR: 0.003
 LOGIT_TOKENS: 10
 DIMS_PINNED:
-
+  2: 4
 
 ## Stable Dev Constants
 # `wandb` logging
@@ -71,8 +71,8 @@ VIEW: 5
 # `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 1000
-MAX_SEQ_INTERPED_LEN: 1000
+NUM_SEQUENCES_INTERPED: 150
+MAX_SEQ_INTERPED_LEN: 150
 
 # `directed_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
