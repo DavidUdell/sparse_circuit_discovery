@@ -1,18 +1,20 @@
 ## Smoke Test Main Config
 # Smoke Test Model
-MODEL_DIR: "EleutherAI/pythia-70m"
+MODEL_DIR: "openai-community/gpt2"
 
 # Layers Slice to Cache Activations From
 ACTS_LAYERS_SLICE: "1:4"
 
 # Autoencoder Size
-PROJECTION_FACTOR: 1
+PROJECTION_FACTOR: 32
 
 # Smoke Test Save Files
 PROMPT_IDS_FILE: "smoke_test_activations_prompt_ids.npy"
 ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
-ENCODER_FILE: "smoke_test_learned_encoder.pt"
-BIASES_FILE: "smoke_test_learned_biases.pt"
+ENCODER_FILE: "smoke_test_encoder.pt"
+ENC_BIASES_FILE: "smoke_test_enc_biases.pt"
+DECODER_FILE: "smoke_test_decoder.pt"
+DEC_BIASES_FILE: "smoke_test_dec_biases.pt"
 TOP_K_INFO_FILE: "smoke_test_token_info.csv"
 GRAPH_FILE: "smoke_test_graph.svg"
 GRAPH_DOT_FILE: "smoke_test_graph.dot"

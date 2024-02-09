@@ -57,27 +57,38 @@ def load_autoencoder(
 
     for idx in acts_layers_range:
         filename: str = f"{prefix}{idx}{endfix}"
-        safe_model_name = sanitize_model_name(model_dir)
-        save_path = save_paths(
-            base_file,
-            f"{safe_model_name}/{idx}/",
-        )
         file_url = hf_hub_download(
             repo_id=autoencoder_repository,
             filename=filename,
         )
-
-        os.makedirs(save_path, exist_ok=True)
         tensors_dict = t.load(file_url)
 
         encoder = tensors_dict["state_dict"]["W_enc"]
         enc_biases = tensors_dict["state_dict"]["b_enc"]
         decoder = tensors_dict["state_dict"]["W_dec"]
         dec_biases = tensors_dict["state_dict"]["b_dec"]
-        t.save(encoder, f"data/{safe_model_name}/{idx}/{encoder_file}")
-        t.save(enc_biases, f"data/{safe_model_name}/{idx}/{enc_biases_file}")
-        t.save(decoder, f"data/{safe_model_name}/{idx}/{decoder_file}")
-        t.save(dec_biases, f"data/{safe_model_name}/{idx}/{dec_biases_file}")
+
+        safe_model_name = sanitize_model_name(model_dir)
+        t.save(
+            encoder,
+            save_paths(base_file, f"{safe_model_name}/{idx}/{encoder_file}"),
+        )
+        t.save(
+            enc_biases,
+            save_paths(
+                base_file, f"{safe_model_name}/{idx}/{enc_biases_file}"
+            ),
+        )
+        t.save(
+            decoder,
+            save_paths(base_file, f"{safe_model_name}/{idx}/{decoder_file}"),
+        )
+        t.save(
+            dec_biases,
+            save_paths(
+                base_file, f"{safe_model_name}/{idx}/{dec_biases_file}"
+            ),
+        )
 
 
 # %%

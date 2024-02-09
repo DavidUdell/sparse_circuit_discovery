@@ -54,7 +54,9 @@ WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
-BIASES_FILE = config.get("BIASES_FILE")
+ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
+DECODER_FILE = config.get("DECODER_FILE")
+DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 GRAPH_FILE = config.get("GRAPH_FILE")
 GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
@@ -116,11 +118,21 @@ logit_diffs = {}
 # Prepare all layer autoencoders and layer dim index lists up front.
 # layer_autoencoders: dict[int, tuple[t.Tensor]]
 # layer_dim_indices: dict[int, list[int]]
-layer_autoencoders, layer_dim_indices = prepare_autoencoder_and_indices(
+layer_encoders, layer_dim_indices = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
     ENCODER_FILE,
-    BIASES_FILE,
+    ENC_BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
+
+layer_decoders, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    DECODER_FILE,
+    DEC_BIASES_FILE,
     TOP_K_INFO_FILE,
     accelerator,
     __file__,
@@ -152,7 +164,8 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
             layer_range,
             layer_dim_indices,
             model,
-            layer_autoencoders,
+            layer_encoders,
+            layer_decoders,
             base_activations,
             ablate_during_run=False,
         ):
@@ -174,7 +187,8 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
             layer_range,
             layer_dim_indices,
             model,
-            layer_autoencoders,
+            layer_encoders,
+            layer_decoders,
             ablated_activations,
             ablate_during_run=True,
             coefficient=COEFFICIENT,
