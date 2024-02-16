@@ -45,7 +45,7 @@ BRANCHING_FACTOR: 10
 INIT_THINNING_FACTOR: 0.003
 LOGIT_TOKENS: 10
 DIMS_PINNED:
-  2: 4
+  2: 885
 
 ## Stable Dev Constants
 # `wandb` logging
@@ -56,8 +56,8 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 400
-MAX_SEQ_LEN: 400
+NUM_SEQUENCES_EVALED: 1000
+MAX_SEQ_LEN: 100
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
@@ -71,8 +71,8 @@ VIEW: 5
 # `directed_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 150
-MAX_SEQ_INTERPED_LEN: 150
+NUM_SEQUENCES_INTERPED: 1000
+MAX_SEQ_INTERPED_LEN: 100
 
 # `directed_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values

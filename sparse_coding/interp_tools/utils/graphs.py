@@ -27,7 +27,7 @@ def graph_and_log(
     top_k_info_file: str,
     logit_tokens: int,
     tokenizer,
-    logit_diffs,
+    prob_diffs,
     base_file: str,
 ):
     """Graph and log the causal effects of ablations."""
@@ -69,7 +69,7 @@ def graph_and_log(
         overall_effects,
         logit_tokens,
         tokenizer,
-        logit_diffs,
+        prob_diffs,
         base_file,
     )
 
@@ -106,7 +106,7 @@ def label_highlighting(
     logit_tokens: int,
     tokenizer,
     address: str,
-    logit_diffs,
+    prob_diffs,
     base_file,
 ) -> str:
     """Highlight contexts using cached activation data."""
@@ -145,20 +145,20 @@ def label_highlighting(
         label += "</tr>"
 
     # Add logit diffs.
-    if (layer_idx, neuron_idx) in logit_diffs:
+    if (layer_idx, neuron_idx) in prob_diffs:
         label += "<tr>"
         top_tokens_affected = t.abs(
-                logit_diffs[layer_idx, neuron_idx]
+                prob_diffs[layer_idx, neuron_idx]
         ).sum(dim=0).squeeze().topk(logit_tokens).indices
 
         top_tokens_affected = top_tokens_affected.tolist()
         for token in top_tokens_affected:
 
-            if logit_diffs[layer_idx, neuron_idx
+            if prob_diffs[layer_idx, neuron_idx
                            ][:, token].sum(dim=0).item() > 0.0:
                 shade = "#6060ff"
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
-            elif logit_diffs[
+            elif prob_diffs[
                 layer_idx, neuron_idx
                 ][:, token].sum(dim=0).item() < 0.0:
                 shade = "#ff6060"

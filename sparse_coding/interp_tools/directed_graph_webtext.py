@@ -199,7 +199,7 @@ for i in base_activations_all_positions:
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
 keepers: dict[tuple[int, int], int] = {}
-logit_diffs = {}
+probability_diffs = {}
 
 for ablate_layer_idx in ablate_layer_range:
     # Thin the first layer indices or fix any indices, when requested.
@@ -207,7 +207,8 @@ for ablate_layer_idx in ablate_layer_range:
         DIMS_PINNED is not None
         and DIMS_PINNED.get(ablate_layer_idx) is not None
     ):
-        layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
+        # list[int]
+        layer_dim_indices[ablate_layer_idx] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
             DIMS_PINNED,
             layer_dim_indices[ablate_layer_idx],
@@ -312,8 +313,14 @@ for ablate_layer_idx in ablate_layer_range:
                 elif isinstance(ALTERED_LOGITS, t.Tensor):
                     ALTERED_LOGITS = t.cat([ALTERED_LOGITS, logit], dim=0)
 
-        logit_diff = ALTERED_LOGITS - BASE_LOGITS
-        logit_diffs[ablate_layer_idx, ablate_dim_idx] = logit_diff
+        prob_diff = t.nn.functional.softmax(
+            ALTERED_LOGITS,
+            dim=-1,
+        ) - t.nn.functional.softmax(
+            BASE_LOGITS,
+            dim=-1,
+        )
+        probability_diffs[ablate_layer_idx, ablate_dim_idx] = prob_diff
 
     if BRANCHING_FACTOR is None:
         break
@@ -372,7 +379,7 @@ graph_and_log(
     TOP_K_INFO_FILE,
     LOGIT_TOKENS,
     tokenizer,
-    logit_diffs,
+    probability_diffs,
     __file__,
 )
 
