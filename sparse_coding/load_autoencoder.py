@@ -2,8 +2,6 @@
 """Load sparse autoencoders from HuggingFace."""
 
 
-import os
-
 import torch as t
 from huggingface_hub import hf_hub_download
 
