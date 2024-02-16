@@ -61,7 +61,12 @@ def load_autoencoder(
             repo_id=autoencoder_repository,
             filename=filename,
         )
-        tensors_dict = t.load(file_url)
+
+        # Solves a GPU availability issue with CI runners.
+        if not t.cuda.is_available():
+            tensors_dict = t.load(file_url, map_location="cpu")
+        else:
+            tensors_dict = t.load(file_url)
 
         encoder = tensors_dict["state_dict"]["W_enc"]
         enc_biases = tensors_dict["state_dict"]["b_enc"]
