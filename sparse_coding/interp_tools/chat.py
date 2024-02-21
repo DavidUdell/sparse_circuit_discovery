@@ -40,7 +40,7 @@ accelerator = Accelerator()
 # %%
 # Just chat.
 sequence = PROMPT  # pylint: disable=invalid-name
-for _ in range(30):
+for _ in range(50):
     inputs = tokenizer(sequence, return_tensors="pt")
     inputs = accelerator.prepare(inputs)
     outputs = model(**inputs)
@@ -68,6 +68,12 @@ layer_decoders = load_layer_tensors(
 
 activations_dict = defaultdict(list)
 sequence = PROMPT  # pylint: disable=invalid-name
+for _ in range(20):
+    inputs = tokenizer(sequence, return_tensors="pt")
+    inputs = accelerator.prepare(inputs)
+    outputs = model(**inputs)
+    next_token = t.argmax(outputs.logits[:, -1, :], dim=-1)
+    sequence = sequence + tokenizer.decode(*next_token)
 with hooks_manager(
     ABLATION_LAYER,
     ABLATION_DIM,
@@ -85,3 +91,6 @@ with hooks_manager(
         next_token = t.argmax(outputs.logits[:, -1, :], dim=-1)
         sequence = sequence + tokenizer.decode(*next_token)
 print(sequence)
+
+# %%
+# Look at logits affected.
