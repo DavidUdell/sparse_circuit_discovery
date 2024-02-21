@@ -14,7 +14,7 @@ MODEL_DIR: "openai-community/gpt2"
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "2:4"
+ACTS_LAYERS_SLICE: "2:6"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
