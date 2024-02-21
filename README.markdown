@@ -44,7 +44,7 @@ Once you save `central_config.yaml`, run the interpretability pipeline with:
   Toolkit 12.2 or newer.
 
 ## Project Status
-Current version is 0.2.0.
+Current version is 0.2.1.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.
