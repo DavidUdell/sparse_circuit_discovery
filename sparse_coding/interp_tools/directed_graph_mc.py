@@ -144,7 +144,8 @@ for ablate_layer_meta_index, ablate_layer_idx in enumerate(ablate_layer_range):
         DIMS_PINNED is not None
         and DIMS_PINNED.get(ablate_layer_idx) is not None
     ):
-        layer_dim_indices[ablate_layer_idx]: list[int] = prepare_dim_indices(
+        # list[int]
+        layer_dim_indices[ablate_layer_idx] = prepare_dim_indices(
             INIT_THINNING_FACTOR,
             DIMS_PINNED,
             layer_dim_indices[ablate_layer_idx],
