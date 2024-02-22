@@ -30,8 +30,8 @@ DECODER_FILE = config.get("DECODER_FILE")
 DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 PROMPT = "News on the front is that"
-ABLATION_LAYER = 2
-ABLATION_DIM: int = 885
+ABLATION_LAYER = 5
+ABLATION_DIM: int = 221
 
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
@@ -40,7 +40,7 @@ accelerator = Accelerator()
 # %%
 # Just chat.
 sequence = PROMPT  # pylint: disable=invalid-name
-for _ in range(50):
+for _ in range(30):
     inputs = tokenizer(sequence, return_tensors="pt")
     inputs = accelerator.prepare(inputs)
     outputs = model(**inputs)
@@ -84,7 +84,7 @@ with hooks_manager(
     {ABLATION_LAYER: layer_decoders, ABLATION_LAYER + 1: layer_decoders},
     activations_dict,
 ):
-    for _ in range(30):
+    for _ in range(10):
         inputs = tokenizer(sequence, return_tensors="pt")
         inputs = accelerator.prepare(inputs)
         outputs = model(**inputs)
@@ -93,4 +93,7 @@ with hooks_manager(
 print(sequence)
 
 # %%
-# Look at logits affected.
+# Look at logits boosted.
+
+# %%
+# Look at logits suppressed.
