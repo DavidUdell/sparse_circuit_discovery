@@ -1,6 +1,5 @@
 """Graph the causal effects of ablations."""
 
-
 from textwrap import dedent
 
 import bleach
@@ -119,9 +118,7 @@ def label_highlighting(
         base_file,
     )
     label = '<<table border="0" cellborder="0" cellspacing="0">'
-    label += (
-        f'<tr><td><font point-size="16"><b>{address}</b></font></td></tr>'
-    )
+    label += f'<tr><td><font point-size="16"><b>{address}</b></font></td></tr>'
     for context, act in zip(contexts, acts):
         label += "<tr>"
 
@@ -147,20 +144,28 @@ def label_highlighting(
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
         label += "<tr>"
-        top_tokens_affected = t.abs(
-                prob_diffs[layer_idx, neuron_idx]
-        ).sum(dim=0).squeeze().topk(logit_tokens).indices
+        # Negative prob_diffs here to get top tokens negatively affected.
+        top_tokens_affected = (
+            (-prob_diffs[layer_idx, neuron_idx])
+            .sum(dim=0)
+            .squeeze()
+            .topk(logit_tokens)
+            .indices
+        )
 
         top_tokens_affected = top_tokens_affected.tolist()
         for token in top_tokens_affected:
 
-            if prob_diffs[layer_idx, neuron_idx
-                           ][:, token].sum(dim=0).item() > 0.0:
+            if (
+                prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item()
+                > 0.0
+            ):
                 shade = "#6060ff"
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
-            elif prob_diffs[
-                layer_idx, neuron_idx
-                ][:, token].sum(dim=0).item() < 0.0:
+            elif (
+                prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item()
+                < 0.0
+            ):
                 shade = "#ff6060"
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
             else:
@@ -169,7 +174,7 @@ def label_highlighting(
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
             token = bleach.clean(token)
-            label += f'{cell_tag}{token}</td>'
+            label += f"{cell_tag}{token}</td>"
         label += "</tr>"
 
     label += "</table>>"
@@ -185,7 +190,7 @@ def graph_causal_effects(
     overall_effects: float,
     logit_tokens: int,
     tokenizer,
-    logit_diffs,
+    prob_diffs,
     base_file: str,
     rasp=False,
 ) -> AGraph:
@@ -232,7 +237,7 @@ def graph_causal_effects(
                 logit_tokens,
                 tokenizer,
                 f"{ablation_layer_idx}.{ablated_dim}",
-                logit_diffs,
+                prob_diffs,
                 base_file,
             ),
             shape="box",
@@ -240,14 +245,14 @@ def graph_causal_effects(
         graph.add_node(
             f"{ablation_layer_idx + 1}.{downstream_dim}",
             label=label_highlighting(
-                ablation_layer_idx+1,
+                ablation_layer_idx + 1,
                 downstream_dim,
                 model_dir,
                 top_k_info_file,
                 logit_tokens,
                 tokenizer,
                 f"{ablation_layer_idx + 1}.{downstream_dim}",
-                logit_diffs,
+                prob_diffs,
                 base_file,
             ),
             shape="box",
