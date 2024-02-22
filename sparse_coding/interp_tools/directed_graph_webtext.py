@@ -56,7 +56,7 @@ GRAPH_FILE = config.get("GRAPH_FILE")
 GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
-COEFFICIENT = config.get("COEFFICIENT", 0.0)
+# COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
@@ -295,7 +295,6 @@ for ablate_layer_idx in ablate_layer_range:
             layer_decoders,
             ablated_activations,
             ablate_during_run=True,
-            coefficient=COEFFICIENT,
         ):
             for seq in truncated_tok_seqs:
                 top_input = seq.to(model.device)

@@ -31,7 +31,7 @@ DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 PROMPT = "What do you call a chicken that crosses"
 ABLATION_LAYER = 5
-ABLATION_DIM: int = 1
+ABLATION_DIM: int = 883
 
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
