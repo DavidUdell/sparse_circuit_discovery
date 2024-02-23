@@ -1,7 +1,7 @@
 # Sparse Circuit Discovery
 ![Feature graph](header.png)
 
-Automatic circuit discovery in GPT-2 small, using sparse coding.
+Manual circuit discovery in GPT-2 small, using sparse autoencoding.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -24,9 +24,8 @@ Docker image is especially good for pulling to a remote server.
 ## Usage
 To train and interpret a sparse autoencoder, go to
 `sparse_coding/config/central_config.yaml`. There, set your layer indexes to
-collect activation data (`ACT_LAYERS_SLICE`).
-
-(Leave the other hyperparameters as they are.)
+collect activation data (`ACT_LAYERS_SLICE`). (Leave other hyperparameters as
+they are.)
 
 Once you save `central_config.yaml`, run the interpretability pipeline with:
 
