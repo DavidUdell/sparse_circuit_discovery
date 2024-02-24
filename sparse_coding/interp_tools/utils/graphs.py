@@ -130,6 +130,8 @@ def label_highlighting(
         for token, act in zip(context, act):
             token = tokenizer.convert_tokens_to_string([token])
             token = bleach.clean(token)
+            # Explicitly handle newlines.
+            token = token.replace("\n", "\\n")
 
             if act <= 0.0:
                 label += f"<td>{token}</td>"
