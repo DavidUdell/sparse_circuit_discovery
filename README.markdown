@@ -1,7 +1,7 @@
 # Sparse Circuit Discovery
 ![Feature graph](header.png)
 
-Manual circuit discovery in GPT-2 small, using sparse autoencoding.
+Circuit discovery in GPT-2 small, using sparse autoencoding
 
 ## Table of Contents
 - [Installation](#installation)
