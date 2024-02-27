@@ -14,10 +14,10 @@ print(
     )
 )
 
+# "collect_acts",
+# "interp_tools.contexts",
 for script in [
-    "collect_acts",
     "load_autoencoder",
-    "interp_tools.contexts",
     "interp_tools.directed_graph_webtext",
 ]:
     try:
