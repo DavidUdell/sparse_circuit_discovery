@@ -81,7 +81,7 @@ def graph_and_log(
     )
 
     # Read the .svg into a `wandb` artifact.
-    artifact = wandb.Artifact("feature_graph", type="directed_graph")
+    artifact = wandb.Artifact("cognition_graph", type="directed_graph")
     artifact.add_file(save_plot_path)
     wandb.log_artifact(artifact)
 

@@ -27,8 +27,8 @@ ENC_BIASES_FILE: "learned_enc_biases.pt"
 DECODER_FILE: "learned_decoder.pt"
 DEC_BIASES_FILE: "learned_dec_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
-GRAPH_FILE: "cognitive_graph.svg"
-GRAPH_DOT_FILE: "cognitive_graph.dot"
+GRAPH_FILE: "cognition_graph.svg"
+GRAPH_DOT_FILE: "cognition_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
@@ -42,7 +42,7 @@ ACCUMULATE_GRAD_BATCHES: 4
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
 BRANCHING_FACTOR: 10
-INIT_THINNING_FACTOR: 0.003
+INIT_THINNING_FACTOR: 0.002
 LOGIT_TOKENS: 10
 DIMS_PINNED:
 
