@@ -37,7 +37,7 @@ TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
-# Directed Graph
+# Cognition Graph
 # A coefficient of 0.0 means "ablate features." Disable branching and pinning
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
@@ -69,13 +69,13 @@ SYNC_DIST_LOGGING: True
 TOP_K: 6
 VIEW: 5
 
-# `directed_graph_webtext.py`
+# `cognition_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
 NUM_SEQUENCES_INTERPED: 200
 MAX_SEQ_INTERPED_LEN: 100
 
-# `directed_graph_mc.py`
+# `cognition_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
 # are computational waste.
 NUM_QUESTIONS_INTERPED: 1
