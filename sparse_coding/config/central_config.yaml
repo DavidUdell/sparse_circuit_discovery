@@ -27,8 +27,8 @@ ENC_BIASES_FILE: "learned_enc_biases.pt"
 DECODER_FILE: "learned_decoder.pt"
 DEC_BIASES_FILE: "learned_dec_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
-GRAPH_FILE: "feature_graph.svg"
-GRAPH_DOT_FILE: "feature_graph.dot"
+GRAPH_FILE: "cognitive_graph.svg"
+GRAPH_DOT_FILE: "cognitive_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
