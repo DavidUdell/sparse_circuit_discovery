@@ -194,6 +194,8 @@ for i in base_activations_all_positions:
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
 
+            # Solves the problem of densely activating features taking too many
+            # forward passes.
             if top_indices.size(0) <= SEQ_PER_DIM_CAP:
                 choices = top_indices.tolist()
             else:
