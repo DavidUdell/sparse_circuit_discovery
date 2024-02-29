@@ -193,10 +193,16 @@ for i in base_activations_all_positions:
             )
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
-            # Just want to see an MVP for now; this slice is a sloppy solution
-            # to densely activating features, though.
-            favorite_sequence_positions[i, j, k] = top_indices.tolist()[:SEQ_PER_DIM_CAP]
-            print(favorite_sequence_positions[i, j, k])
+
+            if top_indices.size(0) <= SEQ_PER_DIM_CAP:
+                choices = top_indices.tolist()
+            else:
+                choices = np.random.choice(
+                    top_indices.tolist(),
+                    SEQ_PER_DIM_CAP,
+                    replace=False,
+                ).tolist()
+            favorite_sequence_positions[i, j, k] = choices
 
 # %%
 # Run ablations at top sequence positions.
