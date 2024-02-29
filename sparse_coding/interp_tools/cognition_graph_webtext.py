@@ -193,6 +193,7 @@ for i in base_activations_all_positions:
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
             favorite_sequence_positions[i, j, k] = top_indices.tolist()
+            print(favorite_sequence_positions[i, j, k])
 
 # %%
 # Run ablations at top sequence positions.
