@@ -74,6 +74,7 @@ VIEW: 5
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
 NUM_SEQUENCES_INTERPED: 200
 MAX_SEQ_INTERPED_LEN: 100
+SEQ_PER_DIM_CAP: 10
 
 # `cognition_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values

@@ -56,6 +56,7 @@ GRAPH_FILE = config.get("GRAPH_FILE")
 GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
+SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 # COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
@@ -192,7 +193,9 @@ for i in base_activations_all_positions:
             )
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
-            favorite_sequence_positions[i, j, k] = top_indices.tolist()
+            # Just want to see an MVP for now; this slice is a sloppy solution
+            # to densely activating features, though.
+            favorite_sequence_positions[i, j, k] = top_indices.tolist()[:SEQ_PER_DIM_CAP]
             print(favorite_sequence_positions[i, j, k])
 
 # %%
