@@ -26,7 +26,7 @@ TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 0
 ACCUMULATE_GRAD_BATCHES: 1
 
-# Directed Graph
+# Cognition Graph
 COEFFICIENT: 0.0
 BRANCHING_FACTOR: 5
 INIT_THINNING_FACTOR: 0.2
@@ -52,11 +52,11 @@ SYNC_DIST_LOGGING: True
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# `directed_graph_webtext.py`
+# `cognition_graph_webtext.py`
 NUM_SEQUENCES_INTERPED: 1
 MAX_SEQ_INTERPED_LEN: 10
 
-# `directed_graph_mc.py`
+# `cognition_graph_mc.py`
 NUM_QUESTIONS_INTERPED: 1
 MAX_NEW_TOKENS: 1
 NUM_RETURN_SEQUENCES: 1

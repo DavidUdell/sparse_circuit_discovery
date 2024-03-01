@@ -1,8 +1,15 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
+# you the string "None". Key params here:
+ACTS_LAYERS_SLICE: "5:7"
+INIT_THINNING_FACTOR: 0.01
+NUM_SEQUENCES_INTERPED: 200
+SEQ_PER_DIM_CAP: 100
+
+DIMS_PINNED:
 
 
+#
 ## Main Config
 # Model
 # "EleutherAI/pythia-70m"
@@ -14,7 +21,7 @@ MODEL_DIR: "openai-community/gpt2"
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "2:4"
+# ACTS_LAYERS_SLICE: "4:6"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
@@ -27,8 +34,8 @@ ENC_BIASES_FILE: "learned_enc_biases.pt"
 DECODER_FILE: "learned_decoder.pt"
 DEC_BIASES_FILE: "learned_dec_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
-GRAPH_FILE: "feature_graph.svg"
-GRAPH_DOT_FILE: "feature_graph.dot"
+GRAPH_FILE: "cognition_graph.svg"
+GRAPH_DOT_FILE: "cognition_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
@@ -37,16 +44,16 @@ TRAINING_BATCH_SIZE: 8
 NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
-# Directed Graph
+# Cognition Graph
 # A coefficient of 0.0 means "ablate features." Disable branching and pinning
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
 BRANCHING_FACTOR: 10
-INIT_THINNING_FACTOR: 0.003
+# INIT_THINNING_FACTOR: 0.01
 LOGIT_TOKENS: 10
-DIMS_PINNED:
-  2: 885
+# DIMS_PINNED:
 
+#
 ## Stable Dev Constants
 # `wandb` logging
 WANDB_PROJECT: "sparse_circuit_discovery"
@@ -68,13 +75,14 @@ SYNC_DIST_LOGGING: True
 TOP_K: 6
 VIEW: 5
 
-# `directed_graph_webtext.py`
+# `cognition_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 1000
+# NUM_SEQUENCES_INTERPED: 250
 MAX_SEQ_INTERPED_LEN: 100
+# SEQ_PER_DIM_CAP: 350
 
-# `directed_graph_mc.py`
+# `cognition_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
 # are computational waste.
 NUM_QUESTIONS_INTERPED: 1

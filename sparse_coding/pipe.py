@@ -8,17 +8,20 @@ from runpy import run_module
 print(
     dedent(
         """
-        For the time being, model_dir must be openai-community/gpt2 and
-        projection_factor must be 32, and only ablations are performed.
+        For the time being,
+        1. `model_dir` must be `openai-community/gpt2`,
+        2. `projection_factor` must be 32,
+        3. autoencoder interp data has been precomputed, and
+        4. only ablation studies are performed and measured.
         """
     )
 )
 
+# "collect_acts",
+# "interp_tools.contexts",
 for script in [
-    "collect_acts",
     "load_autoencoder",
-    "interp_tools.contexts",
-    "interp_tools.directed_graph_webtext",
+    "interp_tools.cognition_graph_webtext",
 ]:
     try:
         run_module(f"sparse_coding.{script}")

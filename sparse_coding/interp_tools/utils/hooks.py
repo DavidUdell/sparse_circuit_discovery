@@ -123,7 +123,6 @@ def hooks_manager(
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
     ablate_during_run: bool = True,
-    coefficient: float = 0.0,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -148,10 +147,11 @@ def hooks_manager(
             Project activation vectors; ablate them; project them back.
             """
 
-            # Project through the encoder.
+            # Project through the encoder. Bias usage now corresponds to Joseph
+            # Bloom's (and, by his way, Antropic's).
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    output[0] + dec_biases.to(model.device),
+                    output[0] - dec_biases.to(model.device),
                     encoder.T.to(model.device),
                     bias=enc_biases.to(model.device),
                 )
@@ -164,18 +164,18 @@ def hooks_manager(
 
             # We will ablate the activation at dim_idx by subtracting only that
             # dim value.
-            projected_acts[:, -1, :dim_idx] = (
-                t.zeros_like(projected_acts[:, -1, :dim_idx])
+            projected_acts[:, -1, :dim_idx] = t.zeros_like(
+                projected_acts[:, -1, :dim_idx]
             )
-            projected_acts[:, -1, dim_idx+1:] = (
-                t.zeros_like(projected_acts[:, -1, dim_idx+1:])
+            projected_acts[:, -1, dim_idx + 1 :] = t.zeros_like(
+                projected_acts[:, -1, dim_idx + 1 :]
             )
 
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
                     decoder.T.to(model.device),
-                    bias=-dec_biases.to(model.device),
+                    bias=dec_biases.to(model.device),
                 )
             )
             # Perform the ablation. We must also preserve the attention data in

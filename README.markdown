@@ -1,7 +1,7 @@
 # Sparse Circuit Discovery
 ![Feature graph](header.png)
 
-Automatic circuit discovery in GPT-2 small, using sparse coding.
+Circuit discovery in GPT-2 small, using sparse autoencoding
 
 ## Table of Contents
 - [Installation](#installation)
@@ -24,9 +24,8 @@ Docker image is especially good for pulling to a remote server.
 ## Usage
 To train and interpret a sparse autoencoder, go to
 `sparse_coding/config/central_config.yaml`. There, set your layer indexes to
-collect activation data (`ACT_LAYERS_SLICE`).
-
-(Leave the other hyperparameters as they are.)
+collect activation data (`ACT_LAYERS_SLICE`). (Leave other hyperparameters as
+they are.)
 
 Once you save `central_config.yaml`, run the interpretability pipeline with:
 
@@ -44,7 +43,7 @@ Once you save `central_config.yaml`, run the interpretability pipeline with:
   Toolkit 12.2 or newer.
 
 ## Project Status
-Current version is 0.2.0.
+Current version is 0.2.1.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.
