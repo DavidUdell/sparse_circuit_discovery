@@ -1,6 +1,13 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
+# you the string "None". Key params here:
+ACTS_LAYERS_SLICE: "5:7"
+INIT_THINNING_FACTOR: 0.01
+NUM_SEQUENCES_INTERPED: 200
+SEQ_PER_DIM_CAP: 100
+
+DIMS_PINNED:
+
 
 #
 ## Main Config
@@ -14,7 +21,7 @@ MODEL_DIR: "openai-community/gpt2"
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.
-ACTS_LAYERS_SLICE: "4:6"
+# ACTS_LAYERS_SLICE: "4:6"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
@@ -42,10 +49,9 @@ ACCUMULATE_GRAD_BATCHES: 4
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
 BRANCHING_FACTOR: 10
-INIT_THINNING_FACTOR: 0.05
+# INIT_THINNING_FACTOR: 0.01
 LOGIT_TOKENS: 10
-DIMS_PINNED:
-  4: 112
+# DIMS_PINNED:
 
 #
 ## Stable Dev Constants
@@ -72,9 +78,9 @@ VIEW: 5
 # `cognition_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-NUM_SEQUENCES_INTERPED: 250
+# NUM_SEQUENCES_INTERPED: 250
 MAX_SEQ_INTERPED_LEN: 100
-SEQ_PER_DIM_CAP: 350
+# SEQ_PER_DIM_CAP: 350
 
 # `cognition_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values
