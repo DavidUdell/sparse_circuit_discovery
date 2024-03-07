@@ -3,9 +3,11 @@
 
 Circuit discovery in `GPT-2 small`, using sparse autoencoding
 
-## Table of Contents
+### Table of Contents
 - [Installation](#installation)
-- [Usage](#usage)
+- [User's Guide](#users-guide)
+- [How to Read the Graphs](#how-to-read-the-graphs)
+- [Errors](#errors)
 - [Project Status](#project-status)
 
 ## Installation
