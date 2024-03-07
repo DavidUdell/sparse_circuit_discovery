@@ -65,6 +65,26 @@ Set these values, save `central_config.yaml`, then run interpretability with:
 
 Data appears in `sparse_coding/data/`.
 
+The last cognition graph you generated is saved as both a `.svg` for you and as
+a `.dot` for the computer. If you run the interpretability pipeline again, the
+new data will expand upon that old `.dot` file. This way, you can progressively
+trace out circuits as you go.
+
+## How to Read the Graphs
+Consider the cognition graph at the top of this page. Each _box_ with a label
+like `4.112` is a feature in a sparse autoencoder. `4` is its layer index,
+while `112` is its column index in that layer's autoencoder.
+
+_Blue tokens_ in each box represent top feature activations in their contextual
+sequences, to a specified length out to either side.
+
+_Red tokens_ in individual boxes at the bottom are the logits most downweighted
+by that ablation.
+
+_Arrows_ between boxes represent downstream ablation effects on other features.
+Red arrows indicate downweighting, blue arrows indicate upweighting, and degree
+is indicated by color transparency.
+
 ## Errors
 - I've gimped a lot of repository functionality for now: only `GPT-2 small` and
   a projection factor of 32 are supported, to take advantage of a set of
