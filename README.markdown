@@ -51,7 +51,7 @@ In order:
    feature can have. I.e., when it equals `NUM_SEQUENCES_INTERPED`, you're
    saying that any feature that fired at every sequence should be interpreted
    over all of those sequences. For computational reasons, we basically want to
-   set `NUM_SEQUENCES_INTERPRETED` as high as we can, and then set this value
+   set `NUM_SEQUENCES_INTERPED` as high as we can, and then set this value
    relatively low, so that our interpretability calculations are tractable.
 5. `DIMS_PINNED` is a dictionary of layer indices followed by a single feature
    index each. If set for the first layer, it will completely override
