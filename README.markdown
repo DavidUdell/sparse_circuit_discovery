@@ -96,6 +96,10 @@ is indicated by color transparency.
 - If you're encountering cryptic env variable bugs, ensure you're running CUDA
   Toolkit 12.2 or newer.
 
+- As the shell syntax suggests, Unix-like paths (on MacOS or Linux) are
+  currently required, and Windows pathing will probably not play nice with the
+  repo.
+
 ## Project Status
 Current version is 0.2.1.
 
