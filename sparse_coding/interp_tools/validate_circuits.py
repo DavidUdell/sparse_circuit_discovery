@@ -3,6 +3,8 @@
 
 
 import warnings
+from collections import defaultdict
+from contextlib import ExitStack
 
 import numpy as np
 import torch as t
@@ -117,4 +119,55 @@ for i in VALIDATION_DIMS_PINNED:
     assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
 
 # %%
-# Validate the pinned circuit with ablations.
+# Validate the pinned circuit with ablations. Base case first.
+BASE_LOGITS = None
+for seq in eval_set:
+    inputs = tokenizer(
+        seq,
+        return_tensors="pt",
+        truncation=True,
+        max_length=MAX_SEQ_INTERPED_LEN,
+    )
+    outputs = model(**inputs)
+    logit = outputs.logits[:, -1, :]
+    if BASE_LOGITS is None:
+        BASE_LOGITS = logit
+    else:
+        BASE_LOGITS = t.cat((BASE_LOGITS, logit), dim=0)
+
+ALTERED_LOGITS = None
+with ExitStack() as stack:
+    for k, v in VALIDATION_DIMS_PINNED:
+        stack.enter_context(
+            hooks_manager(
+                k,
+                v,
+                layer_range,
+                [None],
+                model,
+                layer_encoders,
+                layer_decoders,
+                defaultdict(list),
+            )
+        )
+
+    for seq in eval_set:
+        inputs = tokenizer(
+            seq,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_INTERPED_LEN,
+        )
+        outputs = model(**inputs)
+        logit = outputs.logits[:, -1, :]
+        if ALTERED_LOGITS is None:
+            ALTERED_LOGITS = logit
+        else:
+            ALTERED_LOGITS = t.cat((ALTERED_LOGITS, logit), dim=0)
+
+# %%
+# Compute and display logit diffs.
+prob_diff = (
+    t.nn.functional.softmax(ALTERED_LOGITS,dim=-1)
+    - t.nn.functional.softmax(BASE_LOGITS, dim=-1)
+)
