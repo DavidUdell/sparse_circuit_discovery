@@ -113,7 +113,7 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 )
 
 # %%
-# Validate the pinned circuit indices.
+# Sanity check the pinned circuit indices.
 for i in VALIDATION_DIMS_PINNED:
     assert i in layer_range
     assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
@@ -171,3 +171,23 @@ prob_diff = (
     t.nn.functional.softmax(ALTERED_LOGITS,dim=-1)
     - t.nn.functional.softmax(BASE_LOGITS, dim=-1)
 )
+
+prob_diff = prob_diff.mean(dim=0)
+positive_tokens = prob_diff.topk(LOGIT_TOKENS).indices
+negative_tokens = prob_diff.topk(LOGIT_TOKENS, largest=False).indices
+token_ids = t.cat((positive_tokens, negative_tokens), dim=0)
+
+for token_id in token_ids:
+    token = tokenizer.convert_ids_to_tokens(token_id.item())
+    token = tokenizer.convert_tokens_to_string([token])
+    token = token.replace("\n", "\\n")
+
+    print(
+        token,
+        str(round(prob_diff[token_id.item()].item()*100, 2)) + "%",
+        sep="  ",
+    )
+
+# %%
+# Wrap up logging.
+wandb.finish()
