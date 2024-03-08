@@ -127,7 +127,7 @@ for seq in eval_set:
         return_tensors="pt",
         truncation=True,
         max_length=MAX_SEQ_INTERPED_LEN,
-    )
+    ).to(model.device)
     outputs = model(**inputs)
     logit = outputs.logits[:, -1, :]
     if BASE_LOGITS is None:
@@ -137,13 +137,13 @@ for seq in eval_set:
 
 ALTERED_LOGITS = None
 with ExitStack() as stack:
-    for k, v in VALIDATION_DIMS_PINNED:
+    for k, v in VALIDATION_DIMS_PINNED.items():
         stack.enter_context(
             hooks_manager(
                 k,
                 v,
                 layer_range,
-                [None],
+                {k+1: []},
                 model,
                 layer_encoders,
                 layer_decoders,
@@ -157,7 +157,7 @@ with ExitStack() as stack:
             return_tensors="pt",
             truncation=True,
             max_length=MAX_SEQ_INTERPED_LEN,
-        )
+        ).to(model.device)
         outputs = model(**inputs)
         logit = outputs.logits[:, -1, :]
         if ALTERED_LOGITS is None:
