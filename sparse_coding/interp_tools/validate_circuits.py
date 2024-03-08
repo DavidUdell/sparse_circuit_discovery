@@ -113,8 +113,8 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 # %%
 # Validate the pinned circuit indices.
 for i in VALIDATION_DIMS_PINNED:
-    assert i.key() in layer_range
-    assert i.value() in layer_dim_indices[i.key()]
+    assert i in layer_range
+    assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
 
 # %%
 # Validate the pinned circuit with ablations.

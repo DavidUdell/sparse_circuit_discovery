@@ -53,6 +53,10 @@ BRANCHING_FACTOR: 10
 LOGIT_TOKENS: 10
 # DIMS_PINNED:
 
+# Validate Circuits
+VALIDATION_DIMS_PINNED:
+  5: 5
+
 #
 ## Stable Dev Constants
 # `wandb` logging
