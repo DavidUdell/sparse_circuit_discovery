@@ -71,7 +71,6 @@ model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
-ablate_layer_range: range =layer_range[:-1]
 
 # %%
 # Load the `openwetext` validation set.
@@ -111,3 +110,11 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
     __file__,
 )
 
+# %%
+# Validate the pinned circuit indices.
+for i in VALIDATION_DIMS_PINNED:
+    assert i.key() in layer_range
+    assert i.value() in layer_dim_indices[i.key()]
+
+# %%
+# Validate the pinned circuit with ablations.
