@@ -6,6 +6,7 @@ import gc
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
+from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -195,6 +196,42 @@ for i in base_activations_all_positions:
                     replace=False,
                 ).tolist()
             favorite_sequence_positions[i, j, k] = choices
+
+
+# %%
+# Using collected activation data, select datapoints for the pinned circuit
+# dims.
+truncated_tok_seqs = []
+for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
+    for fav_seq_pos in favorite_sequence_positions[
+        ablate_layer_idx - 1, None, ablate_dim_idx
+    ]:
+        for seq in eval_set:
+            # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
+            tok_seq = tokenizer(
+                seq,
+                return_tensors="pt",
+                truncation=True,
+                max_length=MAX_SEQ_INTERPED_LEN,
+            )
+            # fav_seq_pos is the index for a flattened eval_set.
+            if tok_seq["input_ids"].size(-1) < fav_seq_pos:
+                fav_seq_pos = fav_seq_pos - tok_seq["input_ids"].size(-1)
+                continue
+            if tok_seq["input_ids"].size(-1) >= fav_seq_pos:
+                tok_seq = tokenizer(
+                    seq,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=fav_seq_pos + 1,
+                )
+                truncated_tok_seqs.append(tok_seq)
+                break
+            raise ValueError("fav_seq_pos out of range.")
+
+    assert len(truncated_tok_seqs) > 0, dedent(
+        f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
+    )
 
 # %%
 # Validate the pinned circuit with ablations. Base case first.
