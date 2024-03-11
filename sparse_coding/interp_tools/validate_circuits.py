@@ -168,7 +168,7 @@ for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
     # The t.argmax here finds the top sequence position for each dict
     # index tuple. # favorite_sequence_position indices are now the
     # tuple (ablate_layer_idx, None, base_cache_dim_index).
-    activations_tensor = base_activations_all_positions[ablate_layer_idx][
+    activations_tensor = base_activations_all_positions[ablate_layer_idx - 1][
         None
     ][ablate_dim_idx]
 
