@@ -2,6 +2,7 @@
 """Validate circuits with simultaneous ablation studies."""
 
 
+import gc
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
@@ -23,6 +24,8 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 
+from sparse_coding.utils.tasks import recursive_defaultdict
+
 
 # %%
 # Load constants.
@@ -40,6 +43,7 @@ DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
+SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 VALIDATION_DIMS_PINNED: dict[int, int] = config.get("VALIDATION_DIMS_PINNED")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS")
 SEED = config.get("SEED")
@@ -73,6 +77,7 @@ model = accelerator.prepare(model)
 model.eval()
 
 layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
+ablate_layer_range: range = layer_range[:-1]
 
 # %%
 # Load the `openwetext` validation set.
@@ -119,6 +124,79 @@ for i in VALIDATION_DIMS_PINNED:
     assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
 
 # %%
+# Collect base case data.
+base_activations_all_positions = defaultdict(recursive_defaultdict)
+for ablate_layer_idx in ablate_layer_range:
+    # Base run, to determine top activating sequence positions. I'm
+    # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
+    # layer, by using its interface in a hacky way.
+    with hooks_manager(
+        ablate_layer_idx - 1,
+        None,
+        [ablate_layer_idx],
+        layer_dim_indices,
+        model,
+        layer_encoders,
+        layer_decoders,
+        base_activations_all_positions,
+        ablate_during_run=False,
+    ):
+        for sequence in eval_set:
+            _ = t.manual_seed(SEED)
+            inputs = tokenizer(
+                sequence,
+                return_tensors="pt",
+                truncation=True,
+                max_length=MAX_SEQ_INTERPED_LEN,
+            ).to(model.device)
+
+            try:
+                model(**inputs)
+            except RuntimeError:
+                # Manually clear memory and retry.
+                gc.collect()
+                model(**inputs)
+
+# %%
+# Find each dim's top activation value, and select all positions in the range
+# [activation/2, activation], a la Cunningham et al. 2023.
+# base_activation indices:
+# [ablate_layer_index][None][base_cache_dim_index]
+favorite_sequence_positions: dict[tuple[int, int, int], list[int]] = {}
+
+for i in base_activations_all_positions:
+    for j in base_activations_all_positions[i]:
+        assert j is None, f"Middle index {j} should have been None."
+        for k in base_activations_all_positions[i][j]:
+            # The t.argmax here finds the top sequence position for each dict
+            # index tuple. # favorite_sequence_position indices are now the
+            # tuple (ablate_layer_idx, None, base_cache_dim_index).
+            activations_tensor = base_activations_all_positions[i][j][k]
+
+            fave_seq_pos_flat: int = (
+                t.argmax(activations_tensor, dim=1).squeeze().item()
+            )
+            max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
+            min_val = max_val / 2.0
+            mask = (activations_tensor >= min_val) & (
+                activations_tensor <= max_val
+            )
+
+            top_indices: t.Tensor = t.nonzero(mask)[:, 1]
+
+            # Solves the problem of densely activating features taking too many
+            # forward passes.
+            if top_indices.size(0) <= SEQ_PER_DIM_CAP:
+                choices = top_indices.tolist()
+            else:
+                choices = np.random.choice(
+                    top_indices.tolist(),
+                    SEQ_PER_DIM_CAP,
+                    replace=False,
+                ).tolist()
+            favorite_sequence_positions[i, j, k] = choices
+
+# %%
 # Validate the pinned circuit with ablations. Base case first.
 BASE_LOGITS = None
 for seq in eval_set:
@@ -143,7 +221,7 @@ with ExitStack() as stack:
                 k,
                 v,
                 layer_range,
-                {k+1: []},
+                {k + 1: []},
                 model,
                 layer_encoders,
                 layer_decoders,
@@ -167,10 +245,9 @@ with ExitStack() as stack:
 
 # %%
 # Compute and display logit diffs.
-prob_diff = (
-    t.nn.functional.softmax(ALTERED_LOGITS,dim=-1)
-    - t.nn.functional.softmax(BASE_LOGITS, dim=-1)
-)
+prob_diff = t.nn.functional.softmax(
+    ALTERED_LOGITS, dim=-1
+) - t.nn.functional.softmax(BASE_LOGITS, dim=-1)
 
 prob_diff = prob_diff.mean(dim=0)
 positive_tokens = prob_diff.topk(LOGIT_TOKENS).indices
@@ -184,7 +261,7 @@ for token_id in token_ids:
 
     print(
         token,
-        str(round(prob_diff[token_id.item()].item()*100, 2)) + "%",
+        str(round(prob_diff[token_id.item()].item() * 100, 2)) + "%",
         sep="  ",
     )
 
