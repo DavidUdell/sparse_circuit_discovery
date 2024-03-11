@@ -159,52 +159,46 @@ for ablate_layer_idx in ablate_layer_range:
                 model(**inputs)
 
 # %%
-# Find each dim's top activation value, and select all positions in the range
-# [activation/2, activation], a la Cunningham et al. 2023.
-# base_activation indices:
-# [ablate_layer_index][None][base_cache_dim_index]
-favorite_sequence_positions: dict[tuple[int, int, int], list[int]] = {}
-
-for i in base_activations_all_positions:
-    for j in base_activations_all_positions[i]:
-        assert j is None, f"Middle index {j} should have been None."
-        for k in base_activations_all_positions[i][j]:
-            # The t.argmax here finds the top sequence position for each dict
-            # index tuple. # favorite_sequence_position indices are now the
-            # tuple (ablate_layer_idx, None, base_cache_dim_index).
-            activations_tensor = base_activations_all_positions[i][j][k]
-
-            fave_seq_pos_flat: int = (
-                t.argmax(activations_tensor, dim=1).squeeze().item()
-            )
-            max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
-            min_val = max_val / 2.0
-            mask = (activations_tensor >= min_val) & (
-                activations_tensor <= max_val
-            )
-
-            top_indices: t.Tensor = t.nonzero(mask)[:, 1]
-
-            # Solves the problem of densely activating features taking too many
-            # forward passes.
-            if top_indices.size(0) <= SEQ_PER_DIM_CAP:
-                choices = top_indices.tolist()
-            else:
-                choices = np.random.choice(
-                    top_indices.tolist(),
-                    SEQ_PER_DIM_CAP,
-                    replace=False,
-                ).tolist()
-            favorite_sequence_positions[i, j, k] = choices
-
-
-# %%
 # Using collected activation data, select datapoints for the pinned circuit
-# dims.
+# dims. `truncated_tok_seqs` is the output of this block, and should contain
+# favorite sequences of all pinned dims, assembled in a list.
+favorite_sequence_positions: dict[tuple[int, int, int], list[int]] = {}
 truncated_tok_seqs = []
 for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
+    # The t.argmax here finds the top sequence position for each dict
+    # index tuple. # favorite_sequence_position indices are now the
+    # tuple (ablate_layer_idx, None, base_cache_dim_index).
+    activations_tensor = base_activations_all_positions[ablate_layer_idx][
+        None
+    ][ablate_dim_idx]
+
+    fave_seq_pos_flat: int = (
+        t.argmax(activations_tensor, dim=1).squeeze().item()
+    )
+    max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
+    min_val = max_val / 2.0
+    mask = (activations_tensor >= min_val) & (activations_tensor <= max_val)
+
+    top_indices: t.Tensor = t.nonzero(mask)[:, 1]
+
+    # Solves the problem of densely activating features taking too many
+    # forward passes.
+    if top_indices.size(0) <= SEQ_PER_DIM_CAP:
+        choices = top_indices.tolist()
+    else:
+        choices = np.random.choice(
+            top_indices.tolist(),
+            SEQ_PER_DIM_CAP,
+            replace=False,
+        ).tolist()
+
+    favorite_sequence_positions[ablate_layer_idx, None, ablate_dim_idx] = (
+        choices
+    )
+
+for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
     for fav_seq_pos in favorite_sequence_positions[
-        ablate_layer_idx - 1, None, ablate_dim_idx
+        ablate_layer_idx, None, ablate_dim_idx
     ]:
         for seq in eval_set:
             # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
