@@ -3,9 +3,11 @@
 
 Circuit discovery in `GPT-2 small`, using sparse autoencoding
 
-## Table of Contents
+### Table of Contents
 - [Installation](#installation)
-- [Usage](#usage)
+- [User's Guide](#users-guide)
+- [How to Read the Graphs](#how-to-read-the-graphs)
+- [Errors](#errors)
 - [Project Status](#project-status)
 
 ## Installation
@@ -73,7 +75,9 @@ trace out circuits as you go.
 ## How to Read the Graphs
 Consider the cognition graph at the top of this page. Each _box_ with a label
 like `4.112` is a feature in a sparse autoencoder. `4` is its layer index,
-while `112` is its column index in that layer's autoencoder.
+while `112` is its column index in that layer's autoencoder. You can
+cross-reference more comprehensive interpretability data for any given feature
+on [Neuronpedia](https://www.neuronpedia.org/gpt2-small).
 
 _Blue tokens_ in each box represent top feature activations in their contextual
 sequences, to a specified length out to either side.
@@ -101,7 +105,8 @@ is indicated by color transparency.
   repo.
 
 ## Project Status
-Current version is 0.2.1.
+Current version is 0.3.0.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
-his pretrained sparse autoencoders from HF Hub.
+his pretrained sparse autoencoders from HF Hub. The Neuronpedia wiki is Johnny
+Lin's.

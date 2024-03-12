@@ -15,7 +15,6 @@ DIMS_PINNED:
 # "EleutherAI/pythia-70m"
 # "meta-llama/Llama-2-7b-hf"
 # "meta-llama/Llama-2-70b-hf"
-# "rasp"
 MODEL_DIR: "openai-community/gpt2"
 
 # Layers Slice to Cache Activations From
@@ -52,6 +51,10 @@ BRANCHING_FACTOR: 10
 # INIT_THINNING_FACTOR: 0.01
 LOGIT_TOKENS: 10
 # DIMS_PINNED:
+
+# Validate Circuits
+VALIDATION_DIMS_PINNED:
+  5: 5
 
 #
 ## Stable Dev Constants
