@@ -15,7 +15,6 @@ DIMS_PINNED:
 # "EleutherAI/pythia-70m"
 # "meta-llama/Llama-2-7b-hf"
 # "meta-llama/Llama-2-70b-hf"
-# "rasp"
 MODEL_DIR: "openai-community/gpt2"
 
 # Layers Slice to Cache Activations From
