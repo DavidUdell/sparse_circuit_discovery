@@ -134,7 +134,7 @@ for ablate_layer_idx in ablate_layer_range:
     with hooks_manager(
         ablate_layer_idx - 1,
         None,
-        [ablate_layer_idx],
+        layer_range,
         layer_dim_indices,
         model,
         layer_encoders,
@@ -230,14 +230,8 @@ for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
 # %%
 # Validate the pinned circuit with ablations. Base case first.
 BASE_LOGITS = None
-for seq in eval_set:
-    inputs = tokenizer(
-        seq,
-        return_tensors="pt",
-        truncation=True,
-        max_length=MAX_SEQ_INTERPED_LEN,
-    ).to(model.device)
-    outputs = model(**inputs)
+for seq in truncated_tok_seqs:
+    outputs = model(**seq.to(model.device))
     logit = outputs.logits[:, -1, :]
     if BASE_LOGITS is None:
         BASE_LOGITS = logit
@@ -260,14 +254,8 @@ with ExitStack() as stack:
             )
         )
 
-    for seq in eval_set:
-        inputs = tokenizer(
-            seq,
-            return_tensors="pt",
-            truncation=True,
-            max_length=MAX_SEQ_INTERPED_LEN,
-        ).to(model.device)
-        outputs = model(**inputs)
+    for seq in truncated_tok_seqs:
+        outputs = model(**seq.to(model.device))
         logit = outputs.logits[:, -1, :]
         if ALTERED_LOGITS is None:
             ALTERED_LOGITS = logit

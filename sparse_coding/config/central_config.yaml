@@ -1,12 +1,15 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "5:7"
+ACTS_LAYERS_SLICE: "3:247"
 INIT_THINNING_FACTOR: 0.01
 NUM_SEQUENCES_INTERPED: 200
 SEQ_PER_DIM_CAP: 100
 
 DIMS_PINNED:
+
+
+VALIDATION_DIMS_PINNED:
 
 
 #
@@ -53,8 +56,7 @@ LOGIT_TOKENS: 10
 # DIMS_PINNED:
 
 # Validate Circuits
-VALIDATION_DIMS_PINNED:
-  5: 5
+# VALIDATION_DIMS_PINNED:
 
 #
 ## Stable Dev Constants

@@ -71,6 +71,28 @@ The last cognition graph you generated is saved as both a `.svg` for you and as
 a `.dot` for the computer. If you run the interpretability pipeline again, the
 new data will expand upon that old `.dot` file. This way, you can progressively
 trace out circuits as you go.
+### Circuit Validation
+There's also independent circuit validation through
+`interp_tools/validate_circuits.py`. This script simultaneously ablates all the
+features that comprise a circuit, to see how the _overall_ circuit behaves
+under ablation (rather than just looking at separate features under independent
+ablations, the way `pipe.py` cognition graphs do).
+
+To set this up, first load all the requisite autoencoders by setting
+`ACTS_LAYERS_SLICE` and calling `load_autoencoders.py`
+```
+## Config Notes
+# Throughout, leave out entries for None. Writing in `None` values will get
+# you the string "None". Key params here:
+ACTS_LAYERS_SLICE: "9:11"
+```
+and then pin all the features that make up a given circuit.
+```
+VALIDATION_DIMS_PINNED:
+  9: 331
+  10: 1734
+```
+Now call `interp_tools/validate_circuits.py`.
 
 ## How to Read the Graphs
 Consider the cognition graph at the top of this page. Each _box_ with a label
@@ -105,7 +127,7 @@ is indicated by color transparency.
   repo.
 
 ## Project Status
-Current version is 0.3.0.
+Current version is 0.3.1.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub. The Neuronpedia wiki is Johnny
