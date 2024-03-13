@@ -86,14 +86,14 @@ in GPT-2 small
 # you the string "None". Key params here:
 ACTS_LAYERS_SLICE: "9:11"
 ```
-and then pin all the features that comprise a given circuit under
+and then pin all the features that comprise a given circuit in
 `VALIDATION_DIMS_PINNED`.
 ```
 VALIDATION_DIMS_PINNED:
   9: 331
   10: 1734
 ```
-Then run validation with:
+Now run validation with:
 
 `python3 val.py`
 
