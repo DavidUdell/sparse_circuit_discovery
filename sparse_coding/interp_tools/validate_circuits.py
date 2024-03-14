@@ -275,7 +275,10 @@ positive_tokens = prob_diff.topk(LOGIT_TOKENS).indices
 negative_tokens = prob_diff.topk(LOGIT_TOKENS, largest=False).indices
 token_ids = t.cat((positive_tokens, negative_tokens), dim=0)
 
-for token_id in token_ids:
+for meta_idx, token_id in enumerate(token_ids):
+    if meta_idx == len(positive_tokens):
+        print()
+
     token = tokenizer.convert_ids_to_tokens(token_id.item())
     token = tokenizer.convert_tokens_to_string([token])
     token = token.replace("\n", "\\n")
