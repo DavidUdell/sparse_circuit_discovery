@@ -79,7 +79,7 @@ _overall_ circuit behaves under ablation (rather than just looking at separate
 features under independent ablations, the way `pipe.py` cognition graphs do).
 
 To set this up, first set `ACTS_LAYERS_SLICE` to encompass the relevant layers
-in GPT-2 small
+in GPT-2 small, including one extra layer after
 ```
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
