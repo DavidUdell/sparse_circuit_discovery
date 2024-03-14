@@ -121,13 +121,15 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 # %%
 # Sanity check the pinned circuit indices.
 for i in VALIDATION_DIMS_PINNED:
-    assert i in layer_range
+    assert (
+        i in ablate_layer_range
+    ), "Layer range should include one more layer after the last pinned layer."
     assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
 
 # %%
 # Collect base case data.
 base_activations_all_positions = defaultdict(recursive_defaultdict)
-for ablate_layer_idx in ablate_layer_range:
+for ablate_layer_idx in VALIDATION_DIMS_PINNED:
     # Base run, to determine top activating sequence positions. I'm
     # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
     # layer, by using its interface in a hacky way.

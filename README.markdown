@@ -84,7 +84,7 @@ in GPT-2 small
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "9:11"
+ACTS_LAYERS_SLICE: "9:12"
 ```
 and then pin all the features that comprise a given circuit in
 `VALIDATION_DIMS_PINNED`.
