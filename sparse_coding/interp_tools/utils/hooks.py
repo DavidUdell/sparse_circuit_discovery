@@ -168,13 +168,6 @@ def hooks_manager(
             mask[:, :, dim_indices] = True
             projected_acts = projected_acts * mask
 
-            projected_acts[:, -1, :dim_indices] = t.zeros_like(
-                projected_acts[:, -1, :dim_indices]
-            )
-            projected_acts[:, -1, dim_indices + 1 :] = t.zeros_like(
-                projected_acts[:, -1, dim_indices + 1 :]
-            )
-
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
