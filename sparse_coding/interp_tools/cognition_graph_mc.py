@@ -17,6 +17,7 @@ You may need to have logged a HF access token, if applicable.
 
 import warnings
 from collections import defaultdict
+from textwrap import dedent
 
 import numpy as np
 import torch as t
@@ -65,9 +66,18 @@ NUM_SHOT = config.get("NUM_SHOT", 6)
 # COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
-DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
+DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
+
+for v in DIMS_PINNED.values():
+    assert isinstance(v, list) and len(v) == 1, dedent(
+        """
+        In this script, DIMS_PINNED for ablations should be a dict of singleton
+        index lists.
+        """
+    )
+
 
 # %%
 # Reproducibility.

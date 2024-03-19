@@ -32,7 +32,7 @@ BRANCHING_FACTOR: 5
 INIT_THINNING_FACTOR: 0.2
 LOGIT_TOKENS: 8
 DIMS_PINNED:
-  1: 1
+  1: [1]
 
 
 ## Stable Smoke Test Constants

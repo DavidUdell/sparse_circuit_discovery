@@ -45,7 +45,7 @@ TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
-VALIDATION_DIMS_PINNED: dict[int, int] = config.get("VALIDATION_DIMS_PINNED")
+VALIDATION_DIMS_PINNED: dict[int, list[int]] = config.get("VALIDATION_DIMS_PINNED")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS")
 SEED = config.get("SEED")
 
@@ -120,11 +120,12 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 
 # %%
 # Sanity check the pinned circuit indices.
-for i in VALIDATION_DIMS_PINNED:
+for k, v in VALIDATION_DIMS_PINNED.items():
     assert (
-        i in ablate_layer_range
+        k in ablate_layer_range
     ), "Layer range should include one more layer after the last pinned layer."
-    assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
+    for i in v:
+        assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[k]
 
 # %%
 # Collect base case data.
