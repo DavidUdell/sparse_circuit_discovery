@@ -194,16 +194,14 @@ for i in base_activations_all_positions:
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
 
-            # Solves the problem of densely activating features taking too many
-            # forward passes.
             if top_indices.size(0) <= SEQ_PER_DIM_CAP:
                 choices = top_indices.tolist()
             else:
-                choices = np.random.choice(
-                    top_indices.tolist(),
-                    SEQ_PER_DIM_CAP,
-                    replace=False,
-                ).tolist()
+                # Solves the problem of densely activating features taking too
+                # many forward passes.
+                superset_acts = activations_tensor.squeeze()[top_indices]
+                meta_indices = t.topk(superset_acts, SEQ_PER_DIM_CAP).indices
+                choices = top_indices[meta_indices].tolist()
             favorite_sequence_positions[i, j, k] = choices
 
 # %%
