@@ -60,9 +60,18 @@ SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 # COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
-DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
+DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
+
+for v in DIMS_PINNED.values():
+    assert isinstance(v, list) and len(v) == 1, dedent(
+        """
+        In this script, DIMS_PINNED for ablations should be a dict of singleton
+        index lists.
+        """
+    )
+
 
 # %%
 # Reproducibility.
