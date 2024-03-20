@@ -70,15 +70,19 @@ DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
-for v in DIMS_PINNED.values():
-    assert isinstance(v, list) and len(v) == 1, dedent(
-        """
-        In this script, DIMS_PINNED for ablations should be a dict of singleton
-        index lists.
-        """
-    )
+<<<<<<< Updated upstream
+=======
+if DIMS_PINNED is not None:
+    for v in DIMS_PINNED.values():
+        assert isinstance(v, list) and len(v) == 1, dedent(
+            """
+            In this script, DIMS_PINNED for ablations should be a dict of
+            singleton index lists.
+            """
+        )
 
 
+>>>>>>> Stashed changes
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)

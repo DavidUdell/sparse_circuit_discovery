@@ -121,12 +121,13 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 
 # %%
 # Sanity check the pinned circuit indices.
-for k, v in VALIDATION_DIMS_PINNED.items():
-    assert (
-        k in ablate_layer_range
-    ), "Layer range should include one more layer after the last pinned layer."
-    for i in v:
-        assert i in layer_dim_indices[k]
+if VALIDATION_DIMS_PINNED is not None:
+    for k, v in VALIDATION_DIMS_PINNED.items():
+        assert (
+            k in ablate_layer_range
+        ), "Layer range should include one more layer after the last pinned layer."
+        for i in v:
+            assert i in layer_dim_indices[k]
 
 # %%
 # Collect base case data.
