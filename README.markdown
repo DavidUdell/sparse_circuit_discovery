@@ -31,13 +31,14 @@ The most important hyperparameters are clustered up top:
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "4:6"
+ACTS_LAYERS_SLICE: "9:12"
 INIT_THINNING_FACTOR: 0.01
 NUM_SEQUENCES_INTERPED: 200
 SEQ_PER_DIM_CAP: 100
 
+# Only pin single dims per layer.
 DIMS_PINNED:
- 4: 112
+  9: [331]
 ```
 
 In order:
@@ -55,9 +56,9 @@ In order:
    over all of those sequences. For computational reasons, we basically want to
    set `NUM_SEQUENCES_INTERPED` as high as we can, and then set this value
    relatively low, so that our interpretability calculations are tractable.
-5. `DIMS_PINNED` is a dictionary of layer indices followed by a single feature
-   index each. If set for the first layer, it will completely override
-   `INIT_THINNING_FACTOR`.
+5. `DIMS_PINNED` is a dictionary of layer indices followed by singleton lists
+   with lone feature indices. If set for the first layer, it will completely
+   override `INIT_THINNING_FACTOR`.
 
 Set these values, save `central_config.yaml`, then run interpretability with:
 
@@ -84,14 +85,15 @@ in GPT-2 small, including one extra layer after
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "9:12"
+ACTS_LAYERS_SLICE: "6:9"
 ```
 and then pin all the features that comprise a given circuit in
 `VALIDATION_DIMS_PINNED`.
 ```
+# Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
-  9: 331
-  10: 1734
+  6: [21383, 8339, 6883, 14104, 8956, 18854]
+  7: [2118]
 ```
 Now run validation with:
 
@@ -130,8 +132,9 @@ is indicated by color transparency.
   repo.
 
 ## Project Status
-Current version is 0.3.2.
+Current version is 0.4.0.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
-his pretrained sparse autoencoders from HF Hub. The Neuronpedia wiki is Johnny
-Lin's.
+his pretrained sparse autoencoders from HF Hub.
+
+The Neuronpedia wiki is Johnny Lin's.
