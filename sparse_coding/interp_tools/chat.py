@@ -80,7 +80,7 @@ for _ in range(20):
     sequence = sequence + tokenizer.decode(*next_token)
 with hooks_manager(
     ABLATION_LAYER,
-    ABLATION_DIM,
+    [ABLATION_DIM],
     range(ABLATION_LAYER, ABLATION_LAYER + 2),
     {ABLATION_LAYER + 1: []},
     model,

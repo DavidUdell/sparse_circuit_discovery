@@ -1,17 +1,19 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "9:12"
+ACTS_LAYERS_SLICE: "6:9"
 INIT_THINNING_FACTOR: 0.01
-NUM_SEQUENCES_INTERPED: 200
+NUM_SEQUENCES_INTERPED: 100
 SEQ_PER_DIM_CAP: 100
 
+# Only pin single dims per layer.
 DIMS_PINNED:
+  9: [331]
 
-
+# Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
-  9: 331
-  10: 1734
+  6: [8339, 14104, 18854]
+  7: [2118]
 
 #
 ## Main Config

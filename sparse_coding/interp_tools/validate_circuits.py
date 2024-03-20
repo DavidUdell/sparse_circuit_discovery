@@ -45,7 +45,8 @@ TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
-VALIDATION_DIMS_PINNED: dict[int, int] = config.get("VALIDATION_DIMS_PINNED")
+# dict[int, list[int]]
+VALIDATION_DIMS_PINNED = config.get("VALIDATION_DIMS_PINNED")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS")
 SEED = config.get("SEED")
 
@@ -120,11 +121,12 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 
 # %%
 # Sanity check the pinned circuit indices.
-for i in VALIDATION_DIMS_PINNED:
+for k, v in VALIDATION_DIMS_PINNED.items():
     assert (
-        i in ablate_layer_range
+        k in ablate_layer_range
     ), "Layer range should include one more layer after the last pinned layer."
-    assert VALIDATION_DIMS_PINNED[i] in layer_dim_indices[i]
+    for i in v:
+        assert i in layer_dim_indices[k]
 
 # %%
 # Collect base case data.
@@ -166,68 +168,70 @@ for ablate_layer_idx in VALIDATION_DIMS_PINNED:
 # favorite sequences of all pinned dims, assembled in a list.
 favorite_sequence_positions: dict[tuple[int, int, int], list[int]] = {}
 truncated_tok_seqs = []
-for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
-    # The t.argmax here finds the top sequence position for each dict
-    # index tuple. # favorite_sequence_position indices are now the
-    # tuple (ablate_layer_idx, None, base_cache_dim_index).
-    activations_tensor = base_activations_all_positions[ablate_layer_idx - 1][
-        None
-    ][ablate_dim_idx]
+for ablate_layer_idx, ablate_dim_indices in VALIDATION_DIMS_PINNED.items():
+    for ablate_dim_idx in ablate_dim_indices:
+        # The t.argmax here finds the top sequence position for each dict
+        # index tuple. # favorite_sequence_position indices are now the
+        # tuple (ablate_layer_idx, None, base_cache_dim_index).
+        activations_tensor = base_activations_all_positions[
+            ablate_layer_idx - 1
+        ][None][ablate_dim_idx]
 
-    fave_seq_pos_flat: int = (
-        t.argmax(activations_tensor, dim=1).squeeze().item()
-    )
-    max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
-    min_val = max_val / 2.0
-    mask = (activations_tensor >= min_val) & (activations_tensor <= max_val)
+        fave_seq_pos_flat: int = (
+            t.argmax(activations_tensor, dim=1).squeeze().item()
+        )
+        max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
+        min_val = max_val / 2.0
+        mask = (activations_tensor >= min_val) & (
+            activations_tensor <= max_val
+        )
 
-    top_indices: t.Tensor = t.nonzero(mask)[:, 1]
+        top_indices: t.Tensor = t.nonzero(mask)[:, 1]
 
-    # Solves the problem of densely activating features taking too many
-    # forward passes.
-    if top_indices.size(0) <= SEQ_PER_DIM_CAP:
-        choices = top_indices.tolist()
-    else:
-        choices = np.random.choice(
-            top_indices.tolist(),
-            SEQ_PER_DIM_CAP,
-            replace=False,
-        ).tolist()
+        if top_indices.size(0) <= SEQ_PER_DIM_CAP:
+            choices = top_indices.tolist()
+        else:
+            # Solves the problem of densely activating features taking too many
+            # forward passes.
+            superset_acts = activations_tensor.squeeze()[top_indices]
+            meta_indices = t.topk(superset_acts, SEQ_PER_DIM_CAP).indices
+            choices = top_indices[meta_indices].tolist()
 
-    favorite_sequence_positions[ablate_layer_idx, None, ablate_dim_idx] = (
-        choices
-    )
+        favorite_sequence_positions[ablate_layer_idx, None, ablate_dim_idx] = (
+            choices
+        )
 
-for ablate_layer_idx, ablate_dim_idx in VALIDATION_DIMS_PINNED.items():
-    for fav_seq_pos in favorite_sequence_positions[
-        ablate_layer_idx, None, ablate_dim_idx
-    ]:
-        for seq in eval_set:
-            # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
-            tok_seq = tokenizer(
-                seq,
-                return_tensors="pt",
-                truncation=True,
-                max_length=MAX_SEQ_INTERPED_LEN,
-            )
-            # fav_seq_pos is the index for a flattened eval_set.
-            if tok_seq["input_ids"].size(-1) < fav_seq_pos:
-                fav_seq_pos = fav_seq_pos - tok_seq["input_ids"].size(-1)
-                continue
-            if tok_seq["input_ids"].size(-1) >= fav_seq_pos:
+for ablate_layer_idx, ablate_dim_indices in VALIDATION_DIMS_PINNED.items():
+    for ablate_dim_idx in ablate_dim_indices:
+        for fav_seq_pos in favorite_sequence_positions[
+            ablate_layer_idx, None, ablate_dim_idx
+        ]:
+            for seq in eval_set:
+                # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
                 tok_seq = tokenizer(
                     seq,
                     return_tensors="pt",
                     truncation=True,
-                    max_length=fav_seq_pos + 1,
+                    max_length=MAX_SEQ_INTERPED_LEN,
                 )
-                truncated_tok_seqs.append(tok_seq)
-                break
-            raise ValueError("fav_seq_pos out of range.")
+                # fav_seq_pos is the index for a flattened eval_set.
+                if tok_seq["input_ids"].size(-1) < fav_seq_pos:
+                    fav_seq_pos = fav_seq_pos - tok_seq["input_ids"].size(-1)
+                    continue
+                if tok_seq["input_ids"].size(-1) >= fav_seq_pos:
+                    tok_seq = tokenizer(
+                        seq,
+                        return_tensors="pt",
+                        truncation=True,
+                        max_length=fav_seq_pos + 1,
+                    )
+                    truncated_tok_seqs.append(tok_seq)
+                    break
+                raise ValueError("fav_seq_pos out of range.")
 
-    assert len(truncated_tok_seqs) > 0, dedent(
-        f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
-    )
+        assert len(truncated_tok_seqs) > 0, dedent(
+            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
+        )
 
 # %%
 # Validate the pinned circuit with ablations. Base case first.

@@ -52,7 +52,7 @@ def prepare_autoencoder_and_indices(
 
 def prepare_dim_indices(
     thinning_factor: float | None,
-    dims_plotted_dict: dict[int, int] | None,
+    dims_plotted_dict: dict[int, list[int]] | None,
     ablate_dim_indices: list[int],
     ablate_layer_idx: int,
     layer_range: range,
@@ -70,10 +70,11 @@ def prepare_dim_indices(
         specified_dims: list[int] = []
         for k, v in dims_plotted_dict.items():
             if k == ablate_layer_idx:
-                assert v in ablate_dim_indices, dedent(
-                    f"Index {v} not in `ablate_dim_indices`."
-                )
-                specified_dims.append(v)
+                for i in v:
+                    assert i in ablate_dim_indices, dedent(
+                        f"Index {v} not in `ablate_dim_indices`."
+                    )
+                    specified_dims.append(i)
 
         return specified_dims
 
@@ -115,7 +116,7 @@ def rasp_ablate_hook_fac(neuron_index: int):
 @contextmanager
 def hooks_manager(
     ablate_layer_idx: int,
-    ablate_dim_idx: int,
+    ablate_dim_indices: list[int],
     model_layer_range: range,
     cache_dim_indices: dict[int, list[int]],
     model,
@@ -132,13 +133,13 @@ def hooks_manager(
     """
 
     def ablate_hook_fac(
-        dim_idx: int,
+        dim_indices: list[int],
         encoder: t.Tensor,
         enc_biases: t.Tensor,
         decoder,
         dec_biases,
     ):
-        """Create hooks that zero a projected neuron and project it back."""
+        """Create hooks that zero projected neurons and project them back."""
 
         def ablate_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
@@ -162,14 +163,10 @@ def hooks_manager(
                 inplace=True,
             )
 
-            # We will ablate the activation at dim_idx by subtracting only that
-            # dim value.
-            projected_acts[:, -1, :dim_idx] = t.zeros_like(
-                projected_acts[:, -1, :dim_idx]
-            )
-            projected_acts[:, -1, dim_idx + 1 :] = t.zeros_like(
-                projected_acts[:, -1, dim_idx + 1 :]
-            )
+            # Zero out everything except for the column vectors specified.
+            mask = t.zeros(projected_acts.shape, dtype=t.bool).to(model.device)
+            mask[:, :, dim_indices] = True
+            projected_acts = projected_acts * mask
 
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
@@ -188,7 +185,7 @@ def hooks_manager(
         return ablate_hook
 
     def cache_hook_fac(
-        ablate_dim_idx: int,
+        ablate_dim_idx: list[int],
         cache_dims: list[int],
         ablate_layer_idx: int,
         encoder: t.Tensor,
@@ -197,6 +194,9 @@ def hooks_manager(
         cache_dict: defaultdict,
     ):
         """Create hooks that cache the projected activations."""
+        if isinstance(ablate_dim_idx, list) and len(ablate_dim_idx) != 1:
+            # Don't cache during multiablations.
+            return lambda *args: None
 
         def cache_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
@@ -265,7 +265,7 @@ def hooks_manager(
             ablate_layer_idx
         ].register_forward_hook(
             ablate_hook_fac(
-                ablate_dim_idx,
+                ablate_dim_indices,
                 ablate_encoder,
                 ablate_enc_bias,
                 ablate_decoder,
@@ -279,7 +279,7 @@ def hooks_manager(
         cache_layer_idx
     ].register_forward_hook(
         cache_hook_fac(
-            ablate_dim_idx,
+            ablate_dim_indices,
             cache_dim_indices[cache_layer_idx],
             ablate_layer_idx,
             cache_encoder,

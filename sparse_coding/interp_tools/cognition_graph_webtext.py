@@ -60,9 +60,18 @@ SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 # COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
-DIMS_PINNED: dict[int, int] = config.get("DIMS_PINNED", None)
+DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
+
+for v in DIMS_PINNED.values():
+    assert isinstance(v, list) and len(v) == 1, dedent(
+        """
+        In this script, DIMS_PINNED for ablations should be a dict of singleton
+        index lists.
+        """
+    )
+
 
 # %%
 # Reproducibility.
@@ -194,16 +203,14 @@ for i in base_activations_all_positions:
 
             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
 
-            # Solves the problem of densely activating features taking too many
-            # forward passes.
             if top_indices.size(0) <= SEQ_PER_DIM_CAP:
                 choices = top_indices.tolist()
             else:
-                choices = np.random.choice(
-                    top_indices.tolist(),
-                    SEQ_PER_DIM_CAP,
-                    replace=False,
-                ).tolist()
+                # Solves the problem of densely activating features taking too
+                # many forward passes.
+                superset_acts = activations_tensor.squeeze()[top_indices]
+                meta_indices = t.topk(superset_acts, SEQ_PER_DIM_CAP).indices
+                choices = top_indices[meta_indices].tolist()
             favorite_sequence_positions[i, j, k] = choices
 
 # %%
