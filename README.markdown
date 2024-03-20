@@ -92,7 +92,7 @@ and then pin all the features that comprise a given circuit in
 ```
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
-  6: [21383, 8339, 6883, 14104, 8956, 18854]
+  6: [8339, 14104, 18854]
   7: [2118]
 ```
 Now run validation with:
