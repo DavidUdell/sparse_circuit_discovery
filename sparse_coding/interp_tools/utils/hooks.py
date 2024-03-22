@@ -149,7 +149,7 @@ def hooks_manager(
             """
 
             # Project through the encoder. Bias usage now corresponds to Joseph
-            # Bloom's (and, by his way, Antropic's).
+            # Bloom's (and, by way of him, Antropic's).
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0] - dec_biases.to(model.device),
@@ -183,8 +183,9 @@ def hooks_manager(
                 )
             )
 
-            # Perform the ablation. We must also preserve the attention data in
-            # `output[1]`.
+            # Perform the ablation. The right term reflects just ablation
+            # effects, hopefully canceling out autoencoder mangling. We must
+            # also preserve the attention data in `output[1]`.
             return (
                 output[0] + (ablated_acts - projected_acts),
                 output[1],
