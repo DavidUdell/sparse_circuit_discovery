@@ -107,7 +107,7 @@ ablate_layer_range: range = layer_range[:-1]
 
 # %%
 # Load the `openwebtext` validation set.
-dataset: list[list[str]] = load_dataset(
+dataset: list[str] = load_dataset(
     "Elriggs/openwebtext-100k",
     split="train",
 )["text"]
@@ -118,7 +118,8 @@ dataset_indices: np.ndarray = np.random.choice(
 )
 STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
-eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
+# Overriding.
+eval_set: list[str] = ["{{{}}}", "{{}}", "{}", "{{{{"]
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
