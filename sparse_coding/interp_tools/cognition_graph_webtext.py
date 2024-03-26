@@ -118,8 +118,104 @@ dataset_indices: np.ndarray = np.random.choice(
 )
 STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
-eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
+eval_set: list[str] = [
+    """
+46 03 B9 01 00 2F – CMD6 – SWITCH (HS_TIMING)
 
+46 03 B7 01 00 2D – CMD6 – SWITCH (BUS_WIDTH 4)
+    """,
+    """
+#25: Gran Torino (2008)
+
+#24: Team America: World Police (2004)
+
+#23: United 93 (2006)
+
+#22: Brazil (1985)
+
+#21: Heartbreak Ridge (1986)
+
+#20: Gattaca (1997)
+
+#19: We Were Soldiers (2002)
+
+#18: The Edge (1997)
+
+#17: The Chronicles of Narnia: The Lion, The Witch, and The Wardrobe (2005)
+
+#16: Master and Commander (2003)
+
+#15: Red Dawn (1984)
+
+#14: A Simple Plan (1998)
+
+#13: Braveheart (1995)
+
+#12: The Dark Knight (2008)
+
+#11: The Lord of the Rings (2001, 2002, 2003)
+
+#10: Ghostbusters (1984)
+
+#9: Blast from the Past (1999)
+
+#8: Juno (2007)
+
+#7: The Pursuit of Happyness (2006)
+
+#6: Groundhog Day (1993)
+
+#5: 300 (2007)
+
+#4: Forrest Gump (1994)
+
+#3: Metropolitan (1990)
+
+#2: The Incredibles (2004)
+
+#1: The Lives of Others (2007)
+""",
+    """
+library ( plotrix ) library ( mgcv ) library ( plyr ) # read and format data x
+<- read. csv (
+""",
+    """
+N 1 , 1 (0,0) = N 1 , 1 * Sin2(0)/2 ~ 200 * 0
+
+N 1 , 1 (0,1) = N 1 , 1 * Cos2(0)/2 ~ 200 * 1/2
+
+N 1 , 1 (1,0) = N 1 , 1 * Cos2(0)/2 ~ 200 * 1/2
+
+N 1 , 1 (1,1)
+    """,
+    """
+Proving this fairly obvious point (that a woman is fully capable of being president)
+""",
+    """
+Fraser Valley has three sections: west (Abbotsford), central (Chilliwack) and east (Hope)
+""",
+    """
+The blaze charred 840 square miles (2,175 square km)
+""",
+    """
+Mysticism, expressed mainly by neoplatonism (2nd-6th century AD)
+""",
+    """
+Augustine (354-430)
+""",
+    """
+SFU is a branch of the Industrial Workers of the World (IWW)
+""",
+    """
+We are Stardust (Family United)
+""",
+    """
+Trump said that he and Sen. Luther Strange (R-Ala.)
+""",
+    """
+Bradley Cooper can do it all, from comedy (The Hangover) to gritty (American Sniper) to just plain weird (American Hustle)
+""",
+]
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
 # layer_encoders: dict[int, tuple[t.Tensor]]
