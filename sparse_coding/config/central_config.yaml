@@ -2,9 +2,9 @@
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
 ACTS_LAYERS_SLICE: "7:9"
-INIT_THINNING_FACTOR: 1.0
-NUM_SEQUENCES_INTERPED: 1000
-SEQ_PER_DIM_CAP: 100
+INIT_THINNING_FACTOR: 0.5
+NUM_SEQUENCES_INTERPED: 1
+SEQ_PER_DIM_CAP: 10
 
 # Only pin single dims per layer.
 DIMS_PINNED:
