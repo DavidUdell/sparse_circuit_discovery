@@ -1,6 +1,7 @@
 """Graph the causal effects of ablations."""
 
 import html
+import re
 from textwrap import dedent
 
 import torch as t
@@ -132,8 +133,10 @@ def label_highlighting(
         for token, act in zip(context, act):
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
-            # Explicitly handle newlines.
+            # Explicitly handle newlines and control characters.
             token = token.replace("\n", "\\n")
+            token = re.sub(r"[\x00-\x1F]", "\\C0", token)
+            token = re.sub(r"[\x7F-\x9F]", "\\C1_or_DEL", token)
 
             if act <= 0.0:
                 label += f"<td>{token}</td>"
@@ -178,6 +181,11 @@ def label_highlighting(
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
+            # Explicitly handle newlines and control characters.
+            token = token.replace("\n", "\\n")
+            token = re.sub(r"[\x00-\x1F]", "\\C0", token)
+            token = re.sub(r"[\x7F-\x9F]", "\\C1_or_DEL", token)
+
             label += f"{cell_tag}{token}</td>"
         label += "</tr>"
 
