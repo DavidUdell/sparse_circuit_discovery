@@ -1,6 +1,5 @@
 """Graph the causal effects of ablations."""
 
-
 import html
 from textwrap import dedent
 
@@ -25,6 +24,7 @@ def graph_and_log(
     graph_file: str,
     graph_dot_file: str,
     top_k_info_file: str,
+    threshold: float,
     logit_tokens: int,
     tokenizer,
     prob_diffs,
@@ -67,6 +67,7 @@ def graph_and_log(
         top_k_info_file,
         graph_dot_file,
         overall_effects,
+        threshold,
         logit_tokens,
         tokenizer,
         prob_diffs,
@@ -191,6 +192,7 @@ def graph_causal_effects(
     top_k_info_file: str,
     graph_dot_file: str,
     overall_effects: float,
+    threshold: float,
     logit_tokens: int,
     tokenizer,
     prob_diffs,
@@ -265,14 +267,14 @@ def graph_causal_effects(
 
     # Plot effect edges.
     plotted_effects: float = 0.0
-    zero_effects: int = 0
+    minor_effects: int = 0
     for (
         ablation_layer_idx,
         ablated_dim,
         downstream_dim,
     ), effect in activations.items():
-        if effect.item() == 0:
-            zero_effects += 1
+        if 0.0 == effect.item() <= threshold:
+            minor_effects += 1
             continue
         plotted_effects += abs(effect.item())
         # Blue means the intervention increased downstream firing, while
@@ -316,7 +318,7 @@ def graph_causal_effects(
         dedent(
             f"""
             Dropped {unlinked_nodes} unlinked neuron(s) from graph.
-            {zero_effects} zero effect(s) ignored.\n
+            {minor_effects} minor effect(s) ignored.\n
             """
         )
     )

@@ -61,6 +61,7 @@ SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
+THRESHOLD = config.get("THRESHOLD", 0.0)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
 
@@ -340,14 +341,14 @@ for ablate_layer_idx in ablate_layer_range:
                 elif isinstance(ALTERED_LOGITS, t.Tensor):
                     ALTERED_LOGITS = t.cat([ALTERED_LOGITS, logit], dim=0)
 
-        prob_diff = t.nn.functional.softmax(
+        log_prob_diff = -t.nn.functional.log_softmax(
             ALTERED_LOGITS,
             dim=-1,
-        ) - t.nn.functional.softmax(
+        ) + t.nn.functional.log_softmax(
             BASE_LOGITS,
             dim=-1,
         )
-        probability_diffs[ablate_layer_idx, ablate_dim_idx] = prob_diff
+        probability_diffs[ablate_layer_idx, ablate_dim_idx] = log_prob_diff
 
     if BRANCHING_FACTOR is None:
         break
@@ -404,6 +405,7 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
+    THRESHOLD,
     LOGIT_TOKENS,
     tokenizer,
     probability_diffs,
