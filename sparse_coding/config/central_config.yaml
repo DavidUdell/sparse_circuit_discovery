@@ -1,8 +1,8 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "2:4"
-INIT_THINNING_FACTOR: 0.05
+ACTS_LAYERS_SLICE: "3:5"
+INIT_THINNING_FACTOR: 0.3
 NUM_SEQUENCES_INTERPED: 1
 SEQ_PER_DIM_CAP: 100
 

@@ -155,14 +155,16 @@ def label_highlighting(
             .topk(logit_tokens)
             .indices
         ).tolist()
+        print(pos_tokens_affected)
         # Negative prob_diffs here to get top tokens negatively affected.
         neg_tokens_affected = (
-            -prob_diffs[layer_idx, neuron_idx]
+            (-prob_diffs[layer_idx, neuron_idx])
             .sum(dim=0)
             .squeeze()
             .topk(logit_tokens)
             .indices
         ).tolist()
+        print(neg_tokens_affected)
         for meta_idx, token in enumerate(
             pos_tokens_affected + neg_tokens_affected
         ):
@@ -183,7 +185,7 @@ def label_highlighting(
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
             else:
                 # Grey for no effect, to disabmiguate from any errors.
-                cell_tag = '<td border="1" bgcolor="#80808080">'
+                cell_tag = '<td border="1" bgcolor="#808080">'
 
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
