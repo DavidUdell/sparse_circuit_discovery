@@ -106,11 +106,11 @@ while `112` is its column index in that layer's autoencoder. You can
 cross-reference more comprehensive interpretability data for any given feature
 on [Neuronpedia](https://www.neuronpedia.org/gpt2-small).
 
-_Blue tokens_ in each box represent top feature activations in their contextual
-sequences, to a specified length out to either side.
+_Blue tokens_ in sequences in each box represent top feature activations in
+their contexts, to a specified length out to either side.
 
-_Red tokens_ in individual boxes at the bottom are the logits most downweighted
-by that ablation.
+_Blue and red tokens_ in individual boxes at the bottom are the logits most
+upweightd/downweighted by that ablation.
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
 Red arrows indicate downweighting, blue arrows indicate upweighting, and degree
@@ -132,7 +132,7 @@ is indicated by color transparency.
   repo.
 
 ## Project Status
-Current version is 0.4.1.
+Current version is 0.4.2.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.
