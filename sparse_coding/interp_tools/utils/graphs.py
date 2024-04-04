@@ -135,8 +135,8 @@ def label_highlighting(
             token = html.escape(token)
             # Explicitly handle newlines and control characters.
             token = token.replace("\n", "\\n")
-            token = re.sub(r"[\x00-\x1F]", "\\C0", token)
-            token = re.sub(r"[\x7F-\x9F]", "\\C1_or_DEL", token)
+            token = re.sub(r"[\x00-\x1F]", r"\\C0", token)
+            token = re.sub(r"[\x7F-\x9F]", r"\\C1_or_DEL", token)
 
             if act <= 0.0:
                 label += f"<td>{token}</td>"
@@ -183,8 +183,8 @@ def label_highlighting(
             token = html.escape(token)
             # Explicitly handle newlines and control characters.
             token = token.replace("\n", "\\n")
-            token = re.sub(r"[\x00-\x1F]", "\\C0", token)
-            token = re.sub(r"[\x7F-\x9F]", "\\C1_or_DEL", token)
+            token = re.sub(r"[\x00-\x1F]", r"\\C0", token)
+            token = re.sub(r"[\x7F-\x9F]", r"\\C1_or_DEL", token)
 
             label += f"{cell_tag}{token}</td>"
         label += "</tr>"
