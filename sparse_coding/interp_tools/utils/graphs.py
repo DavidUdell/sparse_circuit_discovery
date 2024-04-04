@@ -155,7 +155,6 @@ def label_highlighting(
             .topk(logit_tokens)
             .indices
         ).tolist()
-        print(pos_tokens_affected)
         # Negative prob_diffs here to get top tokens negatively affected.
         neg_tokens_affected = (
             (-prob_diffs[layer_idx, neuron_idx])
@@ -164,7 +163,6 @@ def label_highlighting(
             .topk(logit_tokens)
             .indices
         ).tolist()
-        print(neg_tokens_affected)
         for meta_idx, token in enumerate(
             pos_tokens_affected + neg_tokens_affected
         ):
