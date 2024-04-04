@@ -1,6 +1,5 @@
 """Graph the causal effects of ablations."""
 
-
 import html
 from textwrap import dedent
 
@@ -25,6 +24,7 @@ def graph_and_log(
     graph_file: str,
     graph_dot_file: str,
     top_k_info_file: str,
+    threshold: float,
     logit_tokens: int,
     tokenizer,
     prob_diffs,
@@ -67,6 +67,7 @@ def graph_and_log(
         top_k_info_file,
         graph_dot_file,
         overall_effects,
+        threshold,
         logit_tokens,
         tokenizer,
         prob_diffs,
@@ -131,8 +132,8 @@ def label_highlighting(
         for token, act in zip(context, act):
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
-            # Explicitly handle newlines.
-            token = token.replace("\n", "\\n")
+            # Explicitly handle newlines/control characters.
+            token = token.encode("unicode_escape").decode("utf-8")
 
             if act <= 0.0:
                 label += f"<td>{token}</td>"
@@ -147,18 +148,27 @@ def label_highlighting(
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
         label += "<tr>"
+        pos_tokens_affected = (
+            prob_diffs[layer_idx, neuron_idx]
+            .sum(dim=0)
+            .squeeze()
+            .topk(logit_tokens)
+            .indices
+        ).tolist()
         # Negative prob_diffs here to get top tokens negatively affected.
-        top_tokens_affected = (
+        neg_tokens_affected = (
             (-prob_diffs[layer_idx, neuron_idx])
             .sum(dim=0)
             .squeeze()
             .topk(logit_tokens)
             .indices
-        )
-
-        top_tokens_affected = top_tokens_affected.tolist()
-        for token in top_tokens_affected:
-
+        ).tolist()
+        for meta_idx, token in enumerate(
+            pos_tokens_affected + neg_tokens_affected
+        ):
+            # Break rows between positive and negative logits.
+            if meta_idx == len(pos_tokens_affected):
+                label += "</tr><tr>"
             if (
                 prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item()
                 > 0.0
@@ -172,11 +182,15 @@ def label_highlighting(
                 shade = "#ff6060"
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
             else:
-                cell_tag = '<td border="1">'
+                # Grey for no effect, to disabmiguate from any errors.
+                cell_tag = '<td border="1" bgcolor="#808080">'
 
             token = tokenizer.convert_ids_to_tokens(token)
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
+            # Explicitly handle newlines/control characters.
+            token = token.encode("unicode_escape").decode("utf-8")
+
             label += f"{cell_tag}{token}</td>"
         label += "</tr>"
 
@@ -191,6 +205,7 @@ def graph_causal_effects(
     top_k_info_file: str,
     graph_dot_file: str,
     overall_effects: float,
+    threshold: float,
     logit_tokens: int,
     tokenizer,
     prob_diffs,
@@ -265,14 +280,14 @@ def graph_causal_effects(
 
     # Plot effect edges.
     plotted_effects: float = 0.0
-    zero_effects: int = 0
+    minor_effects: int = 0
     for (
         ablation_layer_idx,
         ablated_dim,
         downstream_dim,
     ), effect in activations.items():
-        if effect.item() == 0:
-            zero_effects += 1
+        if 0.0 == effect.item() <= threshold:
+            minor_effects += 1
             continue
         plotted_effects += abs(effect.item())
         # Blue means the intervention increased downstream firing, while
@@ -316,7 +331,7 @@ def graph_causal_effects(
         dedent(
             f"""
             Dropped {unlinked_nodes} unlinked neuron(s) from graph.
-            {zero_effects} zero effect(s) ignored.\n
+            {minor_effects} minor effect(s) ignored.\n
             """
         )
     )

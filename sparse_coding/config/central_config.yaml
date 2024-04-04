@@ -1,14 +1,13 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "9:12"
-INIT_THINNING_FACTOR: 0.005
-NUM_SEQUENCES_INTERPED: 1000
+ACTS_LAYERS_SLICE: "3:5"
+INIT_THINNING_FACTOR: 0.3
+NUM_SEQUENCES_INTERPED: 1
 SEQ_PER_DIM_CAP: 100
 
 # Only pin single dims per layer.
 DIMS_PINNED:
-  9: [331]
 
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
@@ -53,10 +52,11 @@ ACCUMULATE_GRAD_BATCHES: 4
 # A coefficient of 0.0 means "ablate features." Disable branching and pinning
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
-BRANCHING_FACTOR: 10
+BRANCHING_FACTOR: 5
 # INIT_THINNING_FACTOR: 0.01
 LOGIT_TOKENS: 10
 # DIMS_PINNED:
+THRESHOLD: 0.1
 
 # Validate Circuits
 # VALIDATION_DIMS_PINNED:
