@@ -1,7 +1,6 @@
 """Graph the causal effects of ablations."""
 
 import html
-import re
 from textwrap import dedent
 
 import torch as t
