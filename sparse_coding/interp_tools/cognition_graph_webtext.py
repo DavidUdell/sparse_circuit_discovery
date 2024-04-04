@@ -121,6 +121,9 @@ STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
 eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
 
+for i in eval_set:
+    print(i)
+
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
 # layer_encoders: dict[int, tuple[t.Tensor]]
