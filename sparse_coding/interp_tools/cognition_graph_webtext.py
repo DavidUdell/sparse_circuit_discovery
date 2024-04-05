@@ -108,18 +108,20 @@ ablate_layer_range: range = layer_range[:-1]
 
 # %%
 # Load the `openwebtext` validation set.
-dataset: list[list[str]] = load_dataset(
-    "Elriggs/openwebtext-100k",
-    split="train",
-)["text"]
-dataset_indices: np.ndarray = np.random.choice(
-    len(dataset),
-    size=len(dataset),
-    replace=False,
-)
-STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
-eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
-eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
+# dataset: list[list[str]] = load_dataset(
+#     "Elriggs/openwebtext-100k",
+#     split="train",
+# )["text"]
+# dataset_indices: np.ndarray = np.random.choice(
+#     len(dataset),
+#     size=len(dataset),
+#     replace=False,
+# )
+# STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
+# eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
+eval_set: list[str] = [
+    "who recently was appointed by President"
+]
 
 for i in eval_set:
     print(i)
@@ -200,7 +202,8 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 #             fave_seq_pos_flat: int = (
 #                 t.argmax(activations_tensor, dim=1).squeeze().item()
 #             )
-#             max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
+#             max_val = activations_tensor[:, fave_seq_pos_flat,
+#             :].unsqueeze(1)
 #             min_val = max_val / 2.0
 #             mask = (activations_tensor >= min_val) & (
 #                 activations_tensor <= max_val
@@ -211,7 +214,8 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 #             if top_indices.size(0) <= SEQ_PER_DIM_CAP:
 #                 choices = top_indices.tolist()
 #             else:
-#                 # Solves the problem of densely activating features taking too
+#                 # Solves the problem of densely activating features taking
+#                 too
 #                 # many forward passes.
 #                 superset_acts = activations_tensor.squeeze()[top_indices]
 #                 meta_indices = t.topk(superset_acts, SEQ_PER_DIM_CAP).indices
