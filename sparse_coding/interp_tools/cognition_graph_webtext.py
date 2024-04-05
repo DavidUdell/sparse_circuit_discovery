@@ -120,7 +120,7 @@ ablate_layer_range: range = layer_range[:-1]
 # STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
 # eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
 eval_set: list[str] = [
-    "who recently was appointed by President"
+    "Copyright (C"
 ]
 
 for i in eval_set:
