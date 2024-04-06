@@ -85,16 +85,18 @@ acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset.
-dataset: list[list[str]] = load_dataset(
-    "Elriggs/openwebtext-100k", split="train"
-)["text"]
-dataset_indices: np.ndarray = np.random.choice(
-    len(dataset), size=len(dataset), replace=False
-)
-train_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_EVALED]
+# dataset: list[list[str]] = load_dataset(
+#     "Elriggs/openwebtext-100k", split="train"
+# )["text"]
+# dataset_indices: np.ndarray = np.random.choice(
+#     len(dataset), size=len(dataset), replace=False
+# )
+# train_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_EVALED]
 
 # Poor man's fancy indexing.
-training_set: list[list[int]] = [dataset[i] for i in train_indices]
+training_set: list[list[int]] = [
+        "Copyright (C",
+]
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you

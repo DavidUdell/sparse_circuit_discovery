@@ -17,9 +17,9 @@ print(
     )
 )
 
-# "collect_acts",
-# "interp_tools.contexts",
 for script in [
+    "collect_acts",
+    "interp_tools.contexts",
     "load_autoencoder",
     "interp_tools.cognition_graph_webtext",
 ]:
