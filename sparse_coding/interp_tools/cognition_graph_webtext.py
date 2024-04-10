@@ -387,8 +387,8 @@ for ablate_layer_idx in ablate_layer_range:
         top_dims = []
         reference_set = set(layer_dim_indices[a + 1])
         for i in ordered_dims:
-            if i in reference_set:
-                top_dims.append(i)
+            if i.item() in reference_set:
+                top_dims.append(i.item())
                 if len(top_dims) == BRANCHING_FACTOR:
                     break
         keepers[a, j] = top_dims
