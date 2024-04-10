@@ -364,10 +364,10 @@ for ablate_layer_idx in ablate_layer_range:
     assert isinstance(BRANCHING_FACTOR, int)
 
     working_tensor = t.Tensor([[0.0]])
-    top_layer_dims = []
-    a = ablate_layer_idx
+    top_layer_dims: set = set()
+    a: int = ablate_layer_idx
 
-    for j in tqdm(ablated_activations[a], desc="Branching Progress"):
+    for j in tqdm(ablated_activations[a], desc="Branchings Progress"):
         for k in ablated_activations[a][j]:
             working_tensor = t.abs(
                 t.cat(
@@ -379,21 +379,23 @@ for ablate_layer_idx in ablate_layer_range:
                 )
             )
 
+        # t.LongTensor
         _, ordered_dims = t.sort(
             working_tensor.squeeze(),
             descending=True,
         )
-        ordered_dims = ordered_dims.tolist()
-        top_dims = [
-            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
-        ][:BRANCHING_FACTOR]
-
-        assert len(top_dims) <= BRANCHING_FACTOR
-
+        top_dims = []
+        reference_set = set(layer_dim_indices[a + 1])
+        for i in ordered_dims:
+            if i in reference_set:
+                top_dims.append(i)
+                if len(top_dims) == BRANCHING_FACTOR:
+                    break
         keepers[a, j] = top_dims
-        top_layer_dims.extend(top_dims)
 
-    layer_dim_indices[a + 1] = list(set(top_layer_dims))
+        top_layer_dims.update(top_dims)
+    # list
+    layer_dim_indices[a + 1] = list(top_layer_dims)
 
 # %%
 # Compute ablated effects minus base effects.
