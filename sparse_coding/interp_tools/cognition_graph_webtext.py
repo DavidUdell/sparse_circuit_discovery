@@ -367,7 +367,7 @@ for ablate_layer_idx in ablate_layer_range:
     top_layer_dims = []
     a = ablate_layer_idx
 
-    for j in ablated_activations[a]:
+    for j in tqdm(ablated_activations[a], desc="Branching Progress"):
         for k in ablated_activations[a][j]:
             working_tensor = t.abs(
                 t.cat(
