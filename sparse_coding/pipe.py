@@ -10,9 +10,8 @@ print(
         """
         For the time being,
         1. `model_dir` must be `openai-community/gpt2`,
-        2. `projection_factor` must be 32,
-        3. autoencoder interp data has been precomputed, and
-        4. only ablation studies are performed and measured.
+        2. `projection_factor` must be 32, and
+        3. only ablation studies are performed and measured.
         """
     )
 )

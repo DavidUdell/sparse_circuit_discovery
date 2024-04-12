@@ -5,8 +5,8 @@ from textwrap import dedent
 
 from tqdm.auto import tqdm
 import torch as t
-import wandb
 from pygraphviz import AGraph
+import wandb
 
 from sparse_coding.interp_tools.utils.computations import calc_overall_effects
 from sparse_coding.utils.interface import (
@@ -35,14 +35,6 @@ def graph_and_log(
 
     # Asserts that there was any overall effect before proceeding.
     overall_effects: float = calc_overall_effects(act_diffs)
-
-    # All other effect items are t.Tensors, but wandb plays nicer with floats.
-    # diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
-    # for i, j, k in act_diffs:
-    #     key: str = f"{i}.{j}->{i+1}.{k}"
-    #     value: float = act_diffs[i, j, k].item()
-    #     diffs_table.add_data(key, value)
-    # wandb.log({"Effects": diffs_table})
 
     plotted_diffs = {}
     if branching_factor is not None:
@@ -139,11 +131,12 @@ def label_highlighting(
             if act <= 0.0:
                 label += f"<td>{token}</td>"
 
-            elif act >= max_a:
+            else:
                 blue_prop = act / max_a
-                shade = f"#6060{int(255*blue_prop):02x}"
+                shade = f"#0000{int(255*blue_prop):02x}"
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
+
         label += "</tr>"
 
     # Add logit diffs.
