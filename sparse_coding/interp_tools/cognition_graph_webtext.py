@@ -109,6 +109,7 @@ ablate_layer_range: range = layer_range[:-1]
 # Fix the validation set.
 eval_set: list[str] = ["Copyright (C"]
 
+print("Input text as follows:")
 for i in eval_set:
     print(i)
 
