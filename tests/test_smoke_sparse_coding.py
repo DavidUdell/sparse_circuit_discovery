@@ -102,7 +102,7 @@ def test_smoke_sparse_coding(
         "load_autoencoder",
         "interp_tools.contexts",
         "interp_tools.cognition_graph_mc",
-        "interp_tools.cognition_graph_webtext",
+        "interp_tools.cognition_graph",
     ]:
         try:
             with wandb.init(mode="offline"):
