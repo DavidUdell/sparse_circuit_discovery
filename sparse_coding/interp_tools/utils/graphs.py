@@ -129,15 +129,19 @@ def label_highlighting(
             token = token.encode("unicode_escape").decode("utf-8")
 
             if act <= 0.0:
-                label += f"<td>{token}</td>"
+                label += f'<td bgcolor="#ffffff">{token}</td>'
 
             else:
                 blue_prop = act / max_a
-                shade = f"#0000{int(255*blue_prop):02x}"
+                rg_prop = 1.0 - blue_prop
+
+                rg_shade = f"{int(128 + (127*rg_prop)):02x}"
+                b_shade = f"{255:02x}"
+                shade = f"#{rg_shade}{rg_shade}{b_shade}"
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
 
-        label += "</tr>"
+        label += "</tr><tr><td></td></tr><tr><td></td></tr>"
 
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
