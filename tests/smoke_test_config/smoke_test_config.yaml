@@ -2,6 +2,9 @@
 # Smoke Test Model
 MODEL_DIR: "openai-community/gpt2"
 
+# Prompt
+PROMPT: "Copyright (C"
+
 # Layers Slice to Cache Activations From
 ACTS_LAYERS_SLICE: "1:4"
 

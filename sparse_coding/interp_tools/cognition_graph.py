@@ -45,6 +45,7 @@ HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
+PROMPT = config.get("PROMPT")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
@@ -107,7 +108,7 @@ ablate_layer_range: range = layer_range[:-1]
 
 # %%
 # Fix the validation set.
-eval_set: list[str] = ["Copyright (C"]
+eval_set: list[str] = [PROMPT]
 
 print("Input text as follows:")
 for i in eval_set:
