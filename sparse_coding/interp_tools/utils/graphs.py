@@ -135,7 +135,7 @@ def label_highlighting(
                 blue_prop = act / max_a
                 rg_prop = 1.0 - blue_prop
 
-                rg_shade = f"{int(128 + (127*rg_prop)):02x}"
+                rg_shade = f"{int(96 + (159*rg_prop)):02x}"
                 b_shade = f"{255:02x}"
                 shade = f"#{rg_shade}{rg_shade}{b_shade}"
                 cell_tag = f'<td bgcolor="{shade}">'
@@ -181,7 +181,7 @@ def label_highlighting(
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
             else:
                 # Grey for no effect, to disabmiguate from any errors.
-                cell_tag = '<td border="1" bgcolor="#808080">'
+                cell_tag = '<td border="1" bgcolor="#cccccc">'
 
             token = tokenizer.convert_ids_to_tokens(token.item())
             token = tokenizer.convert_tokens_to_string([token])
