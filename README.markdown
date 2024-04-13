@@ -132,7 +132,7 @@ is indicated by color transparency.
   repo.
 
 ## Project Status
-Current version is 0.4.2.
+Current version is 0.5.0.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

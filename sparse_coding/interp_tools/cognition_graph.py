@@ -17,11 +17,10 @@ from textwrap import dedent
 
 import numpy as np
 import torch as t
-import wandb
 from accelerate import Accelerator
-from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
+import wandb
 
 from sparse_coding.interp_tools.utils.computations import calc_act_diffs
 from sparse_coding.interp_tools.utils.graphs import graph_and_log
@@ -46,6 +45,7 @@ HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
+PROMPT = config.get("PROMPT")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
 ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
@@ -65,6 +65,7 @@ THRESHOLD = config.get("THRESHOLD", 0.0)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
 
+
 if DIMS_PINNED is not None:
     for v in DIMS_PINNED.values():
         assert isinstance(v, list) and len(v) == 1, dedent(
@@ -73,7 +74,6 @@ if DIMS_PINNED is not None:
             singleton index lists.
             """
         )
-
 
 # %%
 # Reproducibility.
@@ -107,20 +107,10 @@ layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 ablate_layer_range: range = layer_range[:-1]
 
 # %%
-# Load the `openwebtext` validation set.
-dataset: list[list[str]] = load_dataset(
-    "Elriggs/openwebtext-100k",
-    split="train",
-)["text"]
-dataset_indices: np.ndarray = np.random.choice(
-    len(dataset),
-    size=len(dataset),
-    replace=False,
-)
-STARTING_META_IDX: int = len(dataset) - NUM_SEQUENCES_INTERPED
-eval_indices: np.ndarray = dataset_indices[STARTING_META_IDX:]
-eval_set: list[list[str]] = [dataset[i] for i in eval_indices]
+# Fix the validation set.
+eval_set: list[str] = [PROMPT]
 
+print("Prompt is as follows:")
 for i in eval_set:
     print(i)
 
@@ -146,77 +136,6 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
     accelerator,
     __file__,
 )
-
-# %%
-# Collect base case data.
-# base_activations_all_positions = defaultdict(recursive_defaultdict)
-# for ablate_layer_idx in ablate_layer_range:
-#     # Base run, to determine top activating sequence positions. I'm
-#     # repurposing the hooks_lifecycle to cache _at_ the would-be ablated
-#     # layer, by using its interface in a hacky way.
-#     with hooks_manager(
-#         ablate_layer_idx - 1,
-#         None,
-#         [ablate_layer_idx],
-#         layer_dim_indices,
-#         model,
-#         layer_encoders,
-#         layer_decoders,
-#         base_activations_all_positions,
-#         ablate_during_run=False,
-#     ):
-#         for sequence in eval_set:
-#             _ = t.manual_seed(SEED)
-#             inputs = tokenizer(
-#                 sequence,
-#                 return_tensors="pt",
-#                 truncation=True,
-#                 max_length=MAX_SEQ_INTERPED_LEN,
-#             ).to(model.device)
-
-#             try:
-#                 model(**inputs)
-#             except RuntimeError:
-#                 # Manually clear memory and retry.
-#                 gc.collect()
-#                 model(**inputs)
-
-# %%
-# Find each dim's top activation value, and select all positions in the range
-# [activation/2, activation], a la Cunningham et al. 2023.
-# base_activation indices:
-# [ablate_layer_index][None][base_cache_dim_index]
-# favorite_sequence_positions: dict[tuple[int, int, int], list[int]] = {}
-
-# for i in base_activations_all_positions:
-#     for j in base_activations_all_positions[i]:
-#         assert j is None, f"Middle index {j} should have been None."
-#         for k in base_activations_all_positions[i][j]:
-#             # The t.argmax here finds the top sequence position for each dict
-#             # index tuple. # favorite_sequence_position indices are now the
-#             # tuple (ablate_layer_idx, None, base_cache_dim_index).
-#             activations_tensor = base_activations_all_positions[i][j][k]
-
-#             fave_seq_pos_flat: int = (
-#                 t.argmax(activations_tensor, dim=1).squeeze().item()
-#             )
-#             max_val = activations_tensor[:, fave_seq_pos_flat, :].unsqueeze(1)
-#             min_val = max_val / 2.0
-#             mask = (activations_tensor >= min_val) & (
-#                 activations_tensor <= max_val
-#             )
-
-#             top_indices: t.Tensor = t.nonzero(mask)[:, 1]
-
-#             if top_indices.size(0) <= SEQ_PER_DIM_CAP:
-#                 choices = top_indices.tolist()
-#             else:
-#                 # Solves the problem of densely activating features taking too
-#                 # many forward passes.
-#                 superset_acts = activations_tensor.squeeze()[top_indices]
-#                 meta_indices = t.topk(superset_acts, SEQ_PER_DIM_CAP).indices
-#                 choices = top_indices[meta_indices].tolist()
-#             favorite_sequence_positions[i, j, k] = choices
 
 # %%
 # Run ablations at top sequence positions.
@@ -255,32 +174,6 @@ for ablate_layer_idx in ablate_layer_range:
             )
             for c in eval_set
         ]
-
-        # for fav_seq_pos in favorite_sequence_positions[
-        #     ablate_layer_idx - 1, None, ablate_dim_idx
-        # ]:
-        #     for seq in eval_set:
-        # The tokenizer also takes care of MAX_SEQ_INTERPED_LEN.
-        # tok_seq = tokenizer(
-        #     seq,
-        #     return_tensors="pt",
-        #     truncation=True,
-        #     max_length=MAX_SEQ_INTERPED_LEN,
-        # )
-        # # fav_seq_pos is the index for a flattened eval_set.
-        # if tok_seq["input_ids"].size(-1) < fav_seq_pos:
-        #     fav_seq_pos = fav_seq_pos - tok_seq["input_ids"].size(-1)
-        #     continue
-        # if tok_seq["input_ids"].size(-1) >= fav_seq_pos:
-        #     tok_seq = tokenizer(
-        #         seq,
-        #         return_tensors="pt",
-        #         truncation=True,
-        #         max_length=fav_seq_pos + 1,
-        #     )
-        #     truncated_tok_seqs.append(tok_seq)
-        #     break
-        # raise ValueError("fav_seq_pos out of range.")
 
         assert len(truncated_tok_seqs) > 0, dedent(
             f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
@@ -359,37 +252,54 @@ for ablate_layer_idx in ablate_layer_range:
     # Keep just the most affected indices for the next layer's ablations.
     assert isinstance(BRANCHING_FACTOR, int)
 
-    working_tensor = t.Tensor([[0.0]])
-    top_layer_dims = []
-    a = ablate_layer_idx
+    top_layer_dims: set = set()
+    a: int = ablate_layer_idx
+    reference_set = set(layer_dim_indices[a + 1])
 
-    for j in ablated_activations[a]:
+    # len(ablated_activations[a])) == NUM_ABLATION_DIMS
+    for j in tqdm(ablated_activations[a], desc="Branchings Progress"):
+        WORKING_TENSOR = None
+        cache_indices = list(ablated_activations[a][j].keys())
+        # len(ablated_activations[a][j]) == NUM_CACHE_DIMS
         for k in ablated_activations[a][j]:
-            working_tensor = t.abs(
-                t.cat(
+
+            # ablated_activations[a][j][k].shape == (1, SEQ_LEN, 1). Take all
+            # the cached activation diffs and concat their absolute values.
+            if WORKING_TENSOR is None:
+                WORKING_TENSOR = t.abs(
+                    ablated_activations[a][j][k]
+                    - base_activations_top_positions[a][j][k]
+                ).mean(dim=1)
+            else:
+                WORKING_TENSOR = t.cat(
                     [
-                        working_tensor,
-                        ablated_activations[a][j][k][:, -1, :]
-                        - base_activations_top_positions[a][j][k][:, -1, :],
+                        WORKING_TENSOR,
+                        t.abs(
+                            ablated_activations[a][j][k]
+                            - base_activations_top_positions[a][j][k],
+                        ).mean(dim=1),
                     ]
                 )
-            )
 
-        _, ordered_dims = t.sort(
-            working_tensor.squeeze(),
+        # ordered_meta_indices: t.LongTensor
+        _, ordered_meta_indices = t.sort(
+            WORKING_TENSOR.squeeze(),
             descending=True,
         )
-        ordered_dims = ordered_dims.tolist()
-        top_dims = [
-            idx for idx in ordered_dims if idx in layer_dim_indices[a + 1]
-        ][:BRANCHING_FACTOR]
-
-        assert len(top_dims) <= BRANCHING_FACTOR
-
+        assert len(ordered_meta_indices) == len(cache_indices)
+        top_dims = []
+        for i in ordered_meta_indices:
+            if cache_indices[i.item()] in reference_set:
+                top_dims.append(cache_indices[i.item()])
+                if len(top_dims) == BRANCHING_FACTOR:
+                    break
+            else:
+                raise ValueError("OOD ablation effect registered.")
         keepers[a, j] = top_dims
-        top_layer_dims.extend(top_dims)
 
-    layer_dim_indices[a + 1] = list(set(top_layer_dims))
+        top_layer_dims.update(top_dims)
+    # list
+    layer_dim_indices[a + 1] = list(top_layer_dims)
 
 # %%
 # Compute ablated effects minus base effects.

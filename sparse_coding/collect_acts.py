@@ -10,7 +10,6 @@ import torch as t
 import transformers
 import wandb
 from accelerate import Accelerator
-from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -41,6 +40,7 @@ HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
+PROMPT = config.get("PROMPT")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -84,17 +84,10 @@ validate_slice(model, ACTS_LAYERS_SLICE)
 acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
-# Dataset.
-dataset: list[list[str]] = load_dataset(
-    "Elriggs/openwebtext-100k", split="train"
-)["text"]
-dataset_indices: np.ndarray = np.random.choice(
-    len(dataset), size=len(dataset), replace=False
-)
-train_indices: np.ndarray = dataset_indices[:NUM_SEQUENCES_EVALED]
-
-# Poor man's fancy indexing.
-training_set: list[list[int]] = [dataset[i] for i in train_indices]
+# Dataset. Poor man's fancy indexing.
+training_set: list[list[int]] = [
+        PROMPT,
+]
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you

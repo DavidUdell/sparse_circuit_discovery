@@ -1,8 +1,8 @@
 ## Config Notes
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "3:5"
-INIT_THINNING_FACTOR: 0.3
+ACTS_LAYERS_SLICE: "3:6"
+INIT_THINNING_FACTOR: 0.001
 NUM_SEQUENCES_INTERPED: 1
 SEQ_PER_DIM_CAP: 100
 
@@ -21,6 +21,9 @@ VALIDATION_DIMS_PINNED:
 # "meta-llama/Llama-2-7b-hf"
 # "meta-llama/Llama-2-70b-hf"
 MODEL_DIR: "openai-community/gpt2"
+
+# Prompt
+PROMPT: "Copyright (C"
 
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
@@ -56,7 +59,7 @@ BRANCHING_FACTOR: 5
 # INIT_THINNING_FACTOR: 0.01
 LOGIT_TOKENS: 10
 # DIMS_PINNED:
-THRESHOLD: 0.1
+THRESHOLD: 0.2
 
 # Validate Circuits
 # VALIDATION_DIMS_PINNED:

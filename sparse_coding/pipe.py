@@ -10,18 +10,17 @@ print(
         """
         For the time being,
         1. `model_dir` must be `openai-community/gpt2`,
-        2. `projection_factor` must be 32,
-        3. autoencoder interp data has been precomputed, and
-        4. only ablation studies are performed and measured.
+        2. `projection_factor` must be 32, and
+        3. only ablation studies are performed and measured.
         """
     )
 )
 
-# "collect_acts",
-# "interp_tools.contexts",
 for script in [
+    "collect_acts",
+    "interp_tools.contexts",
     "load_autoencoder",
-    "interp_tools.cognition_graph_webtext",
+    "interp_tools.cognition_graph",
 ]:
     try:
         run_module(f"sparse_coding.{script}")

@@ -3,9 +3,10 @@
 import html
 from textwrap import dedent
 
+from tqdm.auto import tqdm
 import torch as t
-import wandb
 from pygraphviz import AGraph
+import wandb
 
 from sparse_coding.interp_tools.utils.computations import calc_overall_effects
 from sparse_coding.utils.interface import (
@@ -34,14 +35,6 @@ def graph_and_log(
 
     # Asserts that there was any overall effect before proceeding.
     overall_effects: float = calc_overall_effects(act_diffs)
-
-    # All other effect items are t.Tensors, but wandb plays nicer with floats.
-    diffs_table = wandb.Table(columns=["Ablated Dim->Cached Dim", "Effect"])
-    for i, j, k in act_diffs:
-        key: str = f"{i}.{j}->{i+1}.{k}"
-        value: float = act_diffs[i, j, k].item()
-        diffs_table.add_data(key, value)
-    wandb.log({"Effects": diffs_table})
 
     plotted_diffs = {}
     if branching_factor is not None:
@@ -136,14 +129,19 @@ def label_highlighting(
             token = token.encode("unicode_escape").decode("utf-8")
 
             if act <= 0.0:
-                label += f"<td>{token}</td>"
+                label += f'<td bgcolor="#ffffff">{token}</td>'
 
-            elif act >= max_a:
+            else:
                 blue_prop = act / max_a
-                shade = f"#6060{int(255*blue_prop):02x}"
+                rg_prop = 1.0 - blue_prop
+
+                rg_shade = f"{int(96 + (159*rg_prop)):02x}"
+                b_shade = f"{255:02x}"
+                shade = f"#{rg_shade}{rg_shade}{b_shade}"
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
-        label += "</tr>"
+
+        label += "</tr><tr><td></td></tr><tr><td></td></tr>"
 
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
@@ -154,7 +152,7 @@ def label_highlighting(
             .squeeze()
             .topk(logit_tokens)
             .indices
-        ).tolist()
+        )
         # Negative prob_diffs here to get top tokens negatively affected.
         neg_tokens_affected = (
             (-prob_diffs[layer_idx, neuron_idx])
@@ -162,9 +160,9 @@ def label_highlighting(
             .squeeze()
             .topk(logit_tokens)
             .indices
-        ).tolist()
+        )
         for meta_idx, token in enumerate(
-            pos_tokens_affected + neg_tokens_affected
+            t.cat((pos_tokens_affected, neg_tokens_affected))
         ):
             # Break rows between positive and negative logits.
             if meta_idx == len(pos_tokens_affected):
@@ -183,9 +181,9 @@ def label_highlighting(
                 cell_tag = f'<td border="1" bgcolor="{shade}">'
             else:
                 # Grey for no effect, to disabmiguate from any errors.
-                cell_tag = '<td border="1" bgcolor="#808080">'
+                cell_tag = '<td border="1" bgcolor="#cccccc">'
 
-            token = tokenizer.convert_ids_to_tokens(token)
+            token = tokenizer.convert_ids_to_tokens(token.item())
             token = tokenizer.convert_tokens_to_string([token])
             token = html.escape(token)
             # Explicitly handle newlines/control characters.
@@ -244,7 +242,7 @@ def graph_causal_effects(
         ablation_layer_idx,
         ablated_dim,
         downstream_dim,
-    ) in activations.keys():
+    ) in tqdm(activations.keys(), desc="Edges Plotted Progress"):
         graph.add_node(
             f"{ablation_layer_idx}.{ablated_dim}",
             label=label_highlighting(

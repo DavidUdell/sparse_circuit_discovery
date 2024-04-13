@@ -2,6 +2,9 @@
 # Smoke Test Model
 MODEL_DIR: "openai-community/gpt2"
 
+# Prompt
+PROMPT: "Copyright (C"
+
 # Layers Slice to Cache Activations From
 ACTS_LAYERS_SLICE: "1:4"
 
@@ -52,7 +55,7 @@ SYNC_DIST_LOGGING: True
 DIMS_IN_BATCH: 500
 TOP_K: 6
 
-# `cognition_graph_webtext.py`
+# `cognition_graph.py`
 NUM_SEQUENCES_INTERPED: 1
 MAX_SEQ_INTERPED_LEN: 10
 
