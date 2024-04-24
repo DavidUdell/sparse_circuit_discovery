@@ -28,7 +28,7 @@ Your base of operations is `sparse_coding/config/central_config.yaml`.
 The most important hyperparameters are clustered up top:
 
 ```
-## Config Notes
+## Key Params
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
 ACTS_LAYERS_SLICE: "9:12"
@@ -82,7 +82,7 @@ features under independent ablations, the way `pipe.py` cognition graphs do).
 To set this up, first set `ACTS_LAYERS_SLICE` to encompass the relevant layers
 in GPT-2 small, including one extra layer after
 ```
-## Config Notes
+## Key Params
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None". Key params here:
 ACTS_LAYERS_SLICE: "6:9"
@@ -110,7 +110,7 @@ _Blue tokens_ in sequences in each box represent top feature activations in
 their contexts, to a specified length out to either side.
 
 _Blue and red tokens_ in individual boxes at the bottom are the logits most
-upweightd/downweighted by that ablation.
+upweighted/downweighted by that ablation. (_Gray_ is the 0.0 effect edge case.)
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
 Red arrows indicate downweighting, blue arrows indicate upweighting, and degree
