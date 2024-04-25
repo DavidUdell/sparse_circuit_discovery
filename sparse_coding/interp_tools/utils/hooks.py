@@ -232,7 +232,8 @@ def hooks_manager(
                 # A defaultdict here means no cached data yet.
                 if isinstance(extant_data, defaultdict):
                     cache_dict[ablate_layer_idx][ablate_dim_idx][cache_dim] = (
-                        projected_acts[:, :, cache_dim]
+                        projected_acts[:, -1, cache_dim]
+                        .unsqueeze(-1)
                         .unsqueeze(-1)
                         .detach()
                         .cpu()
@@ -243,7 +244,8 @@ def hooks_manager(
                         t.cat(
                             (
                                 extant_data,
-                                projected_acts[:, :, cache_dim]
+                                projected_acts[:, -1, cache_dim]
+                                .unsqueeze(-1)
                                 .unsqueeze(-1)
                                 .detach()
                                 .cpu(),

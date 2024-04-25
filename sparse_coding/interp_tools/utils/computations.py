@@ -1,6 +1,5 @@
 """Computational utilities for plotting hook effects."""
 
-
 from collections import defaultdict
 
 import torch as t
@@ -23,7 +22,7 @@ def calc_act_diffs(
             for k in ablated_activations[i][j]:
                 act_diffs[i, j, k] = (
                     ablated_activations[i][j][k][:, -1, :]
-                    - base_activations[i][j][k][:, -1, :]
+                    - base_activations[i][None][k][:, -1, :]
                 )
 
                 assert act_diffs[i, j, k].shape == (1, 1)

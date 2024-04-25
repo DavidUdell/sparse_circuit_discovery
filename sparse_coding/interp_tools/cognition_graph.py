@@ -160,20 +160,49 @@ for ablate_layer_idx in ablate_layer_range:
             SEED,
         )
 
+    # Truncated means truncated to MAX_SEQ_INTERPED_LEN. This block does
+    # the work of further truncating to the top activating position length.
+    truncated_tok_seqs = [
+        tokenizer(
+            c,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_INTERPED_LEN,
+        )
+        for c in eval_set
+    ]
+
+    BASE_LOGITS = None
+    with hooks_manager(
+        ablate_layer_idx,
+        None,
+        layer_range,
+        layer_dim_indices,
+        model,
+        layer_encoders,
+        layer_decoders,
+        base_activations_top_positions,
+        ablate_during_run=False,
+    ):
+        for seq in truncated_tok_seqs:
+            top_input = seq.to(model.device)
+            _ = t.manual_seed(SEED)
+
+            try:
+                output = model(**top_input)
+            except RuntimeError:
+                gc.collect()
+                output = model(**top_input)
+
+            logit = output.logits[:, -1, :].cpu()
+            if BASE_LOGITS is None:
+                BASE_LOGITS = logit
+            elif isinstance(BASE_LOGITS, t.Tensor):
+                BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
+
     for ablate_dim_idx in tqdm(
         layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
     ):
-        # Truncated means truncated to MAX_SEQ_INTERPED_LEN. This block does
-        # the work of further truncating to the top activating position length.
-        truncated_tok_seqs = [
-            tokenizer(
-                c,
-                return_tensors="pt",
-                truncation=True,
-                max_length=MAX_SEQ_INTERPED_LEN,
-            )
-            for c in eval_set
-        ]
 
         assert len(truncated_tok_seqs) > 0, dedent(
             f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
@@ -181,34 +210,6 @@ for ablate_layer_idx in ablate_layer_range:
         # This is a conventional use of hooks_lifecycle, but we're only passing
         # in as input to the model the top activating sequence, truncated. We
         # run one ablated and once not.
-        BASE_LOGITS = None
-        with hooks_manager(
-            ablate_layer_idx,
-            ablate_dim_idx,
-            layer_range,
-            layer_dim_indices,
-            model,
-            layer_encoders,
-            layer_decoders,
-            base_activations_top_positions,
-            ablate_during_run=False,
-        ):
-            for seq in truncated_tok_seqs:
-                top_input = seq.to(model.device)
-                _ = t.manual_seed(SEED)
-
-                try:
-                    output = model(**top_input)
-                except RuntimeError:
-                    gc.collect()
-                    output = model(**top_input)
-
-                logit = output.logits[:, -1, :].cpu()
-                if BASE_LOGITS is None:
-                    BASE_LOGITS = logit
-                elif isinstance(BASE_LOGITS, t.Tensor):
-                    BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
-
         ALTERED_LOGITS = None
         with hooks_manager(
             ablate_layer_idx,
@@ -268,7 +269,7 @@ for ablate_layer_idx in ablate_layer_range:
             if WORKING_TENSOR is None:
                 WORKING_TENSOR = t.abs(
                     ablated_activations[a][j][k]
-                    - base_activations_top_positions[a][j][k]
+                    - base_activations_top_positions[a][None][k]
                 ).mean(dim=1)
             else:
                 WORKING_TENSOR = t.cat(
@@ -276,7 +277,7 @@ for ablate_layer_idx in ablate_layer_range:
                         WORKING_TENSOR,
                         t.abs(
                             ablated_activations[a][j][k]
-                            - base_activations_top_positions[a][j][k],
+                            - base_activations_top_positions[a][None][k],
                         ).mean(dim=1),
                     ]
                 )
