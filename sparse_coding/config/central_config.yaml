@@ -2,7 +2,7 @@
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None".
 ACTS_LAYERS_SLICE: "3:5"
-INIT_THINNING_FACTOR: 0.2
+INIT_THINNING_FACTOR: 0.4
 NUM_SEQUENCES_INTERPED: 1
 SEQ_PER_DIM_CAP: 100
 
