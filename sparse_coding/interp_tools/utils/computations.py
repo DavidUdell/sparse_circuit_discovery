@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 import torch as t
-from pympler import asizeof
+from tqdm.auto import tqdm
 
 
 def calc_act_diffs(
@@ -24,7 +24,7 @@ def calc_act_diffs(
             for k in ablated_activations[i][j]:
                 keys_dict[i, j, k] = None
 
-    for i, j, k in keys_dict:
+    for i, j, k in tqdm(keys_dict, desc="Diffs Computed Progress"):
         act_diffs[i, j, k] = (
             ablated_activations[i][j][k][:, -1, :]
             - base_activations[i][None][k][:, -1, :]
