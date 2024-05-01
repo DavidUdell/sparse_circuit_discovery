@@ -3,6 +3,7 @@
 from collections import defaultdict
 
 import torch as t
+from pympler import asizeof
 
 
 def calc_act_diffs(
@@ -17,15 +18,19 @@ def calc_act_diffs(
     """
 
     act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
+    keys_dict = {}
     for i in ablated_activations:
         for j in ablated_activations[i]:
             for k in ablated_activations[i][j]:
-                act_diffs[i, j, k] = (
-                    ablated_activations[i][j][k][:, -1, :]
-                    - base_activations[i][None][k][:, -1, :]
-                )
+                keys_dict[i, j, k] = None
 
-                assert act_diffs[i, j, k].shape == (1, 1)
+    for i, j, k in keys_dict:
+        act_diffs[i, j, k] = (
+            ablated_activations[i][j][k][:, -1, :]
+            - base_activations[i][None][k][:, -1, :]
+        )
+        assert act_diffs[i, j, k].shape == (1, 1)
+        del ablated_activations[i][j][k]
 
     return act_diffs
 
