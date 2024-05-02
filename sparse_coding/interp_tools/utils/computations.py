@@ -20,7 +20,7 @@ def calc_act_diffs(
     act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
     keys_dict = {}
     for i in ablated_activations:
-        for j in ablated_activations[i]:
+        for j in tqdm(ablated_activations[i], desc="Keys Dict Progress"):
             for k in ablated_activations[i][j]:
                 keys_dict[i, j, k] = None
 
