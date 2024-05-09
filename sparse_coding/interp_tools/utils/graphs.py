@@ -284,7 +284,7 @@ def graph_causal_effects(
         ablated_dim,
         downstream_dim,
     ), effect in activations.items():
-        if t.abs(effect.item()) <= threshold or 0.0 == effect.item():
+        if abs(effect.item()) <= threshold or 0.0 == effect.item():
             minor_effects += 1
             continue
         plotted_effects += abs(effect.item())
