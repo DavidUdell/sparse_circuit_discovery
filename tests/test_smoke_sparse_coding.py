@@ -101,7 +101,6 @@ def test_smoke_sparse_coding(
         "collect_acts",
         "load_autoencoder",
         "interp_tools.contexts",
-        "interp_tools.cognition_graph_mc",
         "interp_tools.cognition_graph",
     ]:
         try:
