@@ -138,7 +138,71 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
 )
 
 # %%
-# Run ablations at top sequence positions.
+# For the top sequence positions, run ablations and reduce the ouput.
+for ablate_layer_idx in ablate_layer_range:
+
+    # Preprocess layer dimensions, if applicable.
+    if ablate_layer_idx == ablate_layer_range[0] or (
+        DIMS_PINNED is not None and
+        DIMS_PINNED.get(ablate_layer_idx) is not None
+    ):
+        # list[int]
+        layer_dim_indices[ablate_layer_idx] = prepare_dim_indices(
+            INIT_THINNING_FACTOR,
+            DIMS_PINNED,
+            layer_dim_indices[ablate_layer_idx],
+            ablate_layer_idx,
+            layer_range,
+            SEED,
+        )
+
+    # Tokenize and truncate prompts.
+    token_sequences = [
+        tokenizer(
+            context,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_INTERPED_LEN,
+        )
+        for context in eval_set
+    ]
+
+    # Collect the layer base case data.
+    BASE_LOGITS = None
+    base_case_activations = defaultdict(recursive_defaultdict)
+
+    with hooks_manager(
+        ablate_layer_idx,
+        None,
+        layer_range,
+        layer_dim_indices,
+        model,
+        layer_encoders,
+        layer_decoders,
+        base_case_activations,
+        ablate_during_run=False,
+    ):
+        for sequence in token_sequences:
+            sequence = sequence.to(model.device)
+            _ = t.manual_seed(SEED)
+
+            output = model(**sequence)
+            logit = output.logits[:, -1, :].cpu()
+
+            if BASE_LOGITS is None:
+                BASE_LOGITS = logit
+            elif isinstance(BASE_LOGITS, t.Tensor):
+                BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
+
+
+
+
+
+
+
+
+
+
 ablated_activations = defaultdict(recursive_defaultdict)
 base_activations_top_positions = defaultdict(recursive_defaultdict)
 keepers: dict[tuple[int, int], int] = {}
