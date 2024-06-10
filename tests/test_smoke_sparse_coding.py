@@ -111,6 +111,7 @@ def test_smoke_sparse_coding(
         try:
             with wandb.init(mode="offline"):
                 run_module(f"sparse_coding.{script}")
+
                 if script == scripts[-1]:
                     with open(
                         f"{graph_path}", "r", encoding="utf-8"
@@ -119,5 +120,6 @@ def test_smoke_sparse_coding(
                             f"{truth_path}", "r", encoding="utf-8"
                         ) as truth_file:
                             assert graph_file.read() == truth_file.read()
+
         except Exception as e:  # pylint: disable=broad-except
             pytest.fail(f"Smoke test for {script} failed: {e}")
