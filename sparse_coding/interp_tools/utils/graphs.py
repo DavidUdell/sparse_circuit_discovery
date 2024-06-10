@@ -82,6 +82,8 @@ def graph_and_log(
     # Save the AGraph object as a DOT file.
     graph.write(save_dot_path)
 
+    print(f"Graph saved to {save_plot_path}")
+
 
 def color_range_from_scalars(activations: dict) -> tuple[float, float]:
     """Get the range of values in the activations dict."""

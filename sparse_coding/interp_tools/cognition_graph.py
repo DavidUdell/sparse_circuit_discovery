@@ -57,13 +57,13 @@ GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
-# COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 THRESHOLD = config.get("THRESHOLD", 0.0)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
+# COEFFICIENT = config.get("COEFFICIENT", 0.0)
 
 
 if DIMS_PINNED is not None:
