@@ -5,6 +5,7 @@ ACTS_LAYERS_SLICE: "3:5"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
 SEQ_PER_DIM_CAP: 100
+THRESHOLD: 5.0
 
 # Only pin single dims per layer.
 DIMS_PINNED:
@@ -56,10 +57,10 @@ ACCUMULATE_GRAD_BATCHES: 4
 # to plot every ablation effect. Dims are pinned by setting a layer and dim
 # index as keys and values.
 BRANCHING_FACTOR: 5
-# INIT_THINNING_FACTOR: 0.01
 LOGIT_TOKENS: 10
+# INIT_THINNING_FACTOR: 0.01
 # DIMS_PINNED:
-THRESHOLD: 5.0
+# THRESHOLD: 5.0
 
 # Validate Circuits
 # VALIDATION_DIMS_PINNED:
@@ -89,8 +90,8 @@ VIEW: 5
 # `cognition_graph_webtext.py`
 # NUM_SEQUENCES_INTERPED is drawn from the other end of the same indices as
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
-# NUM_SEQUENCES_INTERPED: 250
 MAX_SEQ_INTERPED_LEN: 100
+# NUM_SEQUENCES_INTERPED: 250
 # SEQ_PER_DIM_CAP: 350
 
 # `cognition_graph_mc.py`
