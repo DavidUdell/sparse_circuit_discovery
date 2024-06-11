@@ -332,13 +332,12 @@ for ablate_layer_idx in ablate_layer_range:
         for (_, __, downstream_index), effect in activation_diff.items():
             effect: float = effect.item()
             magnitude: float = abs(effect)
+            total_effect += magnitude
 
-            if magnitude <= THRESHOLD or effect == 0.0:
+            if magnitude <= THRESHOLD or 0.0 == effect:
                 minor_effects += 1
-                total_effect += magnitude
                 continue
 
-            total_effect += magnitude
             plotted_effect += magnitude
 
             graph.add_node(
@@ -400,6 +399,8 @@ for node in graph.nodes():
         graph.remove_node(node)
         unlinked_nodes += 1
 
+if total_effect == 0.0:
+    raise ValueError("Total effect logged was 0.0")
 fraction_included = round(plotted_effect / total_effect, 2)
 graph.add_node(f"Effects plotted out of collected: ~{fraction_included*100}%.")
 
