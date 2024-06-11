@@ -236,7 +236,7 @@ for ablate_layer_idx in ablate_layer_range:
             layer_encoders,
             layer_decoders,
             altered_activations,
-            albate_during_run=True,
+            ablate_during_run=True,
         ):
             for sequence in token_sequences:
                 _ = t.manual_seed(SEED)
