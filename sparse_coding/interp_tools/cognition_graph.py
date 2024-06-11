@@ -194,125 +194,62 @@ for ablate_layer_idx in ablate_layer_range:
             elif isinstance(BASE_LOGITS, t.Tensor):
                 BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
 
-
-
-
-
-
-
-
-
-
-ablated_activations = defaultdict(recursive_defaultdict)
-base_activations_top_positions = defaultdict(recursive_defaultdict)
-keepers: dict[tuple[int, int], int] = {}
-probability_diffs = {}
-
-for ablate_layer_idx in ablate_layer_range:
-    # Thin the first layer indices or fix any indices, when requested.
-    if ablate_layer_idx == ablate_layer_range[0] or (
-        DIMS_PINNED is not None
-        and DIMS_PINNED.get(ablate_layer_idx) is not None
+    # At a layer, loop through the ablation dimensions.
+    assert len(token_sequences) > 0
+    for dimension in tqdm(
+        layer_dim_indices[ablate_layer_idx],
+        desc="Dimensions Progress",
     ):
-        # list[int]
-        layer_dim_indices[ablate_layer_idx] = prepare_dim_indices(
-            INIT_THINNING_FACTOR,
-            DIMS_PINNED,
-            layer_dim_indices[ablate_layer_idx],
-            ablate_layer_idx,
-            layer_range,
-            SEED,
-        )
-
-    # Truncated means truncated to MAX_SEQ_INTERPED_LEN. This block does
-    # the work of further truncating to the top activating position length.
-    truncated_tok_seqs = [
-        tokenizer(
-            c,
-            return_tensors="pt",
-            truncation=True,
-            max_length=MAX_SEQ_INTERPED_LEN,
-        )
-        for c in eval_set
-    ]
-
-    BASE_LOGITS = None
-    with hooks_manager(
-        ablate_layer_idx,
-        None,
-        layer_range,
-        layer_dim_indices,
-        model,
-        layer_encoders,
-        layer_decoders,
-        base_activations_top_positions,
-        ablate_during_run=False,
-    ):
-        for seq in truncated_tok_seqs:
-            top_input = seq.to(model.device)
-            _ = t.manual_seed(SEED)
-
-            try:
-                output = model(**top_input)
-            except RuntimeError:
-                gc.collect()
-                output = model(**top_input)
-
-            logit = output.logits[:, -1, :].cpu()
-            if BASE_LOGITS is None:
-                BASE_LOGITS = logit
-            elif isinstance(BASE_LOGITS, t.Tensor):
-                BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
-
-    for ablate_dim_idx in tqdm(
-        layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
-    ):
-
-        assert len(truncated_tok_seqs) > 0, dedent(
-            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
-        )
-        # This is a conventional use of hooks_lifecycle, but we're only passing
-        # in as input to the model the top activating sequence, truncated. We
-        # run one ablated and once not.
         ALTERED_LOGITS = None
+        altered_activations = defaultdict(recursive_defaultdict)
+
         with hooks_manager(
             ablate_layer_idx,
-            ablate_dim_idx,
+            dimension,
             layer_range,
             layer_dim_indices,
             model,
             layer_encoders,
             layer_decoders,
-            ablated_activations,
-            ablate_during_run=True,
+            altered_activations,
+            albate_during_run=True,
         ):
-            for seq in truncated_tok_seqs:
-                top_input = seq.to(model.device)
+            for sequence in token_sequences:
                 _ = t.manual_seed(SEED)
 
-                try:
-                    output = model(**top_input)
-                except RuntimeError:
-                    gc.collect()
-                    output = model(**top_input)
-
+                output = model(**sequence)
                 logit = output.logits[:, -1, :].cpu()
+
                 if ALTERED_LOGITS is None:
                     ALTERED_LOGITS = logit
                 elif isinstance(ALTERED_LOGITS, t.Tensor):
                     ALTERED_LOGITS = t.cat([ALTERED_LOGITS, logit], dim=0)
 
-        log_prob_diff = -t.nn.functional.log_softmax(
+        # Logits immediately become probability differences.
+        log_probability_diff = -t.nn.functional.log_softmax(
             ALTERED_LOGITS,
             dim=-1,
         ) + t.nn.functional.log_softmax(
             BASE_LOGITS,
             dim=-1,
         )
-        probability_diffs[ablate_layer_idx, ablate_dim_idx] = log_prob_diff
 
-    if BRANCHING_FACTOR is None:
-        break
+        # Postprocess the altered activations, if applicable.
+        if BRANCHING_FACTOR is not None:
+            assert isinstance(BRANCHING_FACTOR, int)
+
+
+
+
+
+
+
+
+
+
+
+# keepers: dict[tuple[int, int], int] = {}
+# probability_diffs = {}
 
     # Keep just the most affected indices for the next layer's ablations.
     assert isinstance(BRANCHING_FACTOR, int)
