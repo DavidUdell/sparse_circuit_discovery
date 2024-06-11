@@ -167,8 +167,8 @@ for ablate_layer_idx in ablate_layer_range:
 
     # Preprocess layer dimensions, if applicable.
     if ablate_layer_idx == ablate_layer_range[0] or (
-        DIMS_PINNED is not None and
-        DIMS_PINNED.get(ablate_layer_idx) is not None
+        DIMS_PINNED is not None
+        and DIMS_PINNED.get(ablate_layer_idx) is not None
     ):
         # list[int]
         layer_dim_indices[ablate_layer_idx] = prepare_dim_indices(
@@ -257,6 +257,9 @@ for ablate_layer_idx in ablate_layer_range:
             BASE_LOGITS,
             dim=-1,
         )
+        log_probability_diff: dict = {
+            (ablate_layer_idx, dimension): log_probability_diff
+        }
 
         # Postprocess the altered activations, if applicable.
         MOST_AFFECTED_DIMENSIONS = None
@@ -273,21 +276,25 @@ for ablate_layer_idx in ablate_layer_range:
             for cache_dim in altered_activations[ablate_layer_idx][dimension]:
                 if WORKING_TENSOR is None:
                     WORKING_TENSOR = t.abs(
-                        altered_activations[
-                            ablate_layer_idx][dimension][cache_dim]
-                        - base_case_activations[
-                            ablate_layer_idx][None][cache_dim]
+                        altered_activations[ablate_layer_idx][dimension][
+                            cache_dim
+                        ]
+                        - base_case_activations[ablate_layer_idx][None][
+                            cache_dim
+                        ]
                     ).mean(dim=1)
                 else:
                     WORKING_TENSOR = t.cat(
                         [
                             WORKING_TENSOR,
                             t.abs(
-                                altered_activations[
-                                    ablate_layer_idx][dimension][cache_dim]
-                                - base_case_activations[
-                                    ablate_layer_idx][None][cache_dim]
-                            ).mean(dim=1)
+                                altered_activations[ablate_layer_idx][
+                                    dimension
+                                ][cache_dim]
+                                - base_case_activations[ablate_layer_idx][
+                                    None
+                                ][cache_dim]
+                            ).mean(dim=1),
                         ]
                     )
 
@@ -373,9 +380,7 @@ for ablate_layer_idx in ablate_layer_range:
             elif effect < 0.0:
                 red: int = 255
                 blue: int = 0
-            alpha = int(
-                255 * magnitude / max(abs(color_max), abs(color_min))
-            )
+            alpha = int(255 * magnitude / max(abs(color_max), abs(color_min)))
             rgba_str: str = f"#{red:02x}00{blue:02x}{alpha:02x}"
 
             graph.add_edge(
@@ -396,9 +401,7 @@ for node in graph.nodes():
         unlinked_nodes += 1
 
 fraction_included = round(plotted_effect / total_effect, 2)
-graph.add_node(
-    f"Effects plotted out of collected: ~{fraction_included*100}%."
-)
+graph.add_node(f"Effects plotted out of collected: ~{fraction_included*100}%.")
 
 print(
     f"{minor_effects} minor effect(s) were ignored."
