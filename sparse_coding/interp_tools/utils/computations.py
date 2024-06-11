@@ -3,7 +3,6 @@
 from collections import defaultdict
 
 import torch as t
-from tqdm.auto import tqdm
 
 
 def calc_act_diffs(
@@ -20,11 +19,11 @@ def calc_act_diffs(
     act_diffs: dict[tuple[int, int, int], t.Tensor] = {}
     keys_dict = {}
     for i in ablated_activations:
-        for j in tqdm(ablated_activations[i], desc="Keys Dict Progress"):
+        for j in ablated_activations[i]:
             for k in ablated_activations[i][j]:
                 keys_dict[i, j, k] = None
 
-    for i, j, k in tqdm(keys_dict, desc="Diffs Computed Progress"):
+    for i, j, k in keys_dict:
         act_diffs[i, j, k] = (
             ablated_activations[i][j][k][:, -1, :]
             - base_activations[i][None][k][:, -1, :]

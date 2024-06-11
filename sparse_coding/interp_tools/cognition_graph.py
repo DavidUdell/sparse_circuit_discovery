@@ -10,7 +10,6 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
-import gc
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -194,7 +193,7 @@ for ablate_layer_idx in ablate_layer_range:
             elif isinstance(BASE_LOGITS, t.Tensor):
                 BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
 
-    # At a layer, loop through the ablation dimensions.
+    # At a layer, loop through the ablation dimensions, reducing each.
     assert len(token_sequences) > 0
     for dimension in tqdm(
         layer_dim_indices[ablate_layer_idx],
@@ -235,12 +234,67 @@ for ablate_layer_idx in ablate_layer_range:
         )
 
         # Postprocess the altered activations, if applicable.
+        MOST_AFFECTED_DIMENSIONS = None
+
         if BRANCHING_FACTOR is not None:
             assert isinstance(BRANCHING_FACTOR, int)
 
+            WORKING_TENSOR = None
+            cache_indices = list(
+                altered_activations[ablate_layer_idx][dimension].keys()
+            )
 
+            # Build tensor block of effects from the activations dict.
+            for cache_dim in altered_activations[ablate_layer_idx][dimension]:
+                if WORKING_TENSOR is None:
+                    WORKING_TENSOR = t.abs(
+                        altered_activations[
+                            ablate_layer_idx][dimension][cache_dim]
+                        - base_case_activations[
+                            ablate_layer_idx][None][cache_dim]
+                    ).mean(dim=1)
+                else:
+                    WORKING_TENSOR = t.cat(
+                        [
+                            WORKING_TENSOR,
+                            t.abs(
+                                altered_activations[
+                                    ablate_layer_idx][dimension][cache_dim]
+                                - base_case_activations[
+                                    ablate_layer_idx][None][cache_dim]
+                            ).mean(dim=1)
+                        ]
+                    )
 
+            # Sort effects.
+            # ordered_meta_indices: t.LongTensor
+            _, ordered_meta_indices = t.sort(
+                WORKING_TENSOR.squeeze(),
+                descending=True,
+            )
+            assert len(ordered_meta_indices) == len(cache_indices)
 
+            # Keep just the greatest effects, if applicable.
+            MOST_AFFECTED_DIMENSIONS = []
+            reference_dimensions = set(layer_dim_indices[ablate_layer_idx + 1])
+
+            for i in ordered_meta_indices:
+                assert cache_indices[i.item()] in reference_dimensions
+
+                MOST_AFFECTED_DIMENSIONS.append(cache_indices[i.item()])
+                if len(MOST_AFFECTED_DIMENSIONS) == BRANCHING_FACTOR:
+                    break
+
+        # Continue on with the affected dimensions, if applicable.
+        if MOST_AFFECTED_DIMENSIONS is not None:
+            layer_dim_indices[ablate_layer_idx + 1] = list(
+                set(MOST_AFFECTED_DIMENSIONS)
+            )
+
+        activation_diff: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
+            altered_activations,
+            base_case_activations,
+        )
 
 
 
@@ -249,66 +303,6 @@ for ablate_layer_idx in ablate_layer_range:
 
 
 # keepers: dict[tuple[int, int], int] = {}
-# probability_diffs = {}
-
-    # Keep just the most affected indices for the next layer's ablations.
-    assert isinstance(BRANCHING_FACTOR, int)
-
-    top_layer_dims: set = set()
-    a: int = ablate_layer_idx
-    reference_set = set(layer_dim_indices[a + 1])
-
-    # len(ablated_activations[a])) == NUM_ABLATION_DIMS
-    for j in tqdm(ablated_activations[a], desc="Branchings Progress"):
-        WORKING_TENSOR = None
-        cache_indices = list(ablated_activations[a][j].keys())
-        # len(ablated_activations[a][j]) == NUM_CACHE_DIMS
-        for k in ablated_activations[a][j]:
-
-            # ablated_activations[a][j][k].shape == (1, SEQ_LEN, 1). Take all
-            # the cached activation diffs and concat their absolute values.
-            if WORKING_TENSOR is None:
-                WORKING_TENSOR = t.abs(
-                    ablated_activations[a][j][k]
-                    - base_activations_top_positions[a][None][k]
-                ).mean(dim=1)
-            else:
-                WORKING_TENSOR = t.cat(
-                    [
-                        WORKING_TENSOR,
-                        t.abs(
-                            ablated_activations[a][j][k]
-                            - base_activations_top_positions[a][None][k],
-                        ).mean(dim=1),
-                    ]
-                )
-
-        # ordered_meta_indices: t.LongTensor
-        _, ordered_meta_indices = t.sort(
-            WORKING_TENSOR.squeeze(),
-            descending=True,
-        )
-        assert len(ordered_meta_indices) == len(cache_indices)
-        top_dims = []
-        for i in ordered_meta_indices:
-            if cache_indices[i.item()] in reference_set:
-                top_dims.append(cache_indices[i.item()])
-                if len(top_dims) == BRANCHING_FACTOR:
-                    break
-            else:
-                raise ValueError("OOD ablation effect registered.")
-        keepers[a, j] = top_dims
-
-        top_layer_dims.update(top_dims)
-    # list
-    layer_dim_indices[a + 1] = list(top_layer_dims)
-
-# %%
-# Compute ablated effects minus base effects.
-act_diffs: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
-    ablated_activations,
-    base_activations_top_positions,
-)
 
 # %%
 # Graph effects.
