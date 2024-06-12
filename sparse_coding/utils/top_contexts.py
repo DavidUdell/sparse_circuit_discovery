@@ -89,6 +89,9 @@ def top_k_contexts(
             max_position = acts.index(max(acts))
             # To complete the open end of the slice, we add 1 to that side.
             view_slice = slice(max_position-view, max_position+view+1)
+            # Fixes singleton unpadded _contexts_.
+            if isinstance(context, int):
+                context: list = [context]
             top_k_views[dim_idx].append(
                 (context[view_slice], acts[view_slice])
             )
@@ -110,6 +113,9 @@ def unpad_activations(
 
     for k, unpadded_prompt in enumerate(unpadded_prompts):
         try:
+            # Fixes singleton unpadded _activations_.
+            if isinstance(unpadded_prompt, int):
+                unpadded_prompt: list = [unpadded_prompt]
             original_length: int = len(unpadded_prompt)
             # From here on out, activations are unpadded, and so must be
             # packaged as a _list of tensors_ instead of as just a tensor
