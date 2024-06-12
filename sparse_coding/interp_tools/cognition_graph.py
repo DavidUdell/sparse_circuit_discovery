@@ -10,6 +10,7 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
+import math
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -71,6 +72,7 @@ LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
 # COEFFICIENT = config.get("COEFFICIENT", 0.0)
 
+THRESHOLD = 2.0**THRESHOLD
 
 if DIMS_PINNED is not None:
     for v in DIMS_PINNED.values():
