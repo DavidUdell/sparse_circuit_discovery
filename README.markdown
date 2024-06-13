@@ -30,35 +30,32 @@ The most important hyperparameters are clustered up top:
 ```
 ## Key Params
 # Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None". Key params here:
-ACTS_LAYERS_SLICE: "9:12"
-INIT_THINNING_FACTOR: 0.01
-NUM_SEQUENCES_INTERPED: 200
-SEQ_PER_DIM_CAP: 100
+# you the string "None".
+ACTS_LAYERS_SLICE: "3:5"
+INIT_THINNING_FACTOR: 1.0
+NUM_SEQUENCES_INTERPED: 1
+THRESHOLD: 5.0
 
 # Only pin single dims per layer.
 DIMS_PINNED:
-  9: [331]
+  3: [331]
 ```
 
 In order:
 1. `ACTS_LAYERS_SLICE` is a Python slice formatted as a string. It sets which
-  layers of the `GPT-2 small` model you'll interpret activations at.
+   layers of the `GPT-2 small` model you'll interpret activations at.
 2. `INIT_THINNING_FACTOR` is the fraction of features at the first layer in
-   your slice you'll plot. I.e., a fraction of `1` will try to plot every
+   your slice you'll plot. E.g., a fraction of `1.0` will try to plot every
    feature in the layer.
 3. `NUM_SEQUENCES_INTERPED` is the number of token sequences used during
    plotting, for the purpose of caluculating logit effects and downstream
    feature effects.
-4. `SEQ_PER_DIM_CAP` is the maximum number of top-activating sequences a
-   feature can have. I.e., when it equals `NUM_SEQUENCES_INTERPED`, you're
-   saying that any feature that fired at every sequence should be interpreted
-   over all of those sequences. For computational reasons, we basically want to
-   set `NUM_SEQUENCES_INTERPED` as high as we can, and then set this value
-   relatively low, so that our interpretability calculations are tractable.
+4. `THRESHOLD` is the threshold value for activation differences plotted.
+   Smaller differences in activation magnitude than `2**THRESHOLD` are dropped.
+   Set this to `0.0` to plot every effect.
 5. `DIMS_PINNED` is a dictionary of layer indices followed by singleton lists
-   with lone feature indices. If set for the first layer, it will completely
-   override `INIT_THINNING_FACTOR`.
+   of feature indices. If set for the first layer, it will completely override
+   `INIT_THINNING_FACTOR`.
 
 Set these values, save `central_config.yaml`, then run interpretability with:
 
@@ -66,7 +63,7 @@ Set these values, save `central_config.yaml`, then run interpretability with:
 
 `python3 pipe.py`
 
-Data appears in `sparse_coding/data/`.
+All data appears in `sparse_coding/data/`.
 
 The last cognition graph you generated is saved as both a `.svg` for you and as
 a `.dot` for the computer. If you run the interpretability pipeline again, the
@@ -84,7 +81,7 @@ in GPT-2 small, including one extra layer after
 ```
 ## Key Params
 # Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None". Key params here:
+# you the string "None".
 ACTS_LAYERS_SLICE: "6:9"
 ```
 and then pin all the features that comprise a given circuit in
@@ -113,8 +110,9 @@ _Blue and red tokens_ in individual boxes at the bottom are the logits most
 upweighted/downweighted by that ablation. (_Gray_ is the 0.0 effect edge case.)
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
-Red arrows indicate downweighting, blue arrows indicate upweighting, and degree
-is indicated by color transparency.
+Red arrows represent downweighting, blue arrows represent upweighting, and
+arrow transparency represents magnitude. E.g., a pale red arrow is a minor
+downweighting effect.
 
 ## Errors
 - I've gimped a lot of repository functionality for now: only `GPT-2 small` and
@@ -132,7 +130,7 @@ is indicated by color transparency.
   repo.
 
 ## Project Status
-Current version is 0.5.0.
+Current version is 1.0.0.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

@@ -97,14 +97,29 @@ def test_smoke_sparse_coding(
     mock_interface,
 ):  # pylint: disable=redefined-outer-name, unused-argument
     """Run the submodule scripts in sequence."""
-    for script in [
+
+    scripts = [
         "collect_acts",
         "load_autoencoder",
         "interp_tools.contexts",
         "interp_tools.cognition_graph",
-    ]:
+    ]
+    graph_path = "smoke_test_data/openai-community_gpt2/smoke_test_graph.dot"
+    truth_path = "smoke_test_data/ground_truth_graph.dot"
+
+    for script in scripts:
         try:
             with wandb.init(mode="offline"):
                 run_module(f"sparse_coding.{script}")
+
+                if script == scripts[-1]:
+                    with open(
+                        f"{graph_path}", "r", encoding="utf-8"
+                    ) as graph_file:
+                        with open(
+                            f"{truth_path}", "r", encoding="utf-8"
+                        ) as truth_file:
+                            assert graph_file.read() == truth_file.read()
+
         except Exception as e:  # pylint: disable=broad-except
             pytest.fail(f"Smoke test for {script} failed: {e}")

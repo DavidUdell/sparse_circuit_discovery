@@ -6,7 +6,7 @@ MODEL_DIR: "openai-community/gpt2"
 PROMPT: "Copyright (C"
 
 # Layers Slice to Cache Activations From
-ACTS_LAYERS_SLICE: "1:4"
+ACTS_LAYERS_SLICE: "7:9"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
@@ -34,8 +34,9 @@ COEFFICIENT: 0.0
 BRANCHING_FACTOR: 5
 INIT_THINNING_FACTOR: 0.2
 LOGIT_TOKENS: 8
+THRESHOLD: 5.01
 DIMS_PINNED:
-  1: [1]
+  7: [15755]
 
 
 ## Stable Smoke Test Constants

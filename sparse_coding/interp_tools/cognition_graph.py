@@ -10,7 +10,7 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
-import gc
+import math
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -18,12 +18,16 @@ from textwrap import dedent
 import numpy as np
 import torch as t
 from accelerate import Accelerator
+from pygraphviz import AGraph
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 import wandb
 
 from sparse_coding.interp_tools.utils.computations import calc_act_diffs
-from sparse_coding.interp_tools.utils.graphs import graph_and_log
+from sparse_coding.interp_tools.utils.graphs import (
+    color_range_from_scalars,
+    label_highlighting,
+)
 from sparse_coding.interp_tools.utils.hooks import (
     hooks_manager,
     prepare_autoencoder_and_indices,
@@ -31,7 +35,10 @@ from sparse_coding.interp_tools.utils.hooks import (
 )
 from sparse_coding.utils.interface import (
     load_yaml_constants,
+    load_preexisting_graph,
     parse_slice,
+    sanitize_model_name,
+    save_paths,
     slice_to_range,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
@@ -57,14 +64,15 @@ GRAPH_DOT_FILE = config.get("GRAPH_DOT_FILE")
 NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
-# COEFFICIENT = config.get("COEFFICIENT", 0.0)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 THRESHOLD = config.get("THRESHOLD", 0.0)
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
+# COEFFICIENT = config.get("COEFFICIENT", 0.0)
 
+THRESHOLD = 2.0**THRESHOLD
 
 if DIMS_PINNED is not None:
     for v in DIMS_PINNED.values():
@@ -137,15 +145,29 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
     __file__,
 )
 
-# %%
-# Run ablations at top sequence positions.
-ablated_activations = defaultdict(recursive_defaultdict)
-base_activations_top_positions = defaultdict(recursive_defaultdict)
-keepers: dict[tuple[int, int], int] = {}
-probability_diffs = {}
+# Load preexisting graph, if applicable.
+graph = load_preexisting_graph(MODEL_DIR, GRAPH_DOT_FILE, __file__)
+if graph is None:
+    graph = AGraph(directed=True)
 
+minor_effects: int = 0
+total_effect: float = 0.0
+plotted_effect: float = 0.0
+
+save_graph_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",
+)
+save_dot_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_DOT_FILE}",
+)
+
+# %%
+# For the top sequence positions, run ablations and reduce the ouput.
 for ablate_layer_idx in ablate_layer_range:
-    # Thin the first layer indices or fix any indices, when requested.
+
+    # Preprocess layer dimensions, if applicable.
     if ablate_layer_idx == ablate_layer_range[0] or (
         DIMS_PINNED is not None
         and DIMS_PINNED.get(ablate_layer_idx) is not None
@@ -160,19 +182,21 @@ for ablate_layer_idx in ablate_layer_range:
             SEED,
         )
 
-    # Truncated means truncated to MAX_SEQ_INTERPED_LEN. This block does
-    # the work of further truncating to the top activating position length.
-    truncated_tok_seqs = [
+    # Tokenize and truncate prompts.
+    token_sequences = [
         tokenizer(
-            c,
+            context,
             return_tensors="pt",
             truncation=True,
             max_length=MAX_SEQ_INTERPED_LEN,
         )
-        for c in eval_set
+        for context in eval_set
     ]
 
+    # Collect the layer base case data.
     BASE_LOGITS = None
+    base_case_activations = defaultdict(recursive_defaultdict)
+
     with hooks_manager(
         ablate_layer_idx,
         None,
@@ -181,150 +205,229 @@ for ablate_layer_idx in ablate_layer_range:
         model,
         layer_encoders,
         layer_decoders,
-        base_activations_top_positions,
+        base_case_activations,
         ablate_during_run=False,
     ):
-        for seq in truncated_tok_seqs:
-            top_input = seq.to(model.device)
+        for sequence in token_sequences:
+            sequence = sequence.to(model.device)
             _ = t.manual_seed(SEED)
 
-            try:
-                output = model(**top_input)
-            except RuntimeError:
-                gc.collect()
-                output = model(**top_input)
-
+            output = model(**sequence)
             logit = output.logits[:, -1, :].cpu()
+
             if BASE_LOGITS is None:
                 BASE_LOGITS = logit
             elif isinstance(BASE_LOGITS, t.Tensor):
                 BASE_LOGITS = t.cat([BASE_LOGITS, logit], dim=0)
 
-    for ablate_dim_idx in tqdm(
-        layer_dim_indices[ablate_layer_idx], desc="Dim Ablations Progress"
+    # At a layer, loop through the ablation dimensions, reducing each.
+    assert len(token_sequences) > 0
+    for dimension in tqdm(
+        layer_dim_indices[ablate_layer_idx],
+        desc="Dimensions Progress",
     ):
-
-        assert len(truncated_tok_seqs) > 0, dedent(
-            f"No truncated sequences for {ablate_layer_idx}.{ablate_dim_idx}."
-        )
-        # This is a conventional use of hooks_lifecycle, but we're only passing
-        # in as input to the model the top activating sequence, truncated. We
-        # run one ablated and once not.
         ALTERED_LOGITS = None
+        altered_activations = defaultdict(recursive_defaultdict)
+
         with hooks_manager(
             ablate_layer_idx,
-            ablate_dim_idx,
+            dimension,
             layer_range,
             layer_dim_indices,
             model,
             layer_encoders,
             layer_decoders,
-            ablated_activations,
+            altered_activations,
             ablate_during_run=True,
         ):
-            for seq in truncated_tok_seqs:
-                top_input = seq.to(model.device)
+            for sequence in token_sequences:
                 _ = t.manual_seed(SEED)
 
-                try:
-                    output = model(**top_input)
-                except RuntimeError:
-                    gc.collect()
-                    output = model(**top_input)
-
+                output = model(**sequence)
                 logit = output.logits[:, -1, :].cpu()
+
                 if ALTERED_LOGITS is None:
                     ALTERED_LOGITS = logit
                 elif isinstance(ALTERED_LOGITS, t.Tensor):
                     ALTERED_LOGITS = t.cat([ALTERED_LOGITS, logit], dim=0)
 
-        log_prob_diff = -t.nn.functional.log_softmax(
+        # Logits immediately become probability differences.
+        log_probability_diff = -t.nn.functional.log_softmax(
             ALTERED_LOGITS,
             dim=-1,
         ) + t.nn.functional.log_softmax(
             BASE_LOGITS,
             dim=-1,
         )
-        probability_diffs[ablate_layer_idx, ablate_dim_idx] = log_prob_diff
+        log_probability_diff: dict = {
+            (ablate_layer_idx, dimension): log_probability_diff
+        }
 
-    if BRANCHING_FACTOR is None:
-        break
+        # Postprocess the altered activations, if applicable.
+        MOST_AFFECTED_DIMENSIONS = None
 
-    # Keep just the most affected indices for the next layer's ablations.
-    assert isinstance(BRANCHING_FACTOR, int)
+        if BRANCHING_FACTOR is not None:
+            assert isinstance(BRANCHING_FACTOR, int)
 
-    top_layer_dims: set = set()
-    a: int = ablate_layer_idx
-    reference_set = set(layer_dim_indices[a + 1])
+            WORKING_TENSOR = None
+            cache_indices = list(
+                altered_activations[ablate_layer_idx][dimension].keys()
+            )
 
-    # len(ablated_activations[a])) == NUM_ABLATION_DIMS
-    for j in tqdm(ablated_activations[a], desc="Branchings Progress"):
-        WORKING_TENSOR = None
-        cache_indices = list(ablated_activations[a][j].keys())
-        # len(ablated_activations[a][j]) == NUM_CACHE_DIMS
-        for k in ablated_activations[a][j]:
+            # Build tensor block of effects from the activations dict.
+            for cache_dim in altered_activations[ablate_layer_idx][dimension]:
+                if WORKING_TENSOR is None:
+                    WORKING_TENSOR = t.abs(
+                        altered_activations[ablate_layer_idx][dimension][
+                            cache_dim
+                        ]
+                        - base_case_activations[ablate_layer_idx][None][
+                            cache_dim
+                        ]
+                    ).mean(dim=1)
+                else:
+                    WORKING_TENSOR = t.cat(
+                        [
+                            WORKING_TENSOR,
+                            t.abs(
+                                altered_activations[ablate_layer_idx][
+                                    dimension
+                                ][cache_dim]
+                                - base_case_activations[ablate_layer_idx][
+                                    None
+                                ][cache_dim]
+                            ).mean(dim=1),
+                        ]
+                    )
 
-            # ablated_activations[a][j][k].shape == (1, SEQ_LEN, 1). Take all
-            # the cached activation diffs and concat their absolute values.
-            if WORKING_TENSOR is None:
-                WORKING_TENSOR = t.abs(
-                    ablated_activations[a][j][k]
-                    - base_activations_top_positions[a][None][k]
-                ).mean(dim=1)
-            else:
-                WORKING_TENSOR = t.cat(
-                    [
-                        WORKING_TENSOR,
-                        t.abs(
-                            ablated_activations[a][j][k]
-                            - base_activations_top_positions[a][None][k],
-                        ).mean(dim=1),
-                    ]
-                )
+            # Sort effects.
+            # ordered_meta_indices: t.LongTensor
+            _, ordered_meta_indices = t.sort(
+                WORKING_TENSOR.squeeze(),
+                descending=True,
+            )
+            assert len(ordered_meta_indices) == len(cache_indices)
 
-        # ordered_meta_indices: t.LongTensor
-        _, ordered_meta_indices = t.sort(
-            WORKING_TENSOR.squeeze(),
-            descending=True,
-        )
-        assert len(ordered_meta_indices) == len(cache_indices)
-        top_dims = []
-        for i in ordered_meta_indices:
-            if cache_indices[i.item()] in reference_set:
-                top_dims.append(cache_indices[i.item()])
-                if len(top_dims) == BRANCHING_FACTOR:
+            # Then keep just the greatest effects.
+            MOST_AFFECTED_DIMENSIONS = []
+            reference_dimensions = set(layer_dim_indices[ablate_layer_idx + 1])
+
+            for i in ordered_meta_indices:
+                assert cache_indices[i.item()] in reference_dimensions
+
+                MOST_AFFECTED_DIMENSIONS.append(cache_indices[i.item()])
+                if len(MOST_AFFECTED_DIMENSIONS) == BRANCHING_FACTOR:
                     break
-            else:
-                raise ValueError("OOD ablation effect registered.")
-        keepers[a, j] = top_dims
 
-        top_layer_dims.update(top_dims)
-    # list
-    layer_dim_indices[a + 1] = list(top_layer_dims)
+        # Continue on with the affected dimensions, if applicable.
+        if MOST_AFFECTED_DIMENSIONS is not None:
+            layer_dim_indices[ablate_layer_idx + 1] = list(
+                set(MOST_AFFECTED_DIMENSIONS)
+            )
+
+        activation_diff: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
+            altered_activations,
+            base_case_activations,
+        )
+
+        # Reduce effects to graph data.
+        for (_, __, downstream_index), effect in activation_diff.items():
+            effect: float = effect.item()
+            magnitude: float = abs(effect)
+            total_effect += magnitude
+
+            if magnitude <= THRESHOLD or 0.0 == effect:
+                minor_effects += 1
+                continue
+
+            plotted_effect += magnitude
+
+            graph.add_node(
+                f"{ablate_layer_idx}.{dimension}",
+                label=label_highlighting(
+                    ablate_layer_idx,
+                    dimension,
+                    MODEL_DIR,
+                    TOP_K_INFO_FILE,
+                    LOGIT_TOKENS,
+                    tokenizer,
+                    f"{ablate_layer_idx}.{dimension}",
+                    log_probability_diff,
+                    __file__,
+                ),
+                shape="box",
+            )
+
+            graph.add_node(
+                f"{ablate_layer_idx + 1}.{downstream_index}",
+                label=label_highlighting(
+                    ablate_layer_idx + 1,
+                    downstream_index,
+                    MODEL_DIR,
+                    TOP_K_INFO_FILE,
+                    LOGIT_TOKENS,
+                    tokenizer,
+                    f"{ablate_layer_idx + 1}.{downstream_index}",
+                    log_probability_diff,
+                    __file__,
+                ),
+                shape="box",
+            )
+
+            color_min, color_max = color_range_from_scalars(activation_diff)
+            if effect > 0.0:
+                red: int = 0
+                blue: int = 255
+            elif effect < 0.0:
+                red: int = 255
+                blue: int = 0
+            alpha = int(255 * magnitude / max(abs(color_max), abs(color_min)))
+            rgba_str: str = f"#{red:02x}00{blue:02x}{alpha:02x}"
+
+            graph.add_edge(
+                f"{ablate_layer_idx}.{dimension}",
+                f"{ablate_layer_idx + 1}.{downstream_index}",
+                color=rgba_str,
+            )
 
 # %%
-# Compute ablated effects minus base effects.
-act_diffs: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
-    ablated_activations,
-    base_activations_top_positions,
+# Cleanup graph.
+edges = graph.edges()
+assert len(edges) == len(set(edges)), "Repeat edges in graph."
+
+unlinked_nodes: int = 0
+for node in graph.nodes():
+    if len(graph.edges(node)) == 0:
+        graph.remove_node(node)
+        unlinked_nodes += 1
+
+if total_effect == 0.0:
+    raise ValueError("Total effect logged was 0.0")
+fraction_included = round(plotted_effect / total_effect, 2)
+graph.add_node(f"Effects plotted out of collected: ~{fraction_included*100}%.")
+
+print(
+    f"{minor_effects} minor effect(s) were ignored."
+    f" {unlinked_nodes} unlinked node(s) were dropped.\n"
 )
 
 # %%
-# Graph effects.
-graph_and_log(
-    act_diffs,
-    keepers,
-    BRANCHING_FACTOR,
-    MODEL_DIR,
-    GRAPH_FILE,
-    GRAPH_DOT_FILE,
-    TOP_K_INFO_FILE,
-    THRESHOLD,
-    LOGIT_TOKENS,
-    tokenizer,
-    probability_diffs,
-    __file__,
+# Render and save graph.
+graph.write(save_dot_path)
+graph.draw(
+    save_graph_path,
+    format="svg",
+    prog="dot",
 )
+
+artifact = wandb.Artifact(
+    "cognition_graph",
+    type="directed_graph",
+)
+artifact.add_file(save_graph_path)
+wandb.log_artifact(artifact)
+
+print(f"Graph saved to {save_graph_path}.")
 
 # %%
 # Wrap up logging.
