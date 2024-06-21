@@ -24,7 +24,8 @@ inputs = tokenizer(PROMPT, return_tensors="pt")
 outputs = model(**inputs)
 logits = outputs.logits
 for idx in range(logits.shape[1]):
-    print(f"Sequence position {idx}:")
+    token = tokenizer.decode(inputs.input_ids.squeeze()[idx].item())
+    print(f"Sequence position {idx}, {token}:")
     # t.return_types.topk
     seq_logits_data = t.topk(logits[:, idx, :], TOPK)
     seq_probs = t.softmax(logits[:, idx, :], dim=-1).detach()
