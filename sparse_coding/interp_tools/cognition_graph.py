@@ -10,7 +10,6 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
-import math
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -67,12 +66,15 @@ SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
-THRESHOLD = config.get("THRESHOLD", 0.0)
+THRESHOLD_EXP = config.get("THRESHOLD_EXP")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED", 0)
 # COEFFICIENT = config.get("COEFFICIENT", 0.0)
 
-THRESHOLD = 2.0**THRESHOLD
+if THRESHOLD_EXP is None:
+    THRESHOLD = 0.0
+else:
+    THRESHOLD = 2.0**THRESHOLD_EXP
 
 if DIMS_PINNED is not None:
     for v in DIMS_PINNED.values():
