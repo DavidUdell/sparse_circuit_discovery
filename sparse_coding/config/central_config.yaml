@@ -52,10 +52,8 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Cognition Graph
-# A coefficient of 0.0 means "ablate features." Disable branching and pinning
-# to plot every ablation effect. Dims are pinned by setting a layer and dim
-# index as keys and values.
-BRANCHING_FACTOR: 5
+# Disable pinning to plot every ablation effect. Dims are pinned by setting a
+# layer and dim index as keys and values.
 LOGIT_TOKENS: 10
 # INIT_THINNING_FACTOR: 0.01
 # DIMS_PINNED:
