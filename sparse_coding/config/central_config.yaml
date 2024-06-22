@@ -4,15 +4,23 @@
 ACTS_LAYERS_SLICE: "3:5"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
-THRESHOLD: 5.0
+THRESHOLD_EXP: 5.0
 
 # Only pin single dims per layer.
 DIMS_PINNED:
 
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
-  6: [8339, 14104, 18854]
-  7: [2118]
+  1: [23433]
+  2: [16869]
+  3: [953, 10942, 14555]
+  4: [7780, 312, 5030, 3888]
+  5: [16123, 22045, 10603, 14829]
+  6: [6565, 6210, 3290, 18557]
+  7: [15755, 10605, 4330, 15608]
+  8: [18895, 7521, 21283]
+  9: [15232, 768, 5147]
+  10: [6807, 9817, 10944]
 
 #
 ## Main Config
@@ -52,10 +60,8 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Cognition Graph
-# A coefficient of 0.0 means "ablate features." Disable branching and pinning
-# to plot every ablation effect. Dims are pinned by setting a layer and dim
-# index as keys and values.
-BRANCHING_FACTOR: 5
+# Disable pinning to plot every ablation effect. Dims are pinned by setting a
+# layer and dim index as keys and values.
 LOGIT_TOKENS: 10
 # INIT_THINNING_FACTOR: 0.01
 # DIMS_PINNED:

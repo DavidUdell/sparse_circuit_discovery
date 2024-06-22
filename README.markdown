@@ -34,7 +34,7 @@ The most important hyperparameters are clustered up top:
 ACTS_LAYERS_SLICE: "3:5"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
-THRESHOLD: 5.0
+THRESHOLD_EXP: 5.0
 
 # Only pin single dims per layer.
 DIMS_PINNED:
@@ -50,9 +50,9 @@ In order:
 3. `NUM_SEQUENCES_INTERPED` is the number of token sequences used during
    plotting, for the purpose of caluculating logit effects and downstream
    feature effects.
-4. `THRESHOLD` is the threshold value for activation differences plotted.
-   Smaller differences in activation magnitude than `2**THRESHOLD` are dropped.
-   Set this to `0.0` to plot every effect.
+4. `THRESHOLD_EXP` is the threshold value exponent for activation differences
+   plotted. Smaller differences in activation magnitude than `2**THRESHOLD_EXP`
+   are dropped. To plot every non-zero effect, comment out this line.
 5. `DIMS_PINNED` is a dictionary of layer indices followed by singleton lists
    of feature indices. If set for the first layer, it will completely override
    `INIT_THINNING_FACTOR`.
@@ -130,7 +130,7 @@ downweighting effect.
   repo.
 
 ## Project Status
-Current version is 1.0.0.
+Current version is 1.0.1.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

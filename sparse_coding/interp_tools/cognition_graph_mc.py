@@ -67,7 +67,7 @@ NUM_SHOT = config.get("NUM_SHOT", 6)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
 BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
-THRESHOLD = config.get("THRESHOLD", 0.0)
+THRESHOLD_EXP = config.get("THRESHOLD_EXP")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
@@ -273,7 +273,7 @@ graph_and_log(
     GRAPH_FILE,
     GRAPH_DOT_FILE,
     TOP_K_INFO_FILE,
-    THRESHOLD,
+    THRESHOLD_EXP,
     LOGIT_TOKENS,
     tokenizer,
     logit_diffs,
