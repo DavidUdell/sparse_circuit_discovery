@@ -64,7 +64,6 @@ NUM_SEQUENCES_INTERPED = config.get("NUM_SEQUENCES_INTERPED")
 MAX_SEQ_INTERPED_LEN = config.get("MAX_SEQ_INTERPED_LEN")
 SEQ_PER_DIM_CAP = config.get("SEQ_PER_DIM_CAP", 10)
 INIT_THINNING_FACTOR = config.get("INIT_THINNING_FACTOR", None)
-BRANCHING_FACTOR = config.get("BRANCHING_FACTOR")
 DIMS_PINNED: dict[int, list[int]] = config.get("DIMS_PINNED", None)
 THRESHOLD_EXP = config.get("THRESHOLD_EXP")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
@@ -120,9 +119,11 @@ ablate_layer_range: range = layer_range[:-1]
 # Fix the validation set.
 eval_set: list[str] = [PROMPT]
 
-print("Prompt is as follows:")
+print("Prompt:")
+print()
 for i in eval_set:
     print(i)
+print()
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
@@ -264,68 +265,6 @@ for ablate_layer_idx in ablate_layer_range:
         log_probability_diff: dict = {
             (ablate_layer_idx, dimension): log_probability_diff
         }
-
-        # Postprocess the altered activations, if applicable.
-        MOST_AFFECTED_DIMENSIONS = None
-
-        if BRANCHING_FACTOR is not None:
-            assert isinstance(BRANCHING_FACTOR, int)
-
-            WORKING_TENSOR = None
-            cache_indices = list(
-                altered_activations[ablate_layer_idx][dimension].keys()
-            )
-
-            # Build tensor block of effects from the activations dict.
-            for cache_dim in altered_activations[ablate_layer_idx][dimension]:
-                if WORKING_TENSOR is None:
-                    WORKING_TENSOR = t.abs(
-                        altered_activations[ablate_layer_idx][dimension][
-                            cache_dim
-                        ]
-                        - base_case_activations[ablate_layer_idx][None][
-                            cache_dim
-                        ]
-                    ).mean(dim=1)
-                else:
-                    WORKING_TENSOR = t.cat(
-                        [
-                            WORKING_TENSOR,
-                            t.abs(
-                                altered_activations[ablate_layer_idx][
-                                    dimension
-                                ][cache_dim]
-                                - base_case_activations[ablate_layer_idx][
-                                    None
-                                ][cache_dim]
-                            ).mean(dim=1),
-                        ]
-                    )
-
-            # Sort effects.
-            # ordered_meta_indices: t.LongTensor
-            _, ordered_meta_indices = t.sort(
-                WORKING_TENSOR.squeeze(),
-                descending=True,
-            )
-            assert len(ordered_meta_indices) == len(cache_indices)
-
-            # Then keep just the greatest effects.
-            MOST_AFFECTED_DIMENSIONS = []
-            reference_dimensions = set(layer_dim_indices[ablate_layer_idx + 1])
-
-            for i in ordered_meta_indices:
-                assert cache_indices[i.item()] in reference_dimensions
-
-                MOST_AFFECTED_DIMENSIONS.append(cache_indices[i.item()])
-                if len(MOST_AFFECTED_DIMENSIONS) == BRANCHING_FACTOR:
-                    break
-
-        # Continue on with the affected dimensions, if applicable.
-        if MOST_AFFECTED_DIMENSIONS is not None:
-            layer_dim_indices[ablate_layer_idx + 1] = list(
-                set(MOST_AFFECTED_DIMENSIONS)
-            )
 
         activation_diff: dict[tuple[int, int, int], t.Tensor] = calc_act_diffs(
             altered_activations,
