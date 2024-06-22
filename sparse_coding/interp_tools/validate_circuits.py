@@ -117,7 +117,6 @@ if VALIDATION_DIMS_PINNED is not None:
 outputs = model(**inputs)
 base_logit = outputs.logits[:, -1, :]
 
-ALTERED_LOGITS = None
 with ExitStack() as stack:
     for k, v in VALIDATION_DIMS_PINNED.items():
         stack.enter_context(
@@ -147,6 +146,18 @@ positive_tokens = prob_diff.topk(LOGIT_TOKENS).indices
 negative_tokens = prob_diff.topk(LOGIT_TOKENS, largest=False).indices
 token_ids = t.cat((positive_tokens, negative_tokens), dim=0)
 
+print("Base Probabilities:")
+initial_probs = t.nn.functional.softmax(base_logit, dim=-1).detach().squeeze()
+top_probs = t.topk(initial_probs, LOGIT_TOKENS)
+for i in top_probs.indices.tolist():
+    token = tokenizer.decode(i)
+    token = token.replace("\n", "\\n")
+    probability = initial_probs[i] * 100
+
+    print(f"{token}: {probability:.1f}%")
+print("\n")
+
+print("Largest Changes:")
 for meta_idx, token_id in enumerate(token_ids):
     if meta_idx == len(positive_tokens):
         print()
@@ -157,9 +168,20 @@ for meta_idx, token_id in enumerate(token_ids):
 
     print(
         token,
-        str(round(prob_diff[token_id.item()].item() * 100, 2)) + "%",
+        str(round(prob_diff[token_id.item()].item() * 100, 1)) + "%",
         sep="  ",
     )
+print("\n")
+
+print("Altered Probabilities:")
+final_probs = t.nn.functional.softmax(altered_logit, dim=-1).detach().squeeze()
+top_probs = t.topk(final_probs, LOGIT_TOKENS)
+for i in top_probs.indices.tolist():
+    token = tokenizer.decode(i)
+    token = token.replace("\n", "\\n")
+    probability = final_probs[i] * 100
+
+    print(f"{token}: {probability:.1f}%")
 
 # %%
 # Wrap up logging.
