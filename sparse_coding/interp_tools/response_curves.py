@@ -37,7 +37,7 @@ SEED = config.get("SEED")
 # dict[int, list[int]]. Use syntax for ablation dim pinning.
 PINNED_ABLATION_DIM = {3: [1]}
 PINNED_CACHE_DIM = {4: [3]}
-COEFFICIENT: float = 0.0
+COEFFICIENT: float = 0.5
 
 ABLATION_LAYER: int = list(PINNED_ABLATION_DIM.keys())[0]
 RANGE = range(
@@ -114,6 +114,7 @@ with hooks_manager(
     layer_decoders,
     pinned_effects,
     ablate_during_run=True,
+    coefficient=COEFFICIENT,
 ):
     _ = model(**inputs)
 

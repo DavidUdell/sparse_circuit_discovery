@@ -124,6 +124,7 @@ def hooks_manager(
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
     ablate_during_run: bool = True,
+    coefficient: float = 0.0,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -163,9 +164,12 @@ def hooks_manager(
                 inplace=True,
             )
 
-            # Zero out the column vectors specified.
+            # Zero out or otherwise pin the column vectors specified.
             mask = t.ones(projected_acts.shape, dtype=t.bool).to(model.device)
-            mask[:, :, dim_indices] = False
+            if coefficient == 0.0:
+                mask[:, :, dim_indices] = False
+            else:
+                mask[:, :, dim_indices] = coefficient
             ablated_acts = projected_acts * mask
 
             projected_acts = (
