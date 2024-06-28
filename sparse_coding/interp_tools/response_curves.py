@@ -3,7 +3,6 @@
 
 
 import warnings
-from collections import defaultdict
 
 import torch as t
 from accelerate import Accelerator
@@ -40,10 +39,13 @@ PINNED_ABLATION_DIM = {3: [1]}
 PINNED_CACHE_DIM = {4: [3]}
 COEFFICIENT: float = 0.0
 
+ABLATION_LAYER: int = list(PINNED_ABLATION_DIM.keys())[0]
 RANGE = range(
-    list(PINNED_ABLATION_DIM.keys())[0],
+    ABLATION_LAYER,
     list(PINNED_CACHE_DIM.keys())[0] + 1,
 )
+ABLATION_DIM: int = list(PINNED_ABLATION_DIM.values())[0][0]
+CACHE_DIM: int = list(PINNED_CACHE_DIM.values())[0][0]
 
 # %%
 # Reproducibility.
@@ -86,8 +88,8 @@ inputs = tokenizer(PROMPT, return_tensors="pt")
 base_effects = recursive_defaultdict()
 
 with hooks_manager(
-    list(PINNED_ABLATION_DIM.keys())[0],
-    list(PINNED_ABLATION_DIM.values())[0][0],
+    ABLATION_LAYER,
+    ABLATION_DIM,
     RANGE,
     PINNED_CACHE_DIM,
     model,
@@ -103,8 +105,8 @@ with hooks_manager(
 pinned_effects = recursive_defaultdict()
 
 with hooks_manager(
-    list(PINNED_ABLATION_DIM.keys())[0],
-    list(PINNED_ABLATION_DIM.values())[0][0],
+    ABLATION_LAYER,
+    ABLATION_DIM,
     RANGE,
     PINNED_CACHE_DIM,
     model,
@@ -117,3 +119,9 @@ with hooks_manager(
 
 # %%
 # Compute and print effect.
+diff = (
+    base_effects[ABLATION_LAYER][ABLATION_DIM][CACHE_DIM]
+    - pinned_effects[ABLATION_LAYER][ABLATION_DIM][CACHE_DIM]
+)
+
+print(f"{diff.item():.2f}")
