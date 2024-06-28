@@ -20,6 +20,7 @@ setup(
         "accelerate",
         "datasets",
         "lightning",
+        "matplotlib",
         "scikit-learn",
         "PyYAML",
         "pytest",

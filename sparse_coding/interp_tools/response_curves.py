@@ -5,6 +5,7 @@
 import warnings
 
 import torch as t
+from matplotlib import pyplot as plt
 from accelerate import Accelerator
 from transformers import (
     AutoModelForCausalLM,
@@ -37,7 +38,7 @@ SEED = config.get("SEED")
 # dict[int, list[int]]. Use syntax for ablation dim pinning.
 PINNED_ABLATION_DIM = {3: [953]}
 PINNED_CACHE_DIM = {4: [7780]}
-COEFFICIENT: float = 0.5
+COEFFICIENTS: list[float] = [0.0, 0.25, 0.5, 0.75, 1.0]
 
 ABLATION_LAYER: int = list(PINNED_ABLATION_DIM.keys())[0]
 RANGE = range(
@@ -101,28 +102,37 @@ with hooks_manager(
     _ = model(**inputs)
 
 # %%
-# Pinned case run.
-pinned_effects = recursive_defaultdict()
+# Pinned case run, for each coefficient.
+diffs = []
+for coefficient in COEFFICIENTS:
+    pinned_effects = recursive_defaultdict()
 
-with hooks_manager(
-    ABLATION_LAYER,
-    ABLATION_DIM,
-    RANGE,
-    PINNED_CACHE_DIM,
-    model,
-    layer_encoders,
-    layer_decoders,
-    pinned_effects,
-    ablate_during_run=True,
-    coefficient=COEFFICIENT,
-):
-    _ = model(**inputs)
+    with hooks_manager(
+        ABLATION_LAYER,
+        ABLATION_DIM,
+        RANGE,
+        PINNED_CACHE_DIM,
+        model,
+        layer_encoders,
+        layer_decoders,
+        pinned_effects,
+        ablate_during_run=True,
+        coefficient=coefficient,
+    ):
+        _ = model(**inputs)
+
+    # Compute and print effect.
+    diff = (
+        base_effects[ABLATION_LAYER][ABLATION_DIM][CACHE_DIM]
+        - pinned_effects[ABLATION_LAYER][ABLATION_DIM][CACHE_DIM]
+    )
+
+    diffs.append(diff.item())
 
 # %%
-# Compute and print effect.
-diff = (
-    base_effects[ABLATION_LAYER][ABLATION_DIM][CACHE_DIM]
-    - pinned_effects[ABLATION_LAYER][ABLATION_DIM][CACHE_DIM]
-)
-
-print(f"{diff.item():.2f}")
+# Plot in graph.
+plt.plot(COEFFICIENTS, diffs)
+plt.title("Pinning strength effect on downstream feature")
+plt.xlabel("Pinning Coefficient")
+plt.ylabel("Downstream Activation Difference")
+plt.show()
