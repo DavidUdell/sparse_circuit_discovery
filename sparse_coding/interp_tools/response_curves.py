@@ -38,7 +38,19 @@ SEED = config.get("SEED")
 # dict[int, list[int]]. Use syntax for ablation dim pinning.
 PINNED_ABLATION_DIM = {3: [953]}
 PINNED_CACHE_DIM = {4: [7780]}
-COEFFICIENTS: list[float] = [0.0, 0.25, 0.5, 0.75, 1.0]
+COEFFICIENTS: list[float] = [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+]
 
 ABLATION_LAYER: int = list(PINNED_ABLATION_DIM.keys())[0]
 RANGE = range(
