@@ -3,6 +3,8 @@
 
 
 import warnings
+from collections import defaultdict
+
 import torch as t
 from accelerate import Accelerator
 from transformers import (
@@ -15,11 +17,11 @@ from sparse_coding.interp_tools.utils.hooks import (
     hooks_manager,
     prepare_autoencoder_and_indices,
 )
-
 from sparse_coding.utils.interface import (
     load_yaml_constants,
     parse_slice,
 )
+from sparse_coding.utils.tasks import recursive_defaultdict
 
 
 _, config = load_yaml_constants(__file__)
@@ -33,14 +35,14 @@ DECODER_FILE = config.get("DECODER_FILE")
 DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 SEED = config.get("SEED")
-# dict[int, list[int]]
-PINNED_ABLATION_DIM = {1: [1]}
-PINNED_CACHE_DIM = {2: [1]}
+# dict[int, list[int]]. Use syntax for ablation dim pinning.
+PINNED_ABLATION_DIM = {3: [1]}
+PINNED_CACHE_DIM = {4: [3]}
 COEFFICIENT: float = 0.0
 
 RANGE = range(
-    PINNED_ABLATION_DIM.keys()[0],
-    PINNED_CACHE_DIM.keys()[0],
+    list(PINNED_ABLATION_DIM.keys())[0],
+    list(PINNED_CACHE_DIM.keys())[0] + 1,
 )
 
 # %%
@@ -51,16 +53,12 @@ _ = t.manual_seed(SEED)
 # Load model, etc.
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
-    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-        MODEL_DIR
-    )
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_DIR
-)
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
 accelerator: Accelerator = Accelerator()
 
 # %%
-# Prepare relevant autoencoders.
+# Prepare relevant autoencoders and the prompt.
 layer_encoders, layer_dim_indices = prepare_autoencoder_and_indices(
     RANGE,
     MODEL_DIR,
@@ -80,3 +78,42 @@ layer_decoders, _ = prepare_autoencoder_and_indices(
     accelerator,
     __file__,
 )
+
+inputs = tokenizer(PROMPT, return_tensors="pt")
+
+# %%
+# Base case run.
+base_effects = recursive_defaultdict()
+
+with hooks_manager(
+    list(PINNED_ABLATION_DIM.keys())[0],
+    list(PINNED_ABLATION_DIM.values())[0][0],
+    RANGE,
+    PINNED_CACHE_DIM,
+    model,
+    layer_encoders,
+    layer_decoders,
+    base_effects,
+    ablate_during_run=False,
+):
+    _ = model(**inputs)
+
+# %%
+# Pinned case run.
+pinned_effects = recursive_defaultdict()
+
+with hooks_manager(
+    list(PINNED_ABLATION_DIM.keys())[0],
+    list(PINNED_ABLATION_DIM.values())[0][0],
+    RANGE,
+    PINNED_CACHE_DIM,
+    model,
+    layer_encoders,
+    layer_decoders,
+    pinned_effects,
+    ablate_during_run=True,
+):
+    _ = model(**inputs)
+
+# %%
+# Compute and print effect.
