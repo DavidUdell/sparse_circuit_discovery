@@ -130,7 +130,8 @@ def hooks_manager(
     Context manager for the full-scale ablations and caching.
 
     Ablates the specified feature at `layer_idx` and caches the downstream
-    effects.
+    effects. `coefficient` can be set for other multiplicative pinnings, apart
+    from ablation.
     """
 
     def ablate_hook_fac(
@@ -169,7 +170,8 @@ def hooks_manager(
             if coefficient == 0.0:
                 mask[:, :, dim_indices] = False
             else:
-                mask[:, :, dim_indices] = coefficient
+                mask = mask.float()
+                mask[:, :, dim_indices] *= coefficient
             ablated_acts = projected_acts * mask
 
             projected_acts = (

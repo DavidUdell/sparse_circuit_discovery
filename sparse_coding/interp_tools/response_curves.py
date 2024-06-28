@@ -35,8 +35,8 @@ DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 SEED = config.get("SEED")
 # dict[int, list[int]]. Use syntax for ablation dim pinning.
-PINNED_ABLATION_DIM = {3: [1]}
-PINNED_CACHE_DIM = {4: [3]}
+PINNED_ABLATION_DIM = {3: [953]}
+PINNED_CACHE_DIM = {4: [7780]}
 COEFFICIENT: float = 0.5
 
 ABLATION_LAYER: int = list(PINNED_ABLATION_DIM.keys())[0]
