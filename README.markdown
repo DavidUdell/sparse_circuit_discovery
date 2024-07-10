@@ -107,7 +107,7 @@ _Blue tokens_ in sequences in each box represent top feature activations in
 their contexts, to a specified length out to either side.
 
 _Blue and red tokens_ in individual boxes at the bottom are the logits most
-upweighted/downweighted by that ablation. (_Gray_ is the 0.0 effect edge case.)
+upweighted/downweighted by that dimension. (_Gray_ is the 0.0 effect edge case.)
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
 Red arrows represent downweighting, blue arrows represent upweighting, and
@@ -130,7 +130,7 @@ downweighting effect.
   repo.
 
 ## Project Status
-Current version is 1.0.2.
+Current version is 1.0.3.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.
