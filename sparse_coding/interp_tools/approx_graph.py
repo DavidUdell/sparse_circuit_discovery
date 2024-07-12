@@ -1,10 +1,40 @@
 # %%
 """A constant-time approximation of the causal graphing algorithm."""
 
+import warnings
 from collections import namedtuple
 
 import torch as t
+from accelerate import Accelerator
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+)
 
+from sparse_coding.utils.interface import load_yaml_constants
+
+
+# %%
+# Load constants.
+_, config = load_yaml_constants(__file__)
+
+MODEL_DIR = config.get("MODEL_DIR")
+SEED = config.get("SEED")
+
+# %%
+# Reproducibility.
+_ = t.manual_seed(SEED)
+
+# %%
+# Load and prepare the model.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+accelerator = Accelerator()
+model = accelerator.prepare(model)
 
 # %%
 # Function and classes.
@@ -73,3 +103,15 @@ def patch_act(
     total_effect = total_effect if total_effect is not None else None
 
     return EffectOut(effects, deltas, grads, total_effect)
+
+
+# %%
+# Run approximation on the model.
+patch_act(
+    None,
+    model,
+    model.transformer.h,
+    None,
+    None,
+    None,
+)
