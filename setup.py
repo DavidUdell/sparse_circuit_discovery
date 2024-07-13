@@ -19,6 +19,7 @@ setup(
         "jupyter",
         "lightning",
         "matplotlib",
+        "nnsight",
         "numpy",
         "pygraphviz",
         "pytest",
