@@ -2,13 +2,13 @@
 """A constant-time approximation of the causal graphing algorithm."""
 
 import warnings
-from collections import namedtuple
 
 from nnsight import LanguageModel
 import torch as t
 from accelerate import Accelerator
 from transformers import (
     AutoTokenizer,
+    AutoModelForCausalLM,
 )
 
 from sparse_coding.utils.interface import load_yaml_constants
@@ -36,33 +36,30 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
 accelerator = Accelerator()
 model = accelerator.prepare(model)
 
+
 # %%
-# Function and classes.
-EffectOut = namedtuple(
-    "EffectOut", ["effects", "deltas", "grads", "total_effect"]
-)
-
-
-def patch_act(
+# Approximation function.
+def approximate(
     base_model,
     sublayers,
 ):
     """Patch the activations of a model using its gradient."""
+    acts = {}
+    gradients = {}
 
     # Cache sublayer acts and gradients.
     with base_model.trace("The Eiddel Tower is in"):
         for sublayer in sublayers:
-            activation = sublayer.output.save()
+            activation = sublayer.output
             gradient = sublayer.output.grad
 
-    acts = {k: v.value for k, v in acts.items()}
-    gradients = {k: v.value for k, v in gradients.items()}
+            acts[f"{sublayer}"] = activation
+            gradients[f"{sublayer}"] = gradient
 
     hidden_states_patch = {
         k: {"act": t.zeros_like(v.act), "res": t.zeros_like(v.res)}
         for k, v in acts.items()
     }
-    total_effect = None
 
     effects = {}
     deltas = {}
@@ -81,14 +78,13 @@ def patch_act(
         effects[sublayer] = effect
         deltas[sublayer] = delta
         gradients[sublayer] = grad
-    total_effect = total_effect if total_effect is not None else None
 
-    return EffectOut(effects, deltas, gradients, total_effect)
+    return acts, gradients
 
 
 # %%
 # Run approximation on the model.
-patch_act(
+activations, grads = approximate(
     model,
     model.transformer.h,
 )
