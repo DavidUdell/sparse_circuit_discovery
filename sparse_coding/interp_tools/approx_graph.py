@@ -47,9 +47,19 @@ def approximate(
     acts = {}
     gradients = {}
 
+    # Address tuple sublayers, to ensure hooks can be registered.
+    sublayer_types = {}
+    with model.trace(" "):
+        for sublayer in sublayers:
+            sublayer_types[sublayer] = type(sublayer.output.shape)
+
+    print(sublayer_types.values())
     # Cache sublayer acts and gradients.
     with base_model.trace("The Eiddel Tower is in"):
         for sublayer in sublayers:
+            if isinstance(sublayer, tuple):
+                print("Sublayer is tuple.")
+                sublayer = sublayer[0]
             activation = sublayer.output
             gradient = sublayer.output.grad
 
