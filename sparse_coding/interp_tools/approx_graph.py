@@ -45,7 +45,7 @@ def approximate(
     """Patch the activations of a model using its gradient."""
     acts = {}
     baseline = {}
-    gradients = {}
+    gradients_dict = {}
 
     # Check all sublayer.output types.
     output_types = {}
@@ -67,34 +67,32 @@ def approximate(
 
             acts[f"{sublayer}"] = activation
             baseline[f"{sublayer}"] = t.zeros_like(activation)
-            gradients[f"{sublayer}"] = gradient
+            gradients_dict[f"{sublayer}"] = gradient
 
-    effects = {}
-    deltas = {}
+    effects_dict = {}
+    deltas_dict = {}
     for sublayer in sublayers:
         key: str = f"{sublayer}"
 
-        patch_state, clean_state, grad = (
+        base_state, changed_state, grad = (
             baseline[key],
             acts[key],
-            gradients[key],
+            gradients_dict[key],
         )
-        delta = (
-            patch_state - clean_state.detach()
-            if patch_state is not None
-            else -clean_state.detach()
-        )
-        effect = delta @ grad
-        effects[sublayer] = effect
-        deltas[sublayer] = delta
-        gradients[sublayer] = grad
 
-    return acts, gradients
+        delta = base_state - changed_state.detach()
+        effect = delta @ grad
+
+        effects_dict[key] = effect
+        deltas_dict[key] = delta
+        gradients_dict[key] = grad
+
+    return effects_dict, deltas_dict, gradients_dict
 
 
 # %%
 # Run approximation on the model.
-activations, grads = approximate(
+effects, deltas, gradients = approximate(
     model,
     model.transformer.h,
 )
