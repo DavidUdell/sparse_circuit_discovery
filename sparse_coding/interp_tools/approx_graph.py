@@ -15,6 +15,9 @@ _, config = load_yaml_constants(__file__)
 MODEL_DIR = config.get("MODEL_DIR")
 SEED = config.get("SEED")
 
+LAYER: int = 2
+PROMPT = "Copyright(C"
+
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
@@ -23,45 +26,20 @@ _ = t.manual_seed(SEED)
 # Load and prepare the model.
 wrapped_model = LanguageModel(MODEL_DIR, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+
+# Suppress horribly annoying usage warnings about NNSight's internals.
 logging.set_verbosity_error()
 
-with wrapped_model.trace("Copyright(C"):
+# %%
+# Approximate the causal effects.
+with wrapped_model.trace(PROMPT):
     # Proxy elements saved in the computational graph.
-    grad = wrapped_model.transformer.h[2].output[0].grad.save()
+    acts = wrapped_model.transformer.h[LAYER].output[0].detach().save()
     logits = wrapped_model.output.logits.save()
+    grad = wrapped_model.transformer.h[LAYER].output[0].grad.save()
 
     logits.sum().backward()
 
-print(logits.detach())
-print(grad)
-
-# %%
-# Approximation function.
-# def approximate(
-#     model,
-#     sublayers,
-# ):
-#     """Patch the activations of a model using its gradient."""
-#     acts = {}
-#     grads = {}
-
-#     # Check all sublayer.output types.
-#     with model.trace("The Eiffel Tower is in"):
-#         for sublayer in sublayers:
-#             acts[f"{sublayer}"] = sublayer.output[0].save()
-#             grads[f"{sublayer}"] = sublayer.output[0].grad.save()
-#         metric = t.nn.functional.l1_loss(model)
-#         metric.sum().backward()
-#     return acts, grads
-
-
-# # %%
-# # Run approximation on the model.
-# effects, gradients = approximate(
-#     wrapped_model,
-#     wrapped_model.transformer.h,
-# )
-
-# # Computations after inference.
-# for value in gradients.values():
-#     print(value)
+print(acts.shape)
+print(grad.shape)
+print((-acts * grad).shape)
