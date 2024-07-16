@@ -15,7 +15,8 @@ _, config = load_yaml_constants(__file__)
 MODEL_DIR = config.get("MODEL_DIR")
 SEED = config.get("SEED")
 
-LAYER: int = 2
+LAYER: int = 1
+TOP_K: int = 10
 PROMPT = "Copyright(C"
 
 # %%
@@ -33,13 +34,28 @@ logging.set_verbosity_error()
 # %%
 # Approximate the causal effects.
 with wrapped_model.trace(PROMPT):
-    # Proxy elements saved in the computational graph.
+    # Proxy elements in the computational graph all need to be saved.
     acts = wrapped_model.transformer.h[LAYER].output[0].detach().save()
+    grads = wrapped_model.transformer.h[LAYER].output[0].grad.save()
     logits = wrapped_model.output.logits.save()
-    grad = wrapped_model.transformer.h[LAYER].output[0].grad.save()
-
+    # Backwards pass occurs.
     logits.sum().backward()
 
-print(acts.shape)
-print(grad.shape)
-print((-acts * grad).shape)
+    approximation = (-acts * grads).save()
+
+final_pass_logits = approximation.squeeze(0)[-1, :]
+effects, indices = t.topk(final_pass_logits, TOP_K)
+
+plotted = t.sum(t.abs(effects)).item()
+total = t.sum(t.abs(final_pass_logits)).item()
+
+# %%
+# Print effects.
+print("Index", "Effect")
+print()
+for idx, effect in zip(indices, effects):
+    print(f"{idx.item()}:", round(effect.item(), None))
+
+print("\n")
+print("Plotted:")
+print(f"{round((plotted / total)*100.0, 2)}%")
