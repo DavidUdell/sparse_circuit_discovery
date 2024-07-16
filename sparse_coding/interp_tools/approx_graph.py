@@ -3,9 +3,7 @@
 
 from nnsight import LanguageModel
 import torch as t
-from transformers import (
-    AutoTokenizer,
-)
+from transformers import AutoTokenizer, logging
 
 from sparse_coding.utils.interface import load_yaml_constants
 
@@ -25,12 +23,17 @@ _ = t.manual_seed(SEED)
 # Load and prepare the model.
 wrapped_model = LanguageModel(MODEL_DIR, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+logging.set_verbosity_error()
 
-with wrapped_model.trace("Hello,") as model:
-    acts_1 = model.output[0].save()
-    grads_1 = model.output[0].grad.save()
-print(acts_1)
-print(grads_1)
+with wrapped_model.trace("Copyright(C"):
+    # Proxy elements saved in the computational graph.
+    grad = wrapped_model.transformer.h[2].output[0].grad.save()
+    logits = wrapped_model.output.logits.save()
+
+    logits.sum().backward()
+
+print(logits.detach())
+print(grad)
 
 # %%
 # Approximation function.
