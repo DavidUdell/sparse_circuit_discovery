@@ -1,5 +1,6 @@
 # %%
-"""A constant-time approximation of the causal graphing algorithm."""
+"""A constant-time causal graphing algorithm."""
+
 
 import torch as t
 from accelerate import Accelerator
@@ -36,7 +37,7 @@ THRESHOLD_EXP = config.get("THRESHOLD_EXP")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
-# Ensure THRESHOLD_EXP is behaving.
+# Ensures THRESHOLD_EXP will behave.
 if THRESHOLD_EXP is None:
     THRESHOLD_EXP = 0.0
 else:
