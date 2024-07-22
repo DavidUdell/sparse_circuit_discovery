@@ -315,7 +315,7 @@ def hooks_manager(
 
 
 @contextmanager
-def jacobian_hook(
+def jacobians_manager(
     upstream_layer_idx: int,
     model,
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
@@ -327,3 +327,21 @@ def jacobian_hook(
     For the time being, only residual stream autoencoders are supported. This
     will be generalized to include attn_out and mlp_out later.
     """
+
+    def jacobian_hook_fac(
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        decoder: t.Tensor,
+        dec_biases: t.Tensor,
+    ):
+        """
+        Create hooks that interfere with gradients to get proper jacobians.
+        """
+
+        def jacobian_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """
+            Splice zero tensors into a forward pass; divert them out; call a
+            torch Jacobian method on them.
+            """
