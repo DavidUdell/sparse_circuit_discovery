@@ -312,3 +312,13 @@ def hooks_manager(
         cache_hook_handle.remove()
         if ablate_during_run:
             ablate_hook_handle.remove()
+
+
+@contextmanager
+def jacobian_hook(
+    upstream_layer_idx: int,
+    model,
+    enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+) -> defaultdict:
+    """Context manager for Jacobian-hooking forwards."""
