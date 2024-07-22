@@ -321,4 +321,9 @@ def jacobian_hook(
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
 ) -> defaultdict:
-    """Context manager for Jacobian-hooking forwards."""
+    """
+    Context manager for Jacobian-hooking forward passes.
+
+    For the time being, only residual stream autoencoders are supported. This
+    will be generalized to include attn_out and mlp_out later.
+    """
