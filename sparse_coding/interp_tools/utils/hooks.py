@@ -3,6 +3,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
+from typing import Generator
 
 import numpy as np
 import torch as t
@@ -321,7 +322,7 @@ def jacobians_manager(
     model,
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
-) -> defaultdict:
+) -> Generator[defaultdict, None, None]:
     """
     Context manager for Jacobian-hooking forward passes.
 
