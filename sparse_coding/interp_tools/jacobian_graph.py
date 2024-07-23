@@ -15,6 +15,10 @@ from sparse_coding.utils.interface import (
     parse_slice,
     slice_to_range,
 )
+from sparse_coding.interp_tools.utils.hooks import (
+    jacobians_manager,
+    prepare_autoencoder_and_indices,
+)
 
 
 # %%
@@ -65,4 +69,37 @@ model = accelerator.prepare(model)
 layer_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
+# Prepare all layer range autoencoders.
+encoders_and_biases, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    ENCODER_FILE,
+    ENC_BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
+decoders_and_biases, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    DECODER_FILE,
+    DEC_BIASES_FILE,
+    TOP_K_INFO_FILE,
+    accelerator,
+    __file__,
+)
+
+# %%
 # Forward pass with Jacobian hooks.
+inputs = tokenizer(PROMPT, return_tensors="pt")
+# `jacobians` will be overwritten by the context manager's value.
+jacobians = {}
+print(layer_range[0])
+with jacobians_manager(
+    layer_range[0],
+    model,
+    encoders_and_biases,
+    decoders_and_biases,
+) as jacobians_dict:
+    _ = model(**inputs)
+    jacobians = jacobians_dict

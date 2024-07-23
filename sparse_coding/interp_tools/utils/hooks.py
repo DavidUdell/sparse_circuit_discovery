@@ -322,7 +322,7 @@ def jacobians_manager(
     model,
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
-) -> Generator[defaultdict, None, None]:
+):
     """
     Context manager for Jacobian-hooking forward passes.
 
