@@ -91,10 +91,10 @@ decoders_and_biases, _ = prepare_autoencoder_and_indices(
 
 # %%
 # Forward pass with Jacobian hooks.
-inputs = tokenizer(PROMPT, return_tensors="pt")
+inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 # `jacobians` will be overwritten by the context manager's value.
 jacobians = {}
-print(layer_range[0])
+
 with jacobians_manager(
     layer_range[0],
     model,
@@ -103,3 +103,7 @@ with jacobians_manager(
 ) as jacobians_dict:
     _ = model(**inputs)
     jacobians = jacobians_dict
+
+# %%
+# Print jacobians.
+print(jacobians[3])
