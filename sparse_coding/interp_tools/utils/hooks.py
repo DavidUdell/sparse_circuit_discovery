@@ -11,6 +11,7 @@ from sparse_coding.utils.interface import (
     load_layer_tensors,
     load_layer_feature_indices,
 )
+from sparse_coding.utils.tasks import recursive_defaultdict
 
 
 def prepare_autoencoder_and_indices(
@@ -327,8 +328,9 @@ def jacobians_manager(
     For the time being, only residual stream autoencoders are supported. This
     will be generalized to include attn_out and mlp_out later.
     """
+    jac_dict: defaultdict = recursive_defaultdict()
 
-    def jacobian_hook_fac(
+    def splice_hook_fac(
         encoder: t.Tensor,
         enc_biases: t.Tensor,
         decoder: t.Tensor,
@@ -338,7 +340,7 @@ def jacobians_manager(
         Create hooks that interfere with gradients to get proper jacobians.
         """
 
-        def jacobian_hook(  # pylint: disable=unused-argument, redefined-builtin
+        def splice_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
         ) -> None:
             """
@@ -374,3 +376,68 @@ def jacobians_manager(
             )
 
             return (replaced_acts, output[1])
+
+        return splice_hook
+
+    def divert_hook_fac(
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        dec_biases: t.Tensor,
+    ):
+        """
+        Create the downstream hook that computes and caches the Jacobian.
+        """
+
+        def divert_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """
+            Divert the spliced acts tensor; call a torch Jacobian method on it;
+            put the Jacobian in a returned defaultdict with key data.
+            """
+
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    output[0] - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
+            )
+
+            jacobian = t.func.jacrev(
+                module,
+                output[0],
+            )
+            jac_dict[upstream_layer_idx] = jacobian
+
+        return divert_hook
+
+    splice_encoder, splice_enc_bias = enc_tensors_per_layer[upstream_layer_idx]
+    splice_decoder, splice_dec_bias = dec_tensors_per_layer[upstream_layer_idx]
+    splice_hook_handle = model.transformer.h[
+        upstream_layer_idx
+    ].register_forward_hook(
+        splice_hook_fac(
+            splice_encoder, splice_enc_bias, splice_decoder, splice_dec_bias
+        )
+    )
+
+    divert_encoder, divert_enc_bias = enc_tensors_per_layer[
+        upstream_layer_idx + 1
+    ]
+    _, divert_dec_bias = dec_tensors_per_layer[upstream_layer_idx + 1]
+    divert_hook_handle = model.transformer.h[
+        upstream_layer_idx + 1
+    ].register_forward_hook(
+        divert_hook_fac(divert_encoder, divert_enc_bias, divert_dec_bias)
+    )
+
+    try:
+        yield jac_dict
+    finally:
+        splice_hook_handle.remove()
+        divert_hook_handle.remove()
