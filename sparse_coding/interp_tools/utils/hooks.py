@@ -345,3 +345,32 @@ def jacobians_manager(
             Splice zero tensors into a forward pass; divert them out; call a
             torch Jacobian method on them.
             """
+
+            # Project activations through the encoder. Bias usage corresponds
+            # to JBloom's.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    output[0] - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
+            )
+
+            # Splice zero vector into the forward-pass gradient tracking.
+            zero_tensor = t.zeros_like(projected_acts).to(model.device)
+            projected_acts.detach()
+            replaced_acts = zero_tensor + projected_acts
+
+            replaced_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    replaced_acts,
+                    decoder.T.to(model.device),
+                    bias=dec_biases.to(model.device),
+                )
+            )
+
+            return (replaced_acts, output[1])
