@@ -385,6 +385,7 @@ def jacobians_manager(
 
             # Project activations through the encoder. Bias usage corresponds
             # to JBloom's.
+            print("Splicing.")
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0] - dec_biases.to(model.device),
@@ -432,7 +433,7 @@ def jacobians_manager(
             Divert the spliced acts tensor; call a torch Jacobian method on it;
             put the Jacobian in a returned defaultdict with key data.
             """
-
+            print("Diverting.")
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0] - dec_biases.to(model.device),
@@ -446,7 +447,7 @@ def jacobians_manager(
             )
 
             differentiable_mod = composite_module(module)
-            jacobian = t.func.jacrev(differentiable_mod)(projected_acts)
+            jacobian = t.func.jacfwd(differentiable_mod)(projected_acts)
             jac_dict[upstream_layer_idx] = jacobian
 
         return divert_hook
