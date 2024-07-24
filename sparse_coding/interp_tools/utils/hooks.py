@@ -333,36 +333,33 @@ def jacobians_manager(
     def composite_module(current_module: t.nn.Module) -> t.nn.Sequential:
         """The relevant torch modules, composed."""
 
+        class MinusBias(t.nn.Module):
+            """Subtract a bias from an input tensor."""
+
+            def __init__(self, bias: t.Tensor):
+                super().__init__()
+
+                self.bias = bias
+
+            def forward(self, x: t.Tensor) -> t.Tensor:
+                """Just subtract the bias from the input tensor."""
+
+                return x - self.bias
+
         decoder_1, dec_bias_1 = dec_tensors_per_layer[upstream_layer_idx]
+        _, dec_bias_2 = dec_tensors_per_layer[upstream_layer_idx + 1]
         encoder_2, enc_bias_2 = enc_tensors_per_layer[upstream_layer_idx + 1]
 
         composed_mod = t.nn.Sequential(
             t.nn.Linear(decoder_1.shape[1], decoder_1.shape[0]),
             current_module,
-            # Constant bias.
+            MinusBias(dec_bias_2),
             t.nn.Linear(encoder_2.shape[1], encoder_2.shape[0]),
             t.nn.ReLU(inplace=True),
         )
 
         composed_mod[0].weight, composed_mod[0].bias = decoder_1.T, dec_bias_1
         composed_mod[2].weight, composed_mod[2].bias = encoder_2.T, enc_bias_2
-
-        #     t.nn.functional.linear(  # pylint: disable=not-callable
-        #         replaced_acts,
-        #         decoder.T.to(model.device),
-        #         bias=dec_biases.to(model.device),
-        #     ),
-        #     current_module,
-        #     t.nn.functional.linear(  # pylint: disable=not-callable
-        #         output[0] - dec_biases.to(model.device),
-        #         encoder.T.to(model.device),
-        #         bias=enc_biases.to(model.device),
-        #     ).to(model.device),
-        #     t.nn.functional.relu(
-        #         projected_acts,
-        #         inplace=True,
-        #     ),
-        # )
 
         return composed_mod
 
@@ -445,7 +442,9 @@ def jacobians_manager(
                 projected_acts,
                 inplace=True,
             )
-            jacobian = t.func.jacrev(module)(projected_acts)
+
+            differentiable_mod = composite_module(module)
+            jacobian = t.func.jacrev(differentiable_mod)(projected_acts)
             jac_dict[upstream_layer_idx] = jacobian
 
         return divert_hook
