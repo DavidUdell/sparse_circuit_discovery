@@ -358,8 +358,10 @@ def jacobians_manager(
             t.nn.ReLU(inplace=True),
         )
 
-        composed_mod[0].weight, composed_mod[0].bias = decoder_1.T, dec_bias_1
-        composed_mod[2].weight, composed_mod[2].bias = encoder_2.T, enc_bias_2
+        composed_mod[0].weight = t.nn.Parameter(decoder_1.T)
+        composed_mod[0].bias = t.nn.Parameter(dec_bias_1)
+        composed_mod[2].weight = t.nn.Parameter(encoder_2.T)
+        composed_mod[2].bias = t.nn.Parameter(enc_bias_2)
 
         return composed_mod
 
