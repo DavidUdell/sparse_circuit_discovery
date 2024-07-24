@@ -12,7 +12,6 @@ from sparse_coding.utils.interface import (
     load_layer_tensors,
     load_layer_feature_indices,
 )
-from sparse_coding.utils.tasks import recursive_defaultdict
 
 
 def prepare_autoencoder_and_indices(
@@ -322,14 +321,14 @@ def jacobians_manager(
     model,
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
-):
+) -> Generator[dict, None, None]:
     """
     Context manager for Jacobian-hooking forward passes.
 
     For the time being, only residual stream autoencoders are supported. This
     will be generalized to include attn_out and mlp_out later.
     """
-    jac_dict: defaultdict = recursive_defaultdict()
+    jac_dict: dict = {}
 
     def splice_hook_fac(
         encoder: t.Tensor,
@@ -364,7 +363,9 @@ def jacobians_manager(
             )
 
             # Splice zero vector into the forward-pass gradient tracking.
-            zero_tensor = t.zeros_like(projected_acts).to(model.device)
+            zero_tensor = t.zeros_like(projected_acts, requires_grad=True).to(
+                model.device
+            )
             projected_acts.detach()
             replaced_acts = zero_tensor + projected_acts
 
@@ -408,11 +409,7 @@ def jacobians_manager(
                 projected_acts,
                 inplace=True,
             )
-
-            jacobian = t.func.jacrev(
-                module,
-                output[0],
-            )
+            jacobian = t.func.jacrev(module)(projected_acts)
             jac_dict[upstream_layer_idx] = jacobian
 
         return divert_hook

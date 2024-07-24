@@ -103,7 +103,7 @@ with jacobians_manager(
 ) as jacobians_dict:
     _ = model(**inputs)
     jacobians = jacobians_dict
+    print(jacobians[layer_range[0]])
 
 # %%
 # Print jacobians.
-print(jacobians[3])
