@@ -333,35 +333,39 @@ def jacobians_manager(
     def composite_module(current_module: t.nn.Module) -> t.nn.Sequential:
         """The relevant torch modules, composed."""
 
-        class MinusBias(t.nn.Module):
+        class OffsetBy(t.nn.Module):
             """Subtract a bias from an input tensor."""
 
             def __init__(self, bias: t.Tensor):
                 super().__init__()
 
                 self.bias = bias
+                print("Registered bias shape:", self.bias.shape)
 
             def forward(self, x: t.Tensor) -> t.Tensor:
                 """Just subtract the bias from the input tensor."""
 
-                return x - self.bias
+                return x[0] - self.bias
 
         decoder_1, dec_bias_1 = dec_tensors_per_layer[upstream_layer_idx]
         _, dec_bias_2 = dec_tensors_per_layer[upstream_layer_idx + 1]
         encoder_2, enc_bias_2 = enc_tensors_per_layer[upstream_layer_idx + 1]
 
+        # Recreates forward-pass section.
         composed_mod = t.nn.Sequential(
             t.nn.Linear(decoder_1.shape[1], decoder_1.shape[0]),
             current_module,
-            MinusBias(dec_bias_2),
+            OffsetBy(dec_bias_2),
             t.nn.Linear(encoder_2.shape[1], encoder_2.shape[0]),
             t.nn.ReLU(inplace=True),
         )
 
+        # Assign weight and bias tensors to submodules.
         composed_mod[0].weight = t.nn.Parameter(decoder_1.T)
         composed_mod[0].bias = t.nn.Parameter(dec_bias_1)
-        composed_mod[2].weight = t.nn.Parameter(encoder_2.T)
-        composed_mod[2].bias = t.nn.Parameter(enc_bias_2)
+
+        composed_mod[3].weight = t.nn.Parameter(encoder_2.T)
+        composed_mod[3].bias = t.nn.Parameter(enc_bias_2)
 
         return composed_mod
 
@@ -385,7 +389,6 @@ def jacobians_manager(
 
             # Project activations through the encoder. Bias usage corresponds
             # to JBloom's.
-            print("Splicing.")
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0] - dec_biases.to(model.device),
@@ -433,7 +436,6 @@ def jacobians_manager(
             Divert the spliced acts tensor; call a torch Jacobian method on it;
             put the Jacobian in a returned defaultdict with key data.
             """
-            print("Diverting.")
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     output[0] - dec_biases.to(model.device),
@@ -447,8 +449,8 @@ def jacobians_manager(
             )
 
             differentiable_mod = composite_module(module)
-            jacobian = t.func.jacfwd(differentiable_mod)(projected_acts)
-            jac_dict[upstream_layer_idx] = jacobian
+            jacobian = t.func.jacrev(differentiable_mod)
+            jac_dict[upstream_layer_idx] = (jacobian, projected_acts)
 
         return divert_hook
 
