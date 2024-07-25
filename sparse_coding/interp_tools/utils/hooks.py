@@ -340,7 +340,6 @@ def jacobians_manager(
                 super().__init__()
 
                 self.bias = bias
-                print("Registered bias shape:", self.bias.shape)
 
             def forward(self, x: t.Tensor) -> t.Tensor:
                 """Just subtract the bias from the input tensor."""
@@ -449,8 +448,10 @@ def jacobians_manager(
             )
 
             differentiable_mod = composite_module(module)
+            # Functional. Note that a `chunk_size` can be set here other than
+            # the full tensor.
             jacobian = t.func.jacrev(differentiable_mod)
-            jac_dict[upstream_layer_idx] = (jacobian, projected_acts)
+            jac_dict[upstream_layer_idx] = (jacobian, projected_acts.detach())
 
         return divert_hook
 
