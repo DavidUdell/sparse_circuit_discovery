@@ -114,3 +114,9 @@ jacobian = jacobian.squeeze()
 
 # %%
 # Reduce Jacobian to directed graph.
+flat_jac = t.flatten(jacobian)
+pos_values, pos_indices = t.topk(flat_jac, 100)
+neg_values, neg_indices = t.topk(flat_jac, 100, largest=False)
+
+print(pos_indices[:10].tolist())
+print(neg_indices[:10].tolist())
