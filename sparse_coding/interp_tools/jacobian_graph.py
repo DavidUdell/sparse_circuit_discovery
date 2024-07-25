@@ -105,9 +105,12 @@ with jacobians_manager(
     jac_func_and_point = func_and_point
 
 # %%
-# Compute and print Jacobian.
+# Compute Jacobian.
 mod_jac_func, act = jac_func_and_point[layer_range[0]]
 act = act[:, -1, :].unsqueeze(0)
 
 jacobian = mod_jac_func(act)
-print(jacobian)
+jacobian = jacobian.squeeze()
+
+# %%
+# Reduce Jacobian to directed graph.
