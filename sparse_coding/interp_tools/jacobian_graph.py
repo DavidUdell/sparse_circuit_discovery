@@ -42,15 +42,8 @@ DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
 JACOBIANS_FILE = config.get("JACOBIANS_FILE")
 JACOBIANS_DOT_FILE = config.get("JACOBIANS_DOT_FILE")
-THRESHOLD_EXP = config.get("THRESHOLD_EXP")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
-
-# Ensures THRESHOLD_EXP will behave.
-if THRESHOLD_EXP is None:
-    THRESHOLD = 0.0
-else:
-    THRESHOLD = 2.0**THRESHOLD_EXP
 
 # %%
 # Reproducibility.
@@ -150,33 +143,23 @@ neg_values, neg_indices = t.topk(flat_jac, 10, largest=False)
 color_max_scalar = pos_values.max().item()
 color_min_scalar = neg_values.min().item()
 
-for i, v in zip(pos_indices, pos_values):
-    print(
-        f"({i.item() % row_length} -> {i.item() // row_length}):",
-        round(v.item(), 2),
-    )
-print()
-for i, v in zip(neg_indices, neg_values):
-    print(
-        f"({i.item() % row_length} -> {i.item() // row_length}):",
-        round(v.item(), 2),
-    )
-
 # %%
 # Populate graph.
-for i, v in zip(pos_indices, pos_values):
-    effect: float = v.item()
+indices = pos_indices.tolist() + neg_indices.tolist()
+values = pos_values.tolist() + neg_values.tolist()
+
+for i, effect in zip(indices, values):
     magnitude = abs(effect)
     total_effect += magnitude
 
-    if magnitude < THRESHOLD or 0.0 == effect:
+    if 0.0 == effect:
         print("Item skipped.")
         continue
 
     graphed_effect += magnitude
     # Upper index is mod row_length; downstream index is floor row_length.
-    up_dim_idx = i.item() % row_length
-    down_dim_idx = i.item() // row_length
+    up_dim_idx = i % row_length
+    down_dim_idx = i // row_length
 
     graph.add_node(
         f"{up_layer_idx}.{up_dim_idx}",
@@ -188,7 +171,7 @@ for i, v in zip(pos_indices, pos_values):
             0,
             tokenizer,
             f"{up_layer_idx}.{up_dim_idx}",
-            None,
+            {},
             __file__,
         ),
         shape="box",
@@ -204,7 +187,7 @@ for i, v in zip(pos_indices, pos_values):
             0,
             tokenizer,
             f"{up_layer_idx + 1}.{down_dim_idx}",
-            None,
+            {},
             __file__,
         ),
         shape="box",
@@ -258,5 +241,5 @@ wandb.log_artifact(artifact)
 print(f"Graph saved to {save_graph_path}")
 
 # %%
-# Wrap up wandb logging.
+# End wandb logging.
 wandb.finish()
