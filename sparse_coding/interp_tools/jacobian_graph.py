@@ -159,7 +159,6 @@ for i, effect in zip(indices, values):
         print("Item skipped.")
         continue
 
-    graphed_effect += magnitude
     # Upper index is mod row_length; downstream index is floor row_length.
     up_dim_idx = i % row_length
     down_dim_idx = i // row_length
@@ -201,6 +200,8 @@ for i, effect in zip(indices, values):
         )
         continue
 
+    graphed_effect += magnitude
+
     if effect > 0.0:
         red, blue = 0, 255
     elif effect < 0.0:
@@ -216,6 +217,7 @@ for i, effect in zip(indices, values):
         f"{up_layer_idx}.{up_dim_idx}",
         f"{up_layer_idx + 1}.{down_dim_idx}",
         color=rgba_str,
+        arrowsize=1.5,
     )
 
 # %%
