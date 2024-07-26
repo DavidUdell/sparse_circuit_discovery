@@ -203,16 +203,16 @@ for i, effect in zip(indices, values):
     graphed_effect += magnitude
 
     if effect > 0.0:
-        red, blue = 0, 255
+        red, green = 0, 255
     elif effect < 0.0:
-        red, blue = 255, 0
+        red, green = 255, 0
     else:
         raise ValueError("Should be unreachable.")
 
     alpha: int = int(
         255 * magnitude / max(abs(color_max_scalar), abs(color_min_scalar))
     )
-    rgba_str: str = f"#{red:02X}00{blue:02X}{alpha:02X}"
+    rgba_str: str = f"#{red:02X}{green:02X}00{alpha:02X}"
     graph.add_edge(
         f"{up_layer_idx}.{up_dim_idx}",
         f"{up_layer_idx + 1}.{down_dim_idx}",
