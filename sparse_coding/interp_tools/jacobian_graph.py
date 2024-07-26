@@ -101,8 +101,6 @@ save_dot_path: str = save_paths(
     __file__, f"{sanitize_model_name(MODEL_DIR)}/{JACOBIANS_DOT_FILE}"
 )
 
-total_effect: float = 0.0
-graphed_effect: float = 0.0
 
 # %%
 # Forward pass with Jacobian hooks.
@@ -137,6 +135,10 @@ row_length: int = jacobian.shape[0]
 act = act.squeeze(0)
 jacobian = jacobian * act
 
+# Total effect computed here.
+total_effect: float = t.sum(t.abs(jacobian)).item()
+graphed_effect: float = 0.0
+
 # %%
 # Reduce Jacobian to directed graph.
 flat_jac = t.flatten(jacobian)
@@ -153,11 +155,12 @@ values = pos_values.tolist() + neg_values.tolist()
 
 for i, effect in zip(indices, values):
     magnitude = abs(effect)
-    total_effect += magnitude
 
     if 0.0 == effect:
         print("Item skipped.")
         continue
+
+    graphed_effect += magnitude
 
     # Upper index is mod row_length; downstream index is floor row_length.
     up_dim_idx = i % row_length
@@ -205,8 +208,6 @@ for i, effect in zip(indices, values):
         label += "</b></font></td></tr></table>>"
 
         graph.add_node(down_node_name, label=label, shape="box")
-
-    graphed_effect += magnitude
 
     if effect > 0.0:
         red, green = 0, 255
