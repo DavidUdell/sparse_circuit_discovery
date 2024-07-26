@@ -106,17 +106,28 @@ with jacobians_manager(
 
 # %%
 # Compute Jacobian.
-mod_jac_func, act = jac_func_and_point[layer_range[0]]
+jac_function, act = jac_func_and_point[layer_range[0]]
 act = act[:, -1, :].unsqueeze(0)
 
-jacobian = mod_jac_func(act)
+jacobian = jac_function(act)
 jacobian = jacobian.squeeze()
 
 # %%
 # Reduce Jacobian to directed graph.
-flat_jac = t.flatten(jacobian)
-pos_values, pos_indices = t.topk(flat_jac, 100)
-neg_values, neg_indices = t.topk(flat_jac, 100, largest=False)
+row_length: int = jacobian.shape[0]
 
-print(pos_indices[:10].tolist())
-print(neg_indices[:10].tolist())
+flat_jac = t.flatten(jacobian)
+pos_values, pos_indices = t.topk(flat_jac, 10)
+neg_values, neg_indices = t.topk(flat_jac, 10, largest=False)
+
+for i, v in zip(pos_indices, pos_values):
+    print(
+        f"({i.item() % row_length} -> {i.item() // row_length}):",
+        round(v.item(), 2),
+    )
+print()
+for i, v in zip(neg_indices, neg_values):
+    print(
+        f"({i.item() % row_length} -> {i.item() // row_length}):",
+        round(v.item(), 2),
+    )
