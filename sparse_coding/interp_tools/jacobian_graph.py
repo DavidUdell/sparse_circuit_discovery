@@ -162,9 +162,11 @@ for i, effect in zip(indices, values):
     # Upper index is mod row_length; downstream index is floor row_length.
     up_dim_idx = i % row_length
     down_dim_idx = i // row_length
+    up_node_name: str = f"{up_layer_idx}.{up_dim_idx}"
+    down_node_name: str = f"{up_layer_idx + 1}.{down_dim_idx}"
 
     graph.add_node(
-        f"{up_layer_idx}.{up_dim_idx}",
+        up_node_name,
         label=label_highlighting(
             up_layer_idx,
             up_dim_idx,
@@ -172,7 +174,7 @@ for i, effect in zip(indices, values):
             TOP_K_INFO_FILE,
             0,
             tokenizer,
-            f"{up_layer_idx}.{up_dim_idx}",
+            up_node_name,
             {},
             __file__,
         ),
@@ -180,7 +182,7 @@ for i, effect in zip(indices, values):
     )
     try:
         graph.add_node(
-            f"{up_layer_idx + 1}.{down_dim_idx}",
+            down_node_name,
             label=label_highlighting(
                 up_layer_idx + 1,
                 down_dim_idx,
@@ -188,17 +190,21 @@ for i, effect in zip(indices, values):
                 TOP_K_INFO_FILE,
                 0,
                 tokenizer,
-                f"{up_layer_idx + 1}.{down_dim_idx}",
+                down_node_name,
                 {},
                 __file__,
             ),
             shape="box",
         )
     except ValueError:
-        print(
-            f"Node {up_layer_idx + 1}.{down_dim_idx} not recognized; skipped."
-        )
-        continue
+        print(f"Node {down_node_name} not recognized; plotting bare.")
+
+        label: str = '<<table border="0" cellborder="0" cellspacing="0">'
+        label += '<tr><td><font point-size="16"><b>'
+        label += down_node_name
+        label += "</b></font></td></tr></table>>"
+
+        graph.add_node(down_node_name, label=label, shape="box")
 
     graphed_effect += magnitude
 
@@ -214,8 +220,8 @@ for i, effect in zip(indices, values):
     )
     rgba_str: str = f"#{red:02X}{green:02X}00{alpha:02X}"
     graph.add_edge(
-        f"{up_layer_idx}.{up_dim_idx}",
-        f"{up_layer_idx + 1}.{down_dim_idx}",
+        up_node_name,
+        down_node_name,
         color=rgba_str,
         arrowsize=1.5,
     )
