@@ -4,6 +4,7 @@
 
 import torch as t
 from accelerate import Accelerator
+from pygraphviz import AGraph
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -11,8 +12,11 @@ from transformers import (
 import wandb
 
 from sparse_coding.utils.interface import (
+    load_preexisting_graph,
     load_yaml_constants,
     parse_slice,
+    sanitize_model_name,
+    save_paths,
     slice_to_range,
 )
 from sparse_coding.interp_tools.utils.hooks import (
@@ -90,7 +94,27 @@ decoders_and_biases, _ = prepare_autoencoder_and_indices(
 )
 
 # %%
+# Load preexisting graph, if available.
+graph = load_preexisting_graph(MODEL_DIR, JACOBIANS_DOT_FILE, __file__)
+if graph is None:
+    graph = AGraph(directed=True)
+
+save_graph_path: str = save_paths(
+    __file__, f"{sanitize_model_name(MODEL_DIR)}/{JACOBIANS_FILE}"
+)
+save_dot_path: str = save_paths(
+    __file__, f"{sanitize_model_name(MODEL_DIR)}/{JACOBIANS_DOT_FILE}"
+)
+
+total_effect: float = 0.0
+graphed_effect: float = 0.0
+
+# %%
 # Forward pass with Jacobian hooks.
+print("Prompt:")
+print()
+print(PROMPT)
+
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 jac_func_and_point = {}
 
