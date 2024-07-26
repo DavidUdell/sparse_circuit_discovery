@@ -130,15 +130,18 @@ act = act[:, -1, :].unsqueeze(0)
 
 jacobian = jac_function(act)
 jacobian = jacobian.squeeze()
+row_length: int = jacobian.shape[0]
+
+# Weight raw Jacobian by the activations, to get an approximation for this
+# forward pass.
+act = act.squeeze(0)
+jacobian = jacobian * act
 
 # %%
 # Reduce Jacobian to directed graph.
-row_length: int = jacobian.shape[0]
-
 flat_jac = t.flatten(jacobian)
 pos_values, pos_indices = t.topk(flat_jac, 10)
 neg_values, neg_indices = t.topk(flat_jac, 10, largest=False)
-
 # Color range scalars for later labeling.
 color_max_scalar = pos_values.max().item()
 color_min_scalar = neg_values.min().item()
@@ -176,22 +179,27 @@ for i, effect in zip(indices, values):
         ),
         shape="box",
     )
-
-    graph.add_node(
-        f"{up_layer_idx + 1}.{down_dim_idx}",
-        label=label_highlighting(
-            up_layer_idx + 1,
-            down_dim_idx,
-            MODEL_DIR,
-            TOP_K_INFO_FILE,
-            0,
-            tokenizer,
+    try:
+        graph.add_node(
             f"{up_layer_idx + 1}.{down_dim_idx}",
-            {},
-            __file__,
-        ),
-        shape="box",
-    )
+            label=label_highlighting(
+                up_layer_idx + 1,
+                down_dim_idx,
+                MODEL_DIR,
+                TOP_K_INFO_FILE,
+                0,
+                tokenizer,
+                f"{up_layer_idx + 1}.{down_dim_idx}",
+                {},
+                __file__,
+            ),
+            shape="box",
+        )
+    except ValueError:
+        print(
+            f"Node {up_layer_idx + 1}.{down_dim_idx} not recognized; skipped."
+        )
+        continue
 
     if effect > 0.0:
         red, blue = 0, 255
