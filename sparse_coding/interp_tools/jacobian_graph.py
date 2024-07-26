@@ -11,6 +11,7 @@ from transformers import (
 )
 import wandb
 
+from sparse_coding.interp_tools.utils.graphs import label_highlighting
 from sparse_coding.utils.interface import (
     load_preexisting_graph,
     load_yaml_constants,
@@ -47,9 +48,9 @@ SEED = config.get("SEED")
 
 # Ensures THRESHOLD_EXP will behave.
 if THRESHOLD_EXP is None:
-    THRESHOLD_EXP = 0.0
+    THRESHOLD = 0.0
 else:
-    THRESHOLD_EXP = 2.0**THRESHOLD_EXP
+    THRESHOLD = 2.0**THRESHOLD_EXP
 
 # %%
 # Reproducibility.
@@ -71,6 +72,7 @@ accelerator: Accelerator = Accelerator()
 
 model = accelerator.prepare(model)
 layer_range = slice_to_range(model, ACTS_LAYERS_SLICE)
+up_layer_idx = layer_range[0]
 
 # %%
 # Prepare all layer range autoencoders.
@@ -119,7 +121,7 @@ inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 jac_func_and_point = {}
 
 with jacobians_manager(
-    layer_range[0],
+    up_layer_idx,
     model,
     encoders_and_biases,
     decoders_and_biases,
@@ -130,7 +132,7 @@ with jacobians_manager(
 
 # %%
 # Compute Jacobian.
-jac_function, act = jac_func_and_point[layer_range[0]]
+jac_function, act = jac_func_and_point[up_layer_idx]
 act = act[:, -1, :].unsqueeze(0)
 
 jacobian = jac_function(act)
@@ -144,6 +146,10 @@ flat_jac = t.flatten(jacobian)
 pos_values, pos_indices = t.topk(flat_jac, 10)
 neg_values, neg_indices = t.topk(flat_jac, 10, largest=False)
 
+# Color range scalars for later labeling.
+color_max_scalar = pos_values.max().item()
+color_min_scalar = neg_values.min().item()
+
 for i, v in zip(pos_indices, pos_values):
     print(
         f"({i.item() % row_length} -> {i.item() // row_length}):",
@@ -155,3 +161,102 @@ for i, v in zip(neg_indices, neg_values):
         f"({i.item() % row_length} -> {i.item() // row_length}):",
         round(v.item(), 2),
     )
+
+# %%
+# Populate graph.
+for i, v in zip(pos_indices, pos_values):
+    effect: float = v.item()
+    magnitude = abs(effect)
+    total_effect += magnitude
+
+    if magnitude < THRESHOLD or 0.0 == effect:
+        print("Item skipped.")
+        continue
+
+    graphed_effect += magnitude
+    # Upper index is mod row_length; downstream index is floor row_length.
+    up_dim_idx = i.item() % row_length
+    down_dim_idx = i.item() // row_length
+
+    graph.add_node(
+        f"{up_layer_idx}.{up_dim_idx}",
+        label=label_highlighting(
+            up_layer_idx,
+            up_dim_idx,
+            MODEL_DIR,
+            TOP_K_INFO_FILE,
+            0,
+            tokenizer,
+            f"{up_layer_idx}.{up_dim_idx}",
+            None,
+            __file__,
+        ),
+        shape="box",
+    )
+
+    graph.add_node(
+        f"{up_layer_idx + 1}.{down_dim_idx}",
+        label=label_highlighting(
+            up_layer_idx + 1,
+            down_dim_idx,
+            MODEL_DIR,
+            TOP_K_INFO_FILE,
+            0,
+            tokenizer,
+            f"{up_layer_idx + 1}.{down_dim_idx}",
+            None,
+            __file__,
+        ),
+        shape="box",
+    )
+
+    if effect > 0.0:
+        red, blue = 0, 255
+    elif effect < 0.0:
+        red, blue = 255, 0
+    else:
+        raise ValueError("Should be unreachable.")
+
+    alpha: int = int(
+        255 * magnitude / max(abs(color_max_scalar), abs(color_min_scalar))
+    )
+    rgba_str: str = f"#{red:02X}00{blue:02X}{alpha:02X}"
+    graph.add_edge(
+        f"{up_layer_idx}.{up_dim_idx}",
+        f"{up_layer_idx + 1}.{down_dim_idx}",
+        color=rgba_str,
+    )
+
+# %%
+# Graph cleanup.
+edges = graph.edges()
+
+assert len(edges) == len(set(edges))
+
+unlinked_nodes: int = 0
+for node in graph.nodes():
+    if len(graph.edges(node)) == 0:
+        graph.remove_node(node)
+        unlinked_nodes += 1
+print(f"{unlinked_nodes} unlinked node(s) were dropped from graph.")
+
+if total_effect == 0.0:
+    raise ValueError("Total effect graphed was 0.0")
+
+fraction_included = round(graphed_effect / total_effect, 2)
+graph.add_node(f"Jacobian graphed out of overall: ~{fraction_included*100}%.")
+
+# %%
+# Render and save graph.
+graph.write(save_dot_path)
+graph.draw(save_graph_path, format="svg", prog="dot")
+
+artifact = wandb.Artifact("jacobian_graph", type="causal_graph")
+artifact.add_file(save_graph_path)
+wandb.log_artifact(artifact)
+
+print(f"Graph saved to {save_graph_path}")
+
+# %%
+# Wrap up wandb logging.
+wandb.finish()
