@@ -45,6 +45,9 @@ JACOBIANS_DOT_FILE = config.get("JACOBIANS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
+# Twice this many total nodes, pos and neg.
+NUM_TOP_EFFECTS: int = 500
+
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
@@ -142,8 +145,9 @@ graphed_effect: float = 0.0
 # %%
 # Reduce Jacobian to directed graph.
 flat_jac = t.flatten(jacobian)
-pos_values, pos_indices = t.topk(flat_jac, 10)
-neg_values, neg_indices = t.topk(flat_jac, 10, largest=False)
+pos_values, pos_indices = t.topk(flat_jac, NUM_TOP_EFFECTS)
+neg_values, neg_indices = t.topk(flat_jac, NUM_TOP_EFFECTS, largest=False)
+
 # Color range scalars for later labeling.
 color_max_scalar = pos_values.max().item()
 color_min_scalar = neg_values.min().item()
@@ -152,6 +156,7 @@ color_min_scalar = neg_values.min().item()
 # Populate graph.
 indices = pos_indices.tolist() + neg_indices.tolist()
 values = pos_values.tolist() + neg_values.tolist()
+num_bare_nodes: int = 0
 
 for i, effect in zip(indices, values):
     magnitude = abs(effect)
@@ -200,8 +205,6 @@ for i, effect in zip(indices, values):
             shape="box",
         )
     except ValueError:
-        print(f"Node {down_node_name} not recognized; plotting bare.")
-
         label: str = '<<table border="0" cellborder="0" cellspacing="0">'
         label += '<tr><td><font point-size="16"><b>'
         label += down_node_name
@@ -209,12 +212,12 @@ for i, effect in zip(indices, values):
 
         graph.add_node(down_node_name, label=label, shape="box")
 
+        num_bare_nodes += 1
+
     if effect > 0.0:
         red, green = 0, 255
     elif effect < 0.0:
         red, green = 255, 0
-    else:
-        raise ValueError("Should be unreachable.")
 
     alpha: int = int(
         255 * magnitude / max(abs(color_max_scalar), abs(color_min_scalar))
@@ -233,12 +236,10 @@ edges = graph.edges()
 
 assert len(edges) == len(set(edges))
 
-unlinked_nodes: int = 0
 for node in graph.nodes():
-    if len(graph.edges(node)) == 0:
-        graph.remove_node(node)
-        unlinked_nodes += 1
-print(f"{unlinked_nodes} unlinked node(s) were dropped from graph.")
+    assert len(graph.edges(node)) > 0
+
+print(f"{num_bare_nodes} node(s) not recognized; plotted bare.")
 
 if total_effect == 0.0:
     raise ValueError("Total effect graphed was 0.0")
@@ -255,7 +256,8 @@ artifact = wandb.Artifact("jacobian_graph", type="causal_graph")
 artifact.add_file(save_graph_path)
 wandb.log_artifact(artifact)
 
-print(f"Graph saved to {save_graph_path}")
+print("Graph saved to:")
+print(save_graph_path)
 
 # %%
 # End wandb logging.
