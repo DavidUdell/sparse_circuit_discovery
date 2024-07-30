@@ -349,7 +349,6 @@ def jacobians_manager(
         decoder_1, dec_bias_1 = dec_tensors_per_layer[upstream_layer_idx]
         _, dec_bias_2 = dec_tensors_per_layer[upstream_layer_idx + 1]
         encoder_2, enc_bias_2 = enc_tensors_per_layer[upstream_layer_idx + 1]
-
         # Recreates forward-pass section.
         composed_mod = t.nn.Sequential(
             t.nn.Linear(decoder_1.shape[1], decoder_1.shape[0]),
@@ -362,7 +361,6 @@ def jacobians_manager(
         # Assign weight and bias tensors to submodules.
         composed_mod[0].weight = t.nn.Parameter(decoder_1.T)
         composed_mod[0].bias = t.nn.Parameter(dec_bias_1)
-
         composed_mod[3].weight = t.nn.Parameter(encoder_2.T)
         composed_mod[3].bias = t.nn.Parameter(enc_bias_2)
 
@@ -400,22 +398,17 @@ def jacobians_manager(
                 inplace=True,
             )
 
-            # Splice zero vector into the forward-pass gradient tracking.
-            zero_tensor = t.zeros_like(projected_acts, requires_grad=True).to(
-                model.device
-            )
-            projected_acts.detach()
-            replaced_acts = zero_tensor + projected_acts
+            jac_dict["point"] = projected_acts.detach()
 
-            replaced_acts = (
+            projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    replaced_acts,
+                    projected_acts,
                     decoder.T.to(model.device),
                     bias=dec_biases.to(model.device),
                 )
             )
 
-            return (replaced_acts, output[1])
+            return (projected_acts, output[1])
 
         return splice_hook
 
@@ -450,8 +443,8 @@ def jacobians_manager(
             differentiable_mod = composite_module(module)
             # Functional. Note that a `chunk_size` can be set here other than
             # the full tensor.
-            jacobian = t.func.jacrev(differentiable_mod)
-            jac_dict[upstream_layer_idx] = (jacobian, projected_acts.detach())
+            jacobian = t.func.jacfwd(differentiable_mod)
+            jac_dict["function"] = jacobian
 
         return divert_hook
 

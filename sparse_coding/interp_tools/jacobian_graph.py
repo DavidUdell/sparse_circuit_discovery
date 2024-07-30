@@ -45,7 +45,7 @@ JACOBIANS_DOT_FILE = config.get("JACOBIANS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
-NUM_TOP_EFFECTS: int = 50
+NUM_TOP_EFFECTS: int = 10
 
 # %%
 # Reproducibility.
@@ -118,14 +118,16 @@ with jacobians_manager(
     model,
     encoders_and_biases,
     decoders_and_biases,
-) as func_and_point:
+) as f_and_p:
     _ = model(**inputs)
 
-    jac_func_and_point = func_and_point
+    jac_func_and_point = f_and_p
 
 # %%
 # Compute Jacobian.
-jac_function, act = jac_func_and_point[up_layer_idx]
+jac_function = jac_func_and_point["function"]
+act = jac_func_and_point["point"]
+
 act = act[:, -1, :].unsqueeze(0)
 
 jacobian = jac_function(act)
