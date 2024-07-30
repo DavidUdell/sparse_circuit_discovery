@@ -251,7 +251,7 @@ assert len(edges) == len(set(edges))
 for node in graph.nodes():
     assert len(graph.edges(node)) > 0
 
-print(f"{num_bare_nodes} node(s) not recognized; plotted bare.")
+print(f"{num_bare_nodes} node(s) not recognized & plotted bare.")
 
 if total_effect == 0.0:
     raise ValueError("Total effect graphed was 0.0")
