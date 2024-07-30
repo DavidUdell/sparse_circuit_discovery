@@ -45,8 +45,7 @@ JACOBIANS_DOT_FILE = config.get("JACOBIANS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
-# Twice this many total nodes, pos and neg.
-NUM_TOP_EFFECTS: int = 500
+NUM_TOP_EFFECTS: int = 50
 
 # %%
 # Reproducibility.
@@ -130,10 +129,13 @@ jac_function, act = jac_func_and_point[up_layer_idx]
 act = act[:, -1, :].unsqueeze(0)
 
 jacobian = jac_function(act)
+# ReLU Jacobian.
+jacobian = t.nn.functional.relu(jacobian)
 jacobian = jacobian.squeeze()
+
 row_length: int = jacobian.shape[0]
 
-# Weight raw Jacobian by the activations, to get an approximation for this
+# Weight the raw Jacobian by the activations, to get an approximation for this
 # forward pass.
 act = act.squeeze(0)
 jacobian = jacobian * act
@@ -146,22 +148,19 @@ graphed_effect: float = 0.0
 # Reduce Jacobian to directed graph.
 flat_jac = t.flatten(jacobian)
 pos_values, pos_indices = t.topk(flat_jac, NUM_TOP_EFFECTS)
-neg_values, neg_indices = t.topk(flat_jac, NUM_TOP_EFFECTS, largest=False)
 
 # Color range scalars for later labeling.
 color_max_scalar = pos_values.max().item()
-color_min_scalar = neg_values.min().item()
+color_min_scalar = pos_values.min().item()
 
 # %%
 # Populate graph.
-indices = pos_indices.tolist() + neg_indices.tolist()
-values = pos_values.tolist() + neg_values.tolist()
 num_bare_nodes: int = 0
 
-for i, effect in zip(indices, values):
+for i, effect in zip(pos_indices.tolist(), pos_values.tolist()):
     magnitude = abs(effect)
 
-    if 0.0 == effect:
+    if effect <= 0.0:
         print("Item skipped.")
         continue
 
@@ -173,21 +172,32 @@ for i, effect in zip(indices, values):
     up_node_name: str = f"{up_layer_idx}.{up_dim_idx}"
     down_node_name: str = f"{up_layer_idx + 1}.{down_dim_idx}"
 
-    graph.add_node(
-        up_node_name,
-        label=label_highlighting(
-            up_layer_idx,
-            up_dim_idx,
-            MODEL_DIR,
-            TOP_K_INFO_FILE,
-            0,
-            tokenizer,
+    try:
+        graph.add_node(
             up_node_name,
-            {},
-            __file__,
-        ),
-        shape="box",
-    )
+            label=label_highlighting(
+                up_layer_idx,
+                up_dim_idx,
+                MODEL_DIR,
+                TOP_K_INFO_FILE,
+                0,
+                tokenizer,
+                up_node_name,
+                {},
+                __file__,
+            ),
+            shape="box",
+        )
+    except ValueError:
+        label: str = '<<table border="0" cellborder="0" cellspacing="0">'
+        label += '<tr><td><font point-size="16"><b>'
+        label += up_node_name
+        label += "</b></font></td></tr></table>>"
+
+        graph.add_node(up_node_name, label=label, shape="box")
+
+        num_bare_nodes += 1
+
     try:
         graph.add_node(
             down_node_name,
