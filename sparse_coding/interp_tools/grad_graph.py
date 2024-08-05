@@ -104,3 +104,11 @@ save_graph_path: str = save_paths(
 save_dot_path: str = save_paths(
     __file__, f"{sanitize_model_name(MODEL_DIR)}/{JACOBIANS_DOT_FILE}"
 )
+
+# %%
+# Forward then backward pass with autoencoder hooks in.
+print("Prompt:")
+print()
+print(PROMPT)
+
+inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
