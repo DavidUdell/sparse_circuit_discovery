@@ -112,3 +112,5 @@ print()
 print(PROMPT)
 
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+
+# with grads_manager():
