@@ -325,8 +325,7 @@ def jacobians_manager(
     """
     Context manager for Jacobian-hooking forward passes.
 
-    For the time being, only residual stream autoencoders are supported. This
-    will be generalized to include attn_out and mlp_out later.
+    Only residual stream autoencoders are supported here.
     """
     jac_dict: dict = {}
 
