@@ -2,8 +2,8 @@
 """
 Classic circuit discovery with gradient methods, with sparse autoencoders.
 
-I want to get a feel for this approach with a quick implementation here, in
-this interface and infrastructure.
+I want to get a feel for this approach with an implementation here, in this
+interface and infrastructure.
 """
 
 
@@ -48,6 +48,7 @@ GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
+# Or some other means of thresholding approximated effects.
 NUM_TOP_EFFECTS: int = 10
 
 # %%
