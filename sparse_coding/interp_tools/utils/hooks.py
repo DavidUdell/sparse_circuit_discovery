@@ -545,6 +545,9 @@ def grads_manager(
 
             # Algebra for the error residual.
             error = projected_acts - output[0]
+            # Then break gradient for the new error tensor.
+            error = error.detach()
+            error.requires_grad = True
 
             error_name: str = f"error_{layer_idx}"
             error.register_hook(backward_hooks_fac(error_name))

@@ -148,4 +148,7 @@ with grads_manager(
 # for act in acts_dict:
 #     print(act[:, -1, :])
 
-print(grads_dict.items())
+for location, grad in grads_dict.items():
+    print(location)
+    print(t.abs(grad).sum())
+    print()
