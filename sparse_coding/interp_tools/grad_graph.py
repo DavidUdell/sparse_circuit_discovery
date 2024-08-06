@@ -43,8 +43,8 @@ ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 DECODER_FILE = config.get("DECODER_FILE")
 DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
-JACOBIANS_FILE = config.get("JACOBIANS_FILE")
-JACOBIANS_DOT_FILE = config.get("JACOBIANS_DOT_FILE")
+GRADS_FILE = config.get("GRADS_FILE")
+GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
@@ -94,23 +94,40 @@ decoders_and_biases, _ = prepare_autoencoder_and_indices(
 
 # %%
 # Load preexisting graph, if available.
-graph = load_preexisting_graph(MODEL_DIR, JACOBIANS_DOT_FILE, __file__)
+graph = load_preexisting_graph(MODEL_DIR, GRADS_DOT_FILE, __file__)
 if graph is None:
     graph = AGraph(directed=True)
 
 save_graph_path: str = save_paths(
-    __file__, f"{sanitize_model_name(MODEL_DIR)}/{JACOBIANS_FILE}"
+    __file__, f"{sanitize_model_name(MODEL_DIR)}/{GRADS_FILE}"
 )
 save_dot_path: str = save_paths(
-    __file__, f"{sanitize_model_name(MODEL_DIR)}/{JACOBIANS_DOT_FILE}"
+    __file__, f"{sanitize_model_name(MODEL_DIR)}/{GRADS_DOT_FILE}"
 )
 
 # %%
-# Forward then backward pass with autoencoder hooks in.
+# Define cross-entropy loss.
+
+
+# %%
+# Model passes.
 print("Prompt:")
 print()
 print(PROMPT)
 
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+acts_dict: dict = None
+grads_dict: dict = None
 
-with grads_manager():
+# Forward pass installs all hooks.
+with grads_manager(
+    model,
+    layer_range,
+    encoders_and_biases,
+    decoders_and_biases,
+) as grad:
+
+    output = model(**inputs)
+    acts_dict = output.hidden_states
+
+    grads_dict = grad
