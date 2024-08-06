@@ -480,9 +480,10 @@ def grads_manager(
     layer_indices: list[int],
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
-) -> Generator[dict, None, None]:
+) -> Generator[tuple[dict, dict], None, None]:
     """Context manager for backward hooks on autoencoder inserts."""
 
+    acts_dict: dict = {}
     grads_dict: dict = {}
 
     def backward_hooks_fac(location: str):
@@ -528,13 +529,15 @@ def grads_manager(
                 inplace=True,
             )
 
-            # Register backward hooks on the projected activations.
             res_autoencoder_name: str = f"res_{layer_idx}"
+            # Register backward hooks on the projected activations.
             projected_acts.register_hook(
                 backward_hooks_fac(res_autoencoder_name)
             )
+            # Cache projected activations.
+            acts_dict[res_autoencoder_name] = projected_acts
 
-            # Finish modified forward pass.
+            # Decode projected acts.
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
@@ -566,7 +569,7 @@ def grads_manager(
         )
 
     try:
-        yield grads_dict
+        yield (acts_dict, grads_dict)
     finally:
         # I have not implemented any hook cleanup.
         pass

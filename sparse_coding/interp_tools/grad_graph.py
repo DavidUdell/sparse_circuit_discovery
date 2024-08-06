@@ -128,12 +128,10 @@ with grads_manager(
     layer_range,
     encoders_and_biases,
     decoders_and_biases,
-) as grad:
+) as acts_and_grads:
 
     # Forward pass installs all backward hooks.
     output = model(**inputs)
-
-    acts_dict = output.hidden_states
 
     # Backward pass.
     metric(
@@ -141,14 +139,19 @@ with grads_manager(
         inputs["input_ids"].view(-1),
     ).backward()
 
-    grads_dict = grad
+    acts_dict, grads_dict = acts_and_grads
 
 # %%
 # Graph approximations.
-# for act in acts_dict:
-#     print(act[:, -1, :])
+print("Activations:")
+for location, act in acts_dict.items():
+    print(location)
+    print(act[:, -1, :])
+    print()
 
+print()
+print("Gradients:")
 for location, grad in grads_dict.items():
     print(location)
-    print(t.abs(grad).sum())
+    print(grad[:, -1, :])
     print()
