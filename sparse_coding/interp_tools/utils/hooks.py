@@ -472,3 +472,92 @@ def jacobians_manager(
     finally:
         splice_hook_handle.remove()
         divert_hook_handle.remove()
+
+
+@contextmanager
+def grads_manager(
+    model: t.nn.Module,
+    layer_indices: list[int],
+    enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+) -> Generator[dict, None, None]:
+    """Context manager for backward hooks on autoencoder inserts."""
+
+    grads_dict: dict = {}
+
+    def backward_hooks_fac(location: int):
+        """Allow backward hooks to label their dictionary entries."""
+
+        def backward_hook(grad):
+            """Label the gradient tensor with its location."""
+            grads_dict[location] = grad
+
+        return backward_hook
+
+    def forward_hooks_fac(
+        layer_idx: int,
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        decoder: t.Tensor,
+        dec_biases: t.Tensor,
+    ):
+        """
+        Pass activations through autoencoders where requested and register
+        backward hooks at the autoencoder tensors.
+        """
+
+        def forward_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """
+            Pass activations through autoencoder and register a backward hook
+            at the autoencoder tensor and error residual.
+            """
+
+            # Project activations through the encoder. Bias usage corresponds
+            # to JBloom's.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    output[0] - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
+            )
+
+            # Register backward hooks on the projected activations.
+            projected_acts.register_hook(backward_hooks_fac(layer_idx))
+
+            # Finish modified forward pass.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    projected_acts,
+                    decoder.T.to(model.device),
+                    bias=dec_biases.to(model.device),
+                )
+            )
+
+            # Algebra for the error residual.
+            error = output[0] - projected_acts
+            error.register_hook(backward_hooks_fac(layer_idx))
+
+            return projected_acts + error, output[1]
+
+        return forward_hook
+
+    # The context manager registers the initial forward hooks.
+    for layer_idx in layer_indices:
+        encoder, enc_bias = enc_tensors_per_layer[layer_idx]
+        decoder, dec_bias = dec_tensors_per_layer[layer_idx]
+        model.transformer.h[layer_idx].register_forward_hook(
+            forward_hooks_fac(layer_idx, encoder, enc_bias, decoder, dec_bias)
+        )
+
+    try:
+        yield grads_dict
+    finally:
+        # I have not implemented any hook cleanup.
+        pass

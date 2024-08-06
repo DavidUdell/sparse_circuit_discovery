@@ -25,6 +25,7 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 from sparse_coding.interp_tools.utils.hooks import (
+    grads_manager,
     prepare_autoencoder_and_indices,
 )
 
@@ -69,7 +70,6 @@ accelerator: Accelerator = Accelerator()
 
 model = accelerator.prepare(model)
 layer_range = slice_to_range(model, ACTS_LAYERS_SLICE)
-up_layer_idx = layer_range[0]
 
 # %%
 # Prepare all layer range autoencoders.
@@ -113,4 +113,4 @@ print(PROMPT)
 
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 
-# with grads_manager():
+with grads_manager():
