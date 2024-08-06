@@ -108,7 +108,7 @@ save_dot_path: str = save_paths(
 
 # %%
 # Define cross-entropy loss.
-
+metric = t.nn.CrossEntropyLoss()
 
 # %%
 # Model passes.
@@ -120,7 +120,6 @@ inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 acts_dict: dict = None
 grads_dict: dict = None
 
-# Forward pass installs all hooks.
 with grads_manager(
     model,
     layer_range,
@@ -128,7 +127,20 @@ with grads_manager(
     decoders_and_biases,
 ) as grad:
 
+    # Forward pass installs all backward hooks.
     output = model(**inputs)
     acts_dict = output.hidden_states
 
+    # Backward pass.
+    metric(
+        output.logits.view(-1, output.logits.size(-1)),
+        inputs["input_ids"].view(-1),
+    ).backward()
     grads_dict = grad
+
+# %%
+# Graph approximations.
+print(acts_dict)
+print(acts_dict.values())
+print(grads_dict)
+print(grads_dict.values())

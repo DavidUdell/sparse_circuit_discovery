@@ -49,10 +49,13 @@ ENC_BIASES_FILE: "learned_enc_biases.pt"
 DECODER_FILE: "learned_decoder.pt"
 DEC_BIASES_FILE: "learned_dec_biases.pt"
 TOP_K_INFO_FILE: "token_info.csv"
+
 GRAPH_FILE: "cognition_graph.svg"
 GRAPH_DOT_FILE: "cognition_graph.dot"
 JACOBIANS_FILE: "jacobians_graph.svg"
 JACOBIANS_DOT_FILE: "jacobians_graph.dot"
+GRADS_FILE: "grads_graph.svg"
+GRADS_DOT_FILE: "grads_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2
