@@ -145,7 +145,7 @@ with grads_manager(
 
 # %%
 # Graph approximations.
-for act in acts_dict:
-    print(act[:, -1, :])
+# for act in acts_dict:
+#     print(act[:, -1, :])
 
-print(grads_dict.values())
+print(grads_dict.items())

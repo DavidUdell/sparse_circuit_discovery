@@ -485,7 +485,7 @@ def grads_manager(
 
     grads_dict: dict = {}
 
-    def backward_hooks_fac(location: int):
+    def backward_hooks_fac(location: str):
         """Allow backward hooks to label their dictionary entries."""
 
         def backward_hook(grad):
@@ -529,7 +529,10 @@ def grads_manager(
             )
 
             # Register backward hooks on the projected activations.
-            projected_acts.register_hook(backward_hooks_fac(layer_idx))
+            res_autoencoder_name: str = f"res_{layer_idx}"
+            projected_acts.register_hook(
+                backward_hooks_fac(res_autoencoder_name)
+            )
 
             # Finish modified forward pass.
             projected_acts = (
@@ -542,7 +545,8 @@ def grads_manager(
 
             # Algebra for the error residual.
             error = output[0] - projected_acts
-            error.register_hook(backward_hooks_fac(layer_idx))
+            error_name: str = f"error_{layer_idx}"
+            error.register_hook(backward_hooks_fac(error_name))
 
             return projected_acts + error, output[1]
 
