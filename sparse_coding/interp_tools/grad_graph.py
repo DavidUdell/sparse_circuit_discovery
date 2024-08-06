@@ -65,7 +65,10 @@ wandb.init(
 
 # %%
 # Load and prepare the model.
-model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
+model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
+    MODEL_DIR,
+    output_hidden_states=True,
+)
 tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
 accelerator: Accelerator = Accelerator()
 
@@ -129,6 +132,7 @@ with grads_manager(
 
     # Forward pass installs all backward hooks.
     output = model(**inputs)
+
     acts_dict = output.hidden_states
 
     # Backward pass.
@@ -136,11 +140,12 @@ with grads_manager(
         output.logits.view(-1, output.logits.size(-1)),
         inputs["input_ids"].view(-1),
     ).backward()
+
     grads_dict = grad
 
 # %%
 # Graph approximations.
-print(acts_dict)
-print(acts_dict.values())
-print(grads_dict)
+for act in acts_dict:
+    print(act[:, -1, :])
+
 print(grads_dict.values())
