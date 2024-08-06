@@ -544,11 +544,13 @@ def grads_manager(
             )
 
             # Algebra for the error residual.
-            error = output[0] - projected_acts
+            error = projected_acts - output[0]
+
             error_name: str = f"error_{layer_idx}"
             error.register_hook(backward_hooks_fac(error_name))
 
-            return projected_acts + error, output[1]
+            # output[0] = projected_acts - error
+            return projected_acts - error, output[1]
 
         return forward_hook
 
