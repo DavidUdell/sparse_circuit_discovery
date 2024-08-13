@@ -133,7 +133,7 @@ with grads_manager(
     # Forward pass installs all backward hooks.
     output = model(**inputs)
 
-    # Backward pass.
+    # Metric backward pass.
     metric(
         output.logits.squeeze(),
         inputs["input_ids"].squeeze(),
@@ -141,55 +141,50 @@ with grads_manager(
 
     acts_dict, grads_dict = acts_and_grads
 
-# %%
-# Add model_dim activations to dict, if needed.
-for grad in grads_dict:
-    if "error" in grad:
-        idx: int = int(grad.split("_")[-1])
-        act: t.Tensor = output.hidden_states[idx]
+    # Add model_dim activations to dict, if needed.
+    for grad in grads_dict:
+        if "error" in grad:
+            idx: int = int(grad.split("_")[-1])
+            act: t.Tensor = output.hidden_states[idx]
 
-        acts_dict[grad] = act
+            acts_dict[grad] = act
 
-assert len(acts_dict) == len(grads_dict)
-for act in acts_dict:
-    assert act in grads_dict
+    assert len(acts_dict) == len(grads_dict)
+    for act in acts_dict:
+        assert act in grads_dict
 
-# %%
-# Compute Jacobian-vector products.
-jvp_dict: dict = {}
-for location, grad in grads_dict.items():
-    act = acts_dict[location]
-    jvp = t.einsum("bsd, bsd -> bs", grad, act)
+    # Compute Jacobian-vector products.
+    jvp_dict: dict = {}
+    for location, grad in grads_dict.items():
+        act = acts_dict[location]
+        jvp = t.einsum("bsd, bsd -> bs", grad, act)
 
-    jvp_last = jvp.squeeze()[-1]
+        jvp_last = jvp.squeeze()[-1]
 
-    jvp_dict[location] = jvp_last
+        jvp_dict[location] = jvp_last
 
-# %%
-# Compute edge values.
-jvp_sum: t.Tensor = t.tensor(
-    0.0,
-    device=model.device,
-    requires_grad=True,
-)
-# We compute a jvp_sum tensor to combine several gradient calculations.
-for jvp in jvp_dict.values():
-    jvp_sum = jvp_sum + jvp
+    jvp_sum: t.Tensor = t.tensor(
+        0.0,
+        device=model.device,
+        requires_grad=True,
+    )
+    # We compute a jvp_sum tensor to combine several gradient calculations.
+    for jvp in jvp_dict.values():
+        jvp_sum = jvp_sum + jvp
 
-edge_grads: dict = None
-with grads_manager(
-    model,
-    layer_range,
-    encoders_and_biases,
-    decoders_and_biases,
-) as acts_and_grads:
-
-    # We can now "batch" grad just that one scalar.
+    edge_grads: dict = None
+    # jvp_sum backward pass.
     jvp_sum.backward()
 
     _, edge_grads = acts_and_grads
 
-for location, jvp_grad in edge_grads.items():
-    print(location)
-    print(jvp_grad)
-    print()
+# %%
+# Take products.
+for grad_loc, grad in edge_grads.items():
+    # For intra-residual streams only so far.
+    grad_mod, grad_idx = grad_loc.split("_")
+    act_idx = int(grad_idx) - 1
+    act_loc = f"{grad_mod}_{act_idx}"
+
+    print(grads_dict[grad_loc].shape)
+    print(acts_dict[act_loc].shape)
