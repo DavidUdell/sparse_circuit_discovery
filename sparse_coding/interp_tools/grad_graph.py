@@ -142,16 +142,25 @@ with grads_manager(
     acts_dict, grads_dict = acts_and_grads
 
 # %%
-# Graph approximations.
-print("Activations:")
-for location, act in acts_dict.items():
-    print(location)
-    print(act[:, -1, :])
-    print()
+# Add model_dim activations to dict, if needed.
+for grad in grads_dict:
+    if "error" in grad:
+        idx: int = int(grad.split("_")[-1])
+        act: t.Tensor = output.hidden_states[idx]
 
-print()
-print("Gradients:")
+        acts_dict[grad] = act
+
+assert len(acts_dict) == len(grads_dict)
+for act in acts_dict:
+    assert act in grads_dict
+
+# %%
+# Compute Jacobian-vector products.
+jvp_dict: dict = {}
 for location, grad in grads_dict.items():
-    print(location)
-    print(grad[:, -1, :])
-    print()
+    act = acts_dict[location]
+    jvp = t.einsum("bsd, bsd -> bs", grad, act)
+
+    jvp_last = jvp.squeeze()[-1]
+
+    jvp_dict[location] = jvp_last
