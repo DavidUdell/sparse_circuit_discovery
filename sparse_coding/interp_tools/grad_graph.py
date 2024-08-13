@@ -137,7 +137,7 @@ with grads_manager(
     metric(
         output.logits.squeeze(),
         inputs["input_ids"].squeeze(),
-    ).backward()
+    ).backward(retain_graph=True)
 
     acts_dict, grads_dict = acts_and_grads
 
@@ -164,3 +164,32 @@ for location, grad in grads_dict.items():
     jvp_last = jvp.squeeze()[-1]
 
     jvp_dict[location] = jvp_last
+
+# %%
+# Compute edge values.
+jvp_sum: t.Tensor = t.tensor(
+    0.0,
+    device=model.device,
+    requires_grad=True,
+)
+# We compute a jvp_sum tensor to combine several gradient calculations.
+for jvp in jvp_dict.values():
+    jvp_sum = jvp_sum + jvp
+
+edge_grads: dict = None
+with grads_manager(
+    model,
+    layer_range,
+    encoders_and_biases,
+    decoders_and_biases,
+) as acts_and_grads:
+
+    # We can now "batch" grad just that one scalar.
+    jvp_sum.backward()
+
+    _, edge_grads = acts_and_grads
+
+for location, jvp_grad in edge_grads.items():
+    print(location)
+    print(jvp_grad)
+    print()
