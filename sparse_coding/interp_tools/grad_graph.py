@@ -181,10 +181,18 @@ with grads_manager(
 # %%
 # Take products.
 for grad_loc, grad in edge_grads.items():
-    # For intra-residual streams only so far.
+    # For inter-residual-streams only so far.
     grad_mod, grad_idx = grad_loc.split("_")
     act_idx = int(grad_idx) - 1
+    if act_idx not in layer_range:
+        continue
     act_loc = f"{grad_mod}_{act_idx}"
 
-    print(grads_dict[grad_loc].shape)
-    print(acts_dict[act_loc].shape)
+    product: t.Tensor = grads_dict[grad_loc] * acts_dict[act_loc]
+    product = product[:, -1, :].squeeze()
+
+    # Threshold
+    top_k_values, top_k_indices = t.topk(t.abs(product), NUM_TOP_EFFECTS)
+    for i in top_k_indices:
+        print(act_loc, f"#{i.item()}", round(product[i].item(), 2))
+    print()
