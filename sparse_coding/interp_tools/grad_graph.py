@@ -135,8 +135,8 @@ with grads_manager(
 
     # Backward pass.
     metric(
-        output.logits.view(-1, output.logits.size(-1)),
-        inputs["input_ids"].view(-1),
+        output.logits.squeeze(),
+        inputs["input_ids"].squeeze(),
     ).backward()
 
     acts_dict, grads_dict = acts_and_grads
