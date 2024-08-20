@@ -624,8 +624,8 @@ def attn_mlp_acts_manager(
             )
         )
 
-        try:
-            yield acts_dict
-        finally:
-            for handle in handles:
-                handle.remove()
+    try:
+        yield acts_dict
+    finally:
+        for handle in handles:
+            handle.remove()
