@@ -573,3 +573,59 @@ def grads_manager(
     finally:
         # I have not implemented any hook cleanup.
         pass
+
+
+@contextmanager
+def attn_mlp_acts_manager(
+    model: t.nn.Module,
+    layer_indices: list[int],
+) -> Generator[dict[str, t.Tensor], None, None]:
+    """Retrieve select attn-out and MLP-out activations."""
+
+    acts_dict: dict[str, t.Tensor] = {}
+    handles = []
+
+    def forward_hooks_fac(layer_idx: int):
+        """Create attn-out and MLP-out forward act hooks for GPT-2-small."""
+
+        def forward_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """Cache activations."""
+
+            if "attention" in module.__class__.__name__.lower():
+                # "gpt2attention"
+                current_name: str = f"attn_{layer_idx}"
+            elif "mlp" in module.__class__.__name__.lower():
+                # "gpt2mlp"
+                current_name: str = f"mlp_{layer_idx}"
+            else:
+                raise ValueError("Unexpected module name.")
+
+            if current_name not in acts_dict:
+                acts_dict[current_name] = output[0]
+            else:
+                acts_dict[current_name] = t.cat(
+                    (acts_dict[current_name], output[0]),
+                    dim=0,
+                )
+
+        return forward_hook
+
+    for layer_idx in layer_indices:
+        handles.append(
+            model.transformer.h[layer_idx].attn.register_forward_hook(
+                forward_hooks_fac(layer_idx)
+            )
+        )
+        handles.append(
+            model.transformer.h[layer_idx].mlp.register_forward_hook(
+                forward_hooks_fac(layer_idx)
+            )
+        )
+
+        try:
+            yield acts_dict
+        finally:
+            for handle in handles:
+                handle.remove()

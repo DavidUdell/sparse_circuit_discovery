@@ -1,8 +1,7 @@
 # %%
-"""Collect model activations during inference on `openwebtext`."""
+"""Collect model activations during inference."""
 
 
-import gc
 import warnings
 
 import numpy as np
@@ -86,31 +85,29 @@ acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 # %%
 # Dataset. Poor man's fancy indexing.
 training_set: list[list[int]] = [
-        PROMPT,
+    PROMPT,
 ]
+
+# %%
+# Hook for attn-out and mlp-out activations.
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
 # put into `activations`.
-activations: list[t.Tensor] = []
+resid_acts: list[t.Tensor] = []
+attn_acts: list[t.Tensor] = []
+mlp_acts: list[t.Tensor] = []
 prompt_ids_tensors: list[t.Tensor] = []
+
 for idx, batch in enumerate(training_set):
-    try:
-        inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
-        ).to(model.device)
-        outputs = model(**inputs)
-        activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-        prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
-    except RuntimeError:
-        # Manually clear memory and try again.
-        gc.collect()
-        inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
-        ).to(model.device)
-        outputs = model(**inputs)
-        activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-        prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
+    inputs = tokenizer(
+        batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
+    ).to(model.device)
+
+    outputs = model(**inputs)
+
+    resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
+    prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
 
 # %%
 # Save the prompt ids and activations.
@@ -123,12 +120,12 @@ np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 # Each element along x is a list of ints, of seq len.
 
 # Single layer case lacks outer tuple; this solves that.
-if isinstance(activations, list) and isinstance(activations[0], t.Tensor):
-    activations: list[tuple[t.Tensor]] = [(tensor,) for tensor in activations]
+if isinstance(resid_acts, list) and isinstance(resid_acts[0], t.Tensor):
+    resid_acts: list[tuple[t.Tensor]] = [(tensor,) for tensor in resid_acts]
 # Tensors are of classic shape: (batch, seq, hidden)
 
 max_seq_length: int = max(
-    tensor.size(1) for layers_tuple in activations for tensor in layers_tuple
+    tensor.size(1) for layers_tuple in resid_acts for tensor in layers_tuple
 )
 
 for abs_idx, layer_idx in enumerate(acts_layers_range):
@@ -138,7 +135,7 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
             max_seq_length,
             accelerator,
         )
-        for layers_tuple in activations
+        for layers_tuple in resid_acts
     ]
     layer_activations: t.Tensor = t.cat(layer_activations, dim=0)
 
