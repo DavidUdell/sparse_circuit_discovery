@@ -7,7 +7,6 @@ import warnings
 import numpy as np
 import torch as t
 import transformers
-import wandb
 from accelerate import Accelerator
 from transformers import (
     AutoModelForCausalLM,
@@ -15,6 +14,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
+import wandb
 
 from sparse_coding.utils.interface import (
     parse_slice,
@@ -25,6 +25,7 @@ from sparse_coding.utils.interface import (
     save_paths,
     pad_activations,
 )
+from sparse_coding.interp_tools.utils.hooks import attn_mlp_acts_manager
 
 
 assert (
@@ -104,9 +105,15 @@ for idx, batch in enumerate(training_set):
         batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
     ).to(model.device)
 
-    outputs = model(**inputs)
+    with attn_mlp_acts_manager(model, list(acts_layers_range)) as a:
+        outputs = model(**inputs)
 
-    resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
+        resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
+
+        for i in acts_layers_range:
+            attn_acts.append(a[f"attn_{i}"])
+            mlp_acts.append(a[f"mlp_{i}"])
+
     prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
 
 # %%
