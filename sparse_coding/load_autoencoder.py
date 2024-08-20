@@ -4,6 +4,7 @@
 
 import torch as t
 from huggingface_hub import hf_hub_download
+from safetensors import safe_open
 
 from sparse_coding.utils.interface import (
     load_yaml_constants,
@@ -23,7 +24,6 @@ ENCODER_FILE = config.get("ENCODER_FILE")
 ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 DECODER_FILE = config.get("DECODER_FILE")
 DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
-
 ATTN_ENCODER_FILE = config.get("ATTN_ENCODER_FILE")
 ATTN_ENC_BIASES_FILE = config.get("ATTN_ENC_BIASES_FILE")
 ATTN_DECODER_FILE = config.get("ATTN_DECODER_FILE")
@@ -32,7 +32,6 @@ MLP_ENCODER_FILE = config.get("MLP_ENCODER_FILE")
 MLP_ENC_BIASES_FILE = config.get("MLP_ENC_BIASES_FILE")
 MLP_DECODER_FILE = config.get("MLP_DECODER_FILE")
 MLP_DEC_BIASES_FILE = config.get("MLP_DEC_BIASES_FILE")
-
 PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -152,15 +151,15 @@ def load_sublayer_autoencoder(
             subfolder=subfolder,
         )
 
-        if not t.cuda.is_available():
-            tensors_dict = t.load(file_url, map_location="cpu")
-        else:
-            tensors_dict = t.load(file_url)
+        tensors_dict: dict = {}
+        with safe_open(file_url, "pt") as f:
+            for k in f.keys():
+                tensors_dict[k] = f.get_tensor(k)
 
-        encoder = tensors_dict["state_dict"]["W_enc"]
-        enc_biases = tensors_dict["state_dict"]["b_enc"]
-        decoder = tensors_dict["state_dict"]["W_dec"]
-        dec_biases = tensors_dict["state_dict"]["b_dec"]
+        encoder = tensors_dict["W_enc"]
+        enc_biases = tensors_dict["b_enc"]
+        decoder = tensors_dict["W_dec"]
+        dec_biases = tensors_dict["b_dec"]
 
         t.save(
             encoder,
