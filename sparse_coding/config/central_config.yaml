@@ -57,7 +57,9 @@ MLP_DEC_BIASES_FILE: "mlp_dec_biases.pt"
 
 # Other Save Files
 PROMPT_IDS_FILE: "activations_prompt_ids.npy"
-ACTS_DATA_FILE: "activations_dataset.pt"
+ACTS_DATA_FILE: "resid_acts_dataset.pt"
+ATTN_DATA_FILE: "attn_acts_dataset.pt"
+MLP_DATA_FILE: "mlp_acts_dataset.pt"
 TOP_K_INFO_FILE: "token_info.csv"
 GRAPH_FILE: "cognition_graph.svg"
 GRAPH_DOT_FILE: "cognition_graph.dot"
