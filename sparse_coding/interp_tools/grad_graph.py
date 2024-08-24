@@ -178,6 +178,10 @@ with grads_manager(
     layer_range,
     res_enc_and_biases,
     res_dec_and_biases,
+    attn_enc_and_biases,
+    attn_dec_and_biases,
+    mlp_enc_and_biases,
+    mlp_dec_and_biases,
 ) as acts_and_grads:
 
     # Forward pass installs all backward hooks.
@@ -195,6 +199,8 @@ with grads_manager(
     for grad in grads_dict:
         if "error" in grad:
             idx: int = int(grad.split("_")[-1])
+            # TODO: Something needs to be implemented here for the attn and mlp
+            # cases.
             act: t.Tensor = output.hidden_states[idx]
 
             acts_dict[grad] = act
@@ -220,6 +226,8 @@ with grads_manager(
         requires_grad=True,
     )
     # We compute a jvp_sum tensor to combine several gradient calculations.
+    # Leverages the fact that the gradient of a sum is the sum of the
+    # gradients.
     for jvp in jvp_dict.values():
         jvp_sum = jvp_sum + jvp
 
@@ -232,7 +240,8 @@ with grads_manager(
 # %%
 # Compute the final products.
 for grad_loc, grad in edge_grads.items():
-    # For inter-residual-streams only so far.
+    # For inter-residual-streams only so far. TODO: This won't work for the new
+    # error names.
     grad_mod, grad_idx = grad_loc.split("_")
     act_idx = int(grad_idx) - 1
     if act_idx not in layer_range:
