@@ -1,9 +1,8 @@
 # %%
 """
-Classic circuit discovery with gradient methods, with sparse autoencoders.
+Circuit discovery with gradient methods, with sparse autoencoders.
 
-I want to get a feel for this approach with an implementation here, in this
-interface and infrastructure.
+Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 """
 
 
@@ -42,7 +41,17 @@ ENCODER_FILE = config.get("ENCODER_FILE")
 ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 DECODER_FILE = config.get("DECODER_FILE")
 DEC_BIASES_FILE = config.get("DEC_BIASES_FILE")
-TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
+ATTN_ENCODER_FILE = config.get("ATTN_ENCODER_FILE")
+ATTN_ENC_BIASES_FILE = config.get("ATTN_ENC_BIASES_FILE")
+ATTN_DECODER_FILE = config.get("ATTN_DECODER_FILE")
+ATTN_DEC_BIASES_FILE = config.get("ATTN_DEC_BIASES_FILE")
+MLP_ENCODER_FILE = config.get("MLP_ENCODER_FILE")
+MLP_ENC_BIASES_FILE = config.get("MLP_ENC_BIASES_FILE")
+MLP_DECODER_FILE = config.get("MLP_DECODER_FILE")
+MLP_DEC_BIASES_FILE = config.get("MLP_DEC_BIASES_FILE")
+RESID_TOKENS_FILE = config.get("TOP_K_INFO_FILE")
+ATTN_TOKENS_FILE = config.get("ATTN_TOKEN_FILE")
+MLP_TOKENS_FILE = config.get("MLP_TOKEN_FILE")
 GRADS_FILE = config.get("GRADS_FILE")
 GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
@@ -77,21 +86,62 @@ layer_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Prepare all layer range autoencoders.
-encoders_and_biases, _ = prepare_autoencoder_and_indices(
+# Residual autoencoders
+res_enc_and_biases, _ = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
     ENCODER_FILE,
     ENC_BIASES_FILE,
-    TOP_K_INFO_FILE,
+    RESID_TOKENS_FILE,
     accelerator,
     __file__,
 )
-decoders_and_biases, _ = prepare_autoencoder_and_indices(
+res_dec_and_biases, _ = prepare_autoencoder_and_indices(
     layer_range,
     MODEL_DIR,
     DECODER_FILE,
     DEC_BIASES_FILE,
-    TOP_K_INFO_FILE,
+    RESID_TOKENS_FILE,
+    accelerator,
+    __file__,
+)
+
+# Attention autoencoders
+attn_enc_and_biases, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    ATTN_ENCODER_FILE,
+    ATTN_ENC_BIASES_FILE,
+    ATTN_TOKENS_FILE,
+    accelerator,
+    __file__,
+)
+attn_dec_and_biases, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    ATTN_DECODER_FILE,
+    ATTN_DEC_BIASES_FILE,
+    ATTN_TOKENS_FILE,
+    accelerator,
+    __file__,
+)
+
+# MLP autoencoders
+mlp_enc_and_biases, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    MLP_ENCODER_FILE,
+    MLP_ENC_BIASES_FILE,
+    MLP_TOKENS_FILE,
+    accelerator,
+    __file__,
+)
+mlp_dec_and_biases, _ = prepare_autoencoder_and_indices(
+    layer_range,
+    MODEL_DIR,
+    MLP_DECODER_FILE,
+    MLP_DEC_BIASES_FILE,
+    MLP_TOKENS_FILE,
     accelerator,
     __file__,
 )
@@ -126,8 +176,8 @@ grads_dict: dict = None
 with grads_manager(
     model,
     layer_range,
-    encoders_and_biases,
-    decoders_and_biases,
+    res_enc_and_biases,
+    res_dec_and_biases,
 ) as acts_and_grads:
 
     # Forward pass installs all backward hooks.
