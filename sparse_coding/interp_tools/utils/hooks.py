@@ -478,13 +478,18 @@ def jacobians_manager(
 def grads_manager(
     model: t.nn.Module,
     layer_indices: list[int],
-    enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
-    dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    res_enc_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    res_dec_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    attn_enc_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    attn_dec_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    mlp_enc_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    mlp_dec_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
 ) -> Generator[tuple[dict, dict], None, None]:
     """Context manager for backward hooks on autoencoder inserts."""
 
     acts_dict: dict = {}
     grads_dict: dict = {}
+    handles = []
 
     def backward_hooks_fac(location: str):
         """Allow backward hooks to label their dictionary entries."""
@@ -529,13 +534,28 @@ def grads_manager(
                 inplace=True,
             )
 
-            res_autoencoder_name: str = f"res_{layer_idx}"
+            # Module detection
+            if "attention" in module.__class__.__name__.lower():
+                # "gpt2attention"
+                current_name: str = f"attn_{layer_idx}"
+                error_name: str = f"attn_error_{layer_idx}"
+            elif "mlp" in module.__class__.__name__.lower():
+                # "gpt2mlp"
+                current_name: str = f"mlp_{layer_idx}"
+                error_name: str = f"mlp_error_{layer_idx}"
+            elif "gpt2block" in module.__class__.__name__.lower():
+                # "gpt2block"
+                current_name: str = f"res_{layer_idx}"
+                error_name: str = f"res_error_{layer_idx}"
+            else:
+                raise ValueError("Unexpected module name.")
+
             # Register backward hooks on the projected activations.
-            projected_acts.register_hook(
-                backward_hooks_fac(res_autoencoder_name)
+            handles.append(
+                projected_acts.register_hook(backward_hooks_fac(current_name))
             )
             # Cache projected activations.
-            acts_dict[res_autoencoder_name] = projected_acts
+            acts_dict[current_name] = projected_acts
 
             # Decode projected acts.
             projected_acts = (
@@ -552,8 +572,7 @@ def grads_manager(
             error = error.detach()
             error.requires_grad = True
 
-            error_name: str = f"error_{layer_idx}"
-            error.register_hook(backward_hooks_fac(error_name))
+            handles.append(error.register_hook(backward_hooks_fac(error_name)))
 
             # output[0] = projected_acts - error
             return projected_acts - error, output[1]
@@ -562,17 +581,44 @@ def grads_manager(
 
     # The context manager registers the initial forward hooks.
     for layer_idx in layer_indices:
-        encoder, enc_bias = enc_tensors_per_layer[layer_idx]
-        decoder, dec_bias = dec_tensors_per_layer[layer_idx]
-        model.transformer.h[layer_idx].register_forward_hook(
-            forward_hooks_fac(layer_idx, encoder, enc_bias, decoder, dec_bias)
+        # Residual stream
+        res_enc, res_enc_bias = res_enc_per_layer[layer_idx]
+        res_dec, res_dec_bias = res_dec_per_layer[layer_idx]
+        handles.append(
+            model.transformer.h[layer_idx].register_forward_hook(
+                forward_hooks_fac(
+                    layer_idx, res_enc, res_enc_bias, res_dec, res_dec_bias
+                )
+            )
+        )
+
+        # Attention
+        attn_enc, attn_enc_bias = attn_enc_per_layer[layer_idx]
+        attn_dec, attn_dec_bias = attn_dec_per_layer[layer_idx]
+        handles.append(
+            model.transformer.h[layer_idx].attn.register_forward_hook(
+                forward_hooks_fac(
+                    layer_idx, attn_enc, attn_enc_bias, attn_dec, attn_dec_bias
+                )
+            )
+        )
+
+        # MLP
+        mlp_enc, mlp_enc_bias = mlp_enc_per_layer[layer_idx]
+        mlp_dec, mlp_dec_bias = mlp_dec_per_layer[layer_idx]
+        handles.append(
+            model.transformer.h[layer_idx].mlp.register_forward_hook(
+                forward_hooks_fac(
+                    layer_idx, mlp_enc, mlp_enc_bias, mlp_dec, mlp_dec_bias
+                )
+            )
         )
 
     try:
         yield (acts_dict, grads_dict)
     finally:
-        # I have not implemented any hook cleanup.
-        pass
+        for handle in handles:
+            handle.remove()
 
 
 @contextmanager

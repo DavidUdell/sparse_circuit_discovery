@@ -191,7 +191,7 @@ with grads_manager(
 
     acts_dict, grads_dict = acts_and_grads
 
-    # Add model_dim activations to dict, if needed.
+    # Add model_dim activations to acts_dict, if needed.
     for grad in grads_dict:
         if "error" in grad:
             idx: int = int(grad.split("_")[-1])
@@ -199,6 +199,7 @@ with grads_manager(
 
             acts_dict[grad] = act
 
+    # Sanity checks
     assert len(acts_dict) == len(grads_dict)
     for act in acts_dict:
         assert act in grads_dict
@@ -229,7 +230,7 @@ with grads_manager(
     _, edge_grads = acts_and_grads
 
 # %%
-# Take products.
+# Compute the final products.
 for grad_loc, grad in edge_grads.items():
     # For inter-residual-streams only so far.
     grad_mod, grad_idx = grad_loc.split("_")
