@@ -197,27 +197,30 @@ with grads_manager(
 
     # Add model_dim activations to acts_dict, if needed.
     for grad in grads_dict:
-        if "error" in grad:
+        if "res_error" in grad:
             idx: int = int(grad.split("_")[-1])
-            # TODO: Something needs to be implemented here for the attn and mlp
-            # cases.
             act: t.Tensor = output.hidden_states[idx]
-
             acts_dict[grad] = act
 
-    # Sanity checks
-    assert len(acts_dict) == len(grads_dict)
+    # Sanity check dicts
     for act in acts_dict:
         assert act in grads_dict
+    for grad in grads_dict:
+        assert grad in acts_dict
 
     # Compute Jacobian-vector products.
     jvp_dict: dict = {}
     for location, grad in grads_dict.items():
         act = acts_dict[location]
+
+        # Shape regularization
+        act = act.squeeze()
+        act = act.unsqueeze(0)
+        grad = grad.squeeze()
+        grad = grad.unsqueeze(0)
+
         jvp = t.einsum("bsd, bsd -> bs", grad, act)
-
         jvp_last = jvp.squeeze()[-1]
-
         jvp_dict[location] = jvp_last
 
     jvp_sum: t.Tensor = t.tensor(

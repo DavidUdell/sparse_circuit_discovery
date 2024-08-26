@@ -554,8 +554,9 @@ def grads_manager(
             handles.append(
                 projected_acts.register_hook(backward_hooks_fac(current_name))
             )
-            # Cache projected activations.
+            # Cache activations.
             acts_dict[current_name] = projected_acts
+            acts_dict[error_name] = output[0]
 
             # Decode projected acts.
             projected_acts = (
