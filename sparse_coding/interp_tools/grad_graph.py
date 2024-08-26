@@ -202,7 +202,7 @@ with grads_manager(
             act: t.Tensor = output.hidden_states[idx]
             acts_dict[grad] = act
 
-    # Sanity check dicts
+    # Sanity checks
     for act in acts_dict:
         assert act in grads_dict
     for grad in grads_dict:
@@ -243,15 +243,22 @@ with grads_manager(
 # %%
 # Compute the final products.
 for grad_loc, grad in edge_grads.items():
-    # For inter-residual-streams only so far. TODO: This won't work for the new
-    # error names.
-    grad_mod, grad_idx = grad_loc.split("_")
+    grad_loc_bits: tuple = grad_loc.split("_")
+    grad_mod = grad_loc_bits[0]
+    # Append the error label when present.
+    if len(grad_loc_bits) == 3:
+        grad_mod += "_" + grad_loc_bits[1]
+    grad_idx = grad_loc_bits[-1]
+
+    # Act idx is one up from grad idx.
     act_idx = int(grad_idx) - 1
     if act_idx not in layer_range:
         continue
     act_loc = f"{grad_mod}_{act_idx}"
 
     product: t.Tensor = grads_dict[grad_loc] * acts_dict[act_loc]
+    # Regularize shape
+    product = product.squeeze().unsqueeze(0)
     product = product[:, -1, :].squeeze()
 
     # Threshold
