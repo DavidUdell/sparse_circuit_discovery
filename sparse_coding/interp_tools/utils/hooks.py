@@ -575,7 +575,12 @@ def grads_manager(
             handles.append(error.register_hook(backward_hooks_fac(error_name)))
 
             # output[0] = projected_acts - error
-            return projected_acts - error, output[1]
+            if isinstance(output, tuple):
+                return projected_acts - error, output[1]
+            elif isinstance(output, t.Tensor):
+                return projected_acts - error
+            else:
+                raise ValueError("Unexpected output type.")
 
         return forward_hook
 
