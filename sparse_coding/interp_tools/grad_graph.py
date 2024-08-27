@@ -172,6 +172,7 @@ print(PROMPT)
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 acts_dict: dict = None
 grads_dict: dict = None
+marginal_grads_dict: dict = {}
 
 with grads_manager(
     model,
@@ -202,67 +203,55 @@ with grads_manager(
             act: t.Tensor = output.hidden_states[idx]
             acts_dict[grad] = act
 
-    # Sanity checks
+    # Compute Jacobian-vector products.
     for act in acts_dict:
         assert act in grads_dict
-    for grad in grads_dict:
-        assert grad in acts_dict
 
-    # Compute Jacobian-vector products.
-    jvp_dict: dict = {}
-    for location, grad in grads_dict.items():
-        act = acts_dict[location]
+    for loc, grad in grads_dict.items():
+        assert loc in acts_dict
 
-        # Shape regularization
-        act = act.squeeze()
-        act = act.unsqueeze(0)
-        grad = grad.squeeze()
-        grad = grad.unsqueeze(0)
+        grad = grad.squeeze().unsqueeze(0)
+        act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        jvp = t.einsum("bsd, bsd -> bs", grad, act)
-        jvp_last = jvp.squeeze()[-1]
-        jvp_dict[location] = jvp_last
+        # The jvp at an activation is a scalar with gradient tracking that
+        # represents how well the model would do on the loss metric in that
+        # forward pass, if all later modules were replaced with a best-fit
+        # first-order Taylor approximation.
+        jvp = t.einsum("bsd,bsd->bs", grad, act).squeeze()
+        jvp[-1].backward(retain_graph=True)
+        _, marginal_grads = acts_and_grads
 
-    jvp_sum: t.Tensor = t.tensor(
-        0.0,
-        device=model.device,
-        requires_grad=True,
-    )
-    # We compute a jvp_sum tensor to combine several gradient calculations.
-    # Leverages the fact that the gradient of a sum is the sum of the
-    # gradients.
-    for jvp in jvp_dict.values():
-        jvp_sum = jvp_sum + jvp
+        # The marginal grads are how much each activation scalar contributes to
+        # the jvp estimation of the loss. We define our edges here where the
+        # bottom node is the jvp position and the top node is the upstream
+        # activation position of our choice.
+        down_idx = int(loc.split("_")[-1])
+        up_idx = down_idx - 1
+        if up_idx not in layer_range:
+            continue
 
-    edge_grads: dict = None
-    # jvp_sum backward pass.
-    jvp_sum.backward()
-
-    _, edge_grads = acts_and_grads
-
-# %%
-# Compute the final products.
-for grad_loc, grad in edge_grads.items():
-    grad_loc_bits: tuple = grad_loc.split("_")
-    grad_mod = grad_loc_bits[0]
-    # Append the error label when present.
-    if len(grad_loc_bits) == 3:
-        grad_mod += "_" + grad_loc_bits[1]
-    grad_idx = grad_loc_bits[-1]
-
-    # Act idx is one up from grad idx.
-    act_idx = int(grad_idx) - 1
-    if act_idx not in layer_range:
-        continue
-    act_loc = f"{grad_mod}_{act_idx}"
-
-    product: t.Tensor = grads_dict[grad_loc] * acts_dict[act_loc]
-    # Regularize shape
-    product = product.squeeze().unsqueeze(0)
-    product = product[:, -1, :].squeeze()
-
-    # Threshold
-    top_k_values, top_k_indices = t.topk(t.abs(product), NUM_TOP_EFFECTS)
-    for i in top_k_indices:
-        print(act_loc, f"#{i.item()}", round(product[i].item(), 2))
-    print()
+        # res_x
+        # mlp_x
+        # attn_x
+        # res_error_x
+        # mlp_error_x
+        # attn_error_x
+        # Total of 36 entries per neighboring layers
+        marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
+            f"res_{up_idx}"
+        ]
+        marginal_grads_dict[f"mlp_{up_idx}_to_" + loc] = marginal_grads[
+            f"mlp_{up_idx}"
+        ]
+        marginal_grads_dict[f"attn_{up_idx}_to_" + loc] = marginal_grads[
+            f"attn_{up_idx}"
+        ]
+        marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = marginal_grads[
+            f"res_error_{up_idx}"
+        ]
+        marginal_grads_dict[f"mlp_error_{up_idx}_to_" + loc] = marginal_grads[
+            f"mlp_error_{up_idx}"
+        ]
+        marginal_grads_dict[f"attn_error_{up_idx}_to_" + loc] = marginal_grads[
+            f"attn_error_{up_idx}"
+        ]
