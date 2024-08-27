@@ -210,7 +210,8 @@ with grads_manager(
     for loc, grad in grads_dict.items():
         assert loc in acts_dict
 
-        grad = grad.squeeze().unsqueeze(0)
+        # The grad must be treated as a constant in the jvp calculation.
+        grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
         # The jvp at an activation is a scalar with gradient tracking that
