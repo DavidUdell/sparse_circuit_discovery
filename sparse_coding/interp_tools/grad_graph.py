@@ -6,6 +6,8 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 """
 
 
+import re
+
 import torch as t
 from accelerate import Accelerator
 from pygraphviz import AGraph
@@ -27,6 +29,7 @@ from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
     prepare_autoencoder_and_indices,
 )
+
 
 # %%
 # Load constants.
@@ -256,3 +259,19 @@ with grads_manager(
         marginal_grads_dict[f"attn_error_{up_idx}_to_" + loc] = marginal_grads[
             f"attn_error_{up_idx}"
         ]
+
+# %%
+# Render the graph.
+for i, v in marginal_grads_dict.items():
+    # Start of string, "res_", minimal selection of any characters, then
+    # "res_".
+    if re.match("^res_.*?res_", i) is not None:
+        # These cases need to account for double-counting.
+        edge_ends: tuple = i.split("_to_")
+        attn_end: str = edge_ends[-1].replace("res_", "attn_")
+        mlp_end: str = edge_ends[-1].replace("res_", "mlp_")
+
+        intervening_attn_edge: str = f"{edge_ends[0]}_to_{attn_end}"
+        intervening_mlp_edge: str = f"{edge_ends[0]}_to_{mlp_end}"
+        assert intervening_attn_edge in marginal_grads_dict
+        assert intervening_mlp_edge in marginal_grads_dict
