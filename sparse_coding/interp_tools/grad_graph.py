@@ -284,4 +284,16 @@ for i, v in marginal_grads_dict.items():
         v -= marginal_grads_dict[intervening_attn_edge]
         v -= marginal_grads_dict[intervening_mlp_edge]
 
-    # Graphing can now take place using i and v, after the corrections block.
+    # Normal graphing can now take place using i and v. We'll plot only the
+    # contributions of the final forward pass using the next line.
+    v = v.detach().squeeze(0)[-1, :]
+
+    print(i)
+    values, indices = t.topk(v, NUM_TOP_EFFECTS)
+    # Negative topk as well.
+    values, indices = values.tolist(), indices.tolist()
+    for value, idx in zip(values, indices):
+        if round(value) == 0:
+            continue
+        print(f"{idx}: {value:.2f}")
+    print("\n")
