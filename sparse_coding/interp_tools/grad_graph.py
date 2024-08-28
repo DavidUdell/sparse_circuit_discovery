@@ -266,7 +266,12 @@ for i, v in marginal_grads_dict.items():
     # Start of string, "res_", minimal selection of any characters, then
     # "res_".
     if re.match("^res_.*?res_", i) is not None:
-        # These cases need to account for double-counting.
+        # These cases need to account for double-counting:
+        # res_ to res_
+        # res_ to res_error_
+        # res_error_ to res_
+        # res_error_ to res_error_
+
         edge_ends: tuple = i.split("_to_")
         attn_end: str = edge_ends[-1].replace("res_", "attn_")
         mlp_end: str = edge_ends[-1].replace("res_", "mlp_")
@@ -275,3 +280,8 @@ for i, v in marginal_grads_dict.items():
         intervening_mlp_edge: str = f"{edge_ends[0]}_to_{mlp_end}"
         assert intervening_attn_edge in marginal_grads_dict
         assert intervening_mlp_edge in marginal_grads_dict
+
+        v -= marginal_grads_dict[intervening_attn_edge]
+        v -= marginal_grads_dict[intervening_mlp_edge]
+
+    # Graphing can now take place using i and v, after the corrections block.
