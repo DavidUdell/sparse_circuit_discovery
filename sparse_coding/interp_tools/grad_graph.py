@@ -240,49 +240,73 @@ with grads_manager(
         # res_error_x
         # mlp_error_x
         # attn_error_x
-        # Total of 36 entries per neighboring layers
-        marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
-            f"res_{up_idx}"
-        ]
-        marginal_grads_dict[f"mlp_{up_idx}_to_" + loc] = marginal_grads[
-            f"mlp_{up_idx}"
-        ]
-        marginal_grads_dict[f"attn_{up_idx}_to_" + loc] = marginal_grads[
-            f"attn_{up_idx}"
-        ]
-        marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = marginal_grads[
-            f"res_error_{up_idx}"
-        ]
-        marginal_grads_dict[f"mlp_error_{up_idx}_to_" + loc] = marginal_grads[
-            f"mlp_error_{up_idx}"
-        ]
-        marginal_grads_dict[f"attn_error_{up_idx}_to_" + loc] = marginal_grads[
-            f"attn_error_{up_idx}"
-        ]
+        if "attn_" in loc:
+            # Upstream res_
+            marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
+                f"res_{up_idx}"
+            ]
+            marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
+                marginal_grads[f"res_error_{up_idx}"]
+            )
+        elif "mlp_" in loc:
+            # Same-layer attn_
+            marginal_grads_dict[f"attn_{down_idx}_to_" + loc] = marginal_grads[
+                f"attn_{down_idx}"
+            ]
+            marginal_grads_dict[f"attn_error_{down_idx}_to_" + loc] = (
+                marginal_grads[f"attn_error_{down_idx}"]
+            )
+        elif "res_" in loc:
+            # Upstream res_
+            marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
+                f"res_{up_idx}"
+            ]
+            marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
+                marginal_grads[f"res_error_{up_idx}"]
+            )
+            # Same-layer mlp_
+            marginal_grads_dict[f"mlp_{down_idx}_to_" + loc] = marginal_grads[
+                f"mlp_{down_idx}"
+            ]
+            marginal_grads_dict[f"mlp_error_{down_idx}_to_" + loc] = (
+                marginal_grads[f"mlp_error_{down_idx}"]
+            )
+
 
 # %%
-# Render the graph.
-for i, v in marginal_grads_dict.items():
-    # Start of string, "res_", minimal selection of any characters, then
-    # "res_".
-    if re.match("^res_.*?res_", i) is not None:
-        # These cases need to account for double-counting:
-        # res_ to res_
-        # res_ to res_error_
-        # res_error_ to res_
-        # res_error_ to res_error_
+# Double-counting correction functionality.
+def dedupe(regex: str, overall_edge: str, val, edges_dict: dict):
+    """
+    Deduplicate effect sizes for GPT-2 edges.
 
-        edge_ends: tuple = i.split("_to_")
+    These cases specifically need to account for double-counting:
+    res_ to res_
+    res_ to res_error_
+    res_error_ to res_
+    res_error_ to res_error_
+    """
+
+    # Regex: start of string, "x_", minimal selection of any characters, then
+    # "x_".
+    if re.match(regex, overall_edge) is not None:
+        edge_ends: tuple = overall_edge.split("_to_")
         attn_end: str = edge_ends[-1].replace("res_", "attn_")
         mlp_end: str = edge_ends[-1].replace("res_", "mlp_")
 
         intervening_attn_edge: str = f"{edge_ends[0]}_to_{attn_end}"
-        intervening_mlp_edge: str = f"{edge_ends[0]}_to_{mlp_end}"
-        assert intervening_attn_edge in marginal_grads_dict
-        assert intervening_mlp_edge in marginal_grads_dict
+        intervening_mlp_edge: str = f"{attn_end}_to_{mlp_end}"
+        assert intervening_attn_edge in edges_dict
+        assert intervening_mlp_edge in edges_dict
 
-        v -= marginal_grads_dict[intervening_attn_edge]
-        v -= marginal_grads_dict[intervening_mlp_edge]
+        val -= edges_dict[intervening_attn_edge]
+        val -= edges_dict[intervening_mlp_edge]
+
+    return val
+
+
+# Render the graph.
+for i, v in marginal_grads_dict.items():
+    v = dedupe("^res_error.*?res_error", i, v, marginal_grads_dict)
 
     # Normal graphing can now take place using i and v. We'll plot only the
     # contributions of the final forward pass using the next line.
