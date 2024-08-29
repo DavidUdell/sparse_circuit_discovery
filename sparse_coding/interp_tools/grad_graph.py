@@ -275,39 +275,61 @@ with grads_manager(
 
 # %%
 # Double-counting correction functionality.
-def dedupe(regex: str, overall_edge: str, val, edges_dict: dict):
+def dedupe(overall_edge: str, val, edges_dict: dict):
     """
     Deduplicate effect sizes for GPT-2 edges.
 
     These cases specifically need to account for double-counting:
-    res_ to res_
-    res_ to res_error_
-    res_error_ to res_
     res_error_ to res_error_
+    res_ to res_
     """
 
     # Regex: start of string, "x_", minimal selection of any characters, then
-    # "x_".
-    if re.match(regex, overall_edge) is not None:
-        edge_ends: tuple = overall_edge.split("_to_")
-        attn_end: str = edge_ends[-1].replace("res_", "attn_")
-        mlp_end: str = edge_ends[-1].replace("res_", "mlp_")
+    # "y_".
+    regexes: list[str] = [
+        "^res_error_.*?res_error_",
+        "^res_\d+.*?res_\d+",
+    ]
 
-        intervening_attn_edge: str = f"{edge_ends[0]}_to_{attn_end}"
-        intervening_mlp_edge: str = f"{attn_end}_to_{mlp_end}"
-        assert intervening_attn_edge in edges_dict
-        assert intervening_mlp_edge in edges_dict
+    for regex in regexes:
+        if re.match(regex, overall_edge) is not None:
+            print("Match:", overall_edge)
+            edge_ends: tuple = overall_edge.split("_to_")
+            res_up: str = edge_ends[0]
+            res_same: str = edge_ends[-1]
 
-        val -= edges_dict[intervening_attn_edge]
-        val -= edges_dict[intervening_mlp_edge]
+            attn_same: str = res_same.replace("res_", "attn_")
+            mlp_same: str = res_same.replace("res_", "mlp_")
+
+            res_to_attn_edge: str = f"{res_up}_to_{attn_same}"
+            attn_to_mlp_edge: str = f"{attn_same}_to_{mlp_same}"
+            mlp_to_res_edge: str = f"{mlp_same}_to_{res_same}"
+            print(
+                "Confounds:",
+                res_to_attn_edge,
+                attn_to_mlp_edge,
+                mlp_to_res_edge,
+            )
+
+            for confound in [
+                res_to_attn_edge,
+                attn_to_mlp_edge,
+                mlp_to_res_edge,
+            ]:
+                assert confound in edges_dict
+
+                val -= edges_dict[confound]
+
+            # If it's error you don't need to also check projected.
+            break
 
     return val
 
 
+# %%
 # Render the graph.
 for i, v in marginal_grads_dict.items():
-    v = dedupe("^res_error.*?res_error", i, v, marginal_grads_dict)
-
+    v = dedupe(i, v, marginal_grads_dict)
     # Normal graphing can now take place using i and v. We'll plot only the
     # contributions of the final forward pass using the next line.
     v = v.detach().squeeze(0)[-1, :]
