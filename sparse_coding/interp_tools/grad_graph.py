@@ -330,9 +330,6 @@ def dedupe(overall_edge: str, val, edges_dict: dict):
             mlp_same: str = res_same.replace("res_", "mlp_")
 
             res_to_mlp_edge: str = f"{res_up}_to_{mlp_same}"
-            print("Match: ", overall_edge)
-            print("Confound: ", res_to_mlp_edge)
-
             assert res_to_mlp_edge in edges_dict
 
             val -= edges_dict[res_to_mlp_edge]
@@ -346,9 +343,16 @@ def dedupe(overall_edge: str, val, edges_dict: dict):
 # %%
 # Render the graph.
 for i, v in marginal_grads_dict.items():
+    # Skip the res_to_mlp edges, which violate graph topology in GPT-2. We just
+    # use them for double-counting correction.
+    if re.match("^res_.*?mlp_", i) is not None:
+        continue
+
+    # Fixes all double-counting.
     v = dedupe(i, v, marginal_grads_dict)
-    # Normal graphing can now take place using i and v. We'll plot only the
-    # contributions of the final forward pass using the next line.
+    # All corrections now done.
+
+    # We'll plot only the contributions of the final forward pass:
     v = v.detach().squeeze(0)[-1, :]
 
     print(i)
