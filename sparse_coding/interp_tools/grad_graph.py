@@ -256,6 +256,16 @@ with grads_manager(
             marginal_grads_dict[f"attn_error_{down_idx}_to_" + loc] = (
                 marginal_grads[f"attn_error_{down_idx}"]
             )
+
+            # Upstream res_. This one is special: it isn't in the graph
+            # topology, but we need it for double-counting correction. Not to
+            # be plotted directly.
+            marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
+                f"res_{up_idx}"
+            ]
+            marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
+                marginal_grads[f"res_error_{up_idx}"]
+            )
         elif "res_" in loc:
             # Upstream res_
             marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
@@ -264,6 +274,7 @@ with grads_manager(
             marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
                 marginal_grads[f"res_error_{up_idx}"]
             )
+
             # Same-layer mlp_
             marginal_grads_dict[f"mlp_{down_idx}_to_" + loc] = marginal_grads[
                 f"mlp_{down_idx}"
@@ -271,6 +282,8 @@ with grads_manager(
             marginal_grads_dict[f"mlp_error_{down_idx}_to_" + loc] = (
                 marginal_grads[f"mlp_error_{down_idx}"]
             )
+        else:
+            raise ValueError("Module location not recognized.")
 
 
 # %%
@@ -279,46 +292,50 @@ def dedupe(overall_edge: str, val, edges_dict: dict):
     """
     Deduplicate effect sizes for GPT-2 edges.
 
-    These cases specifically need to account for double-counting:
-    res_error_ to res_error_
-    res_ to res_
+    These cases specifically need to account for double-counting: res_error_ to
+    res_error_ res_ to res_
+
+    The theory is a little involved:
+
+    We can assign a "frozen JVP" to each node in the computational graph. This
+    is a scalar telling us what the loss would be by that node, if the
+    remainder of the graph were a first-order approximation. Then, the grad of
+    the frozen JVP with respect to some upstream activation tells us how much
+    that upstream activation affected the loss _by way of_ the activations in
+    the JVP. We need to detach ("freeze") the grad of the loss w/r/t the node's
+    activation to take this grad (hence, "frozen" Jacobian-vector product).
+
+    Then, when the computational graph has a forked shape and we want to look
+    at the edge-level contribution due to just one fork, we need to subtract
+    off the contributions of the other fork. Those contributions are the grad
+    of the frozen JVP at the _last_ node in the other fork w/r/t the upstream
+    node's activation. Subtract that from the grad of the frozen JVP of the
+    sink node w/r/t the upstream node's activation. You now have the marginal
+    contribution of the fork edge, with no double counting.
     """
 
     # Regex: start of string, "x_", minimal selection of any characters, then
     # "y_".
     regexes: list[str] = [
         "^res_error_.*?res_error_",
-        "^res_\d+.*?res_\d+",
+        "^res_\d+.*?res_\d+",  # pylint: disable=anomalous-backslash-in-string
     ]
 
     for regex in regexes:
         if re.match(regex, overall_edge) is not None:
-            print("Match:", overall_edge)
             edge_ends: tuple = overall_edge.split("_to_")
+            # Pieces
             res_up: str = edge_ends[0]
             res_same: str = edge_ends[-1]
-
-            attn_same: str = res_same.replace("res_", "attn_")
             mlp_same: str = res_same.replace("res_", "mlp_")
 
-            res_to_attn_edge: str = f"{res_up}_to_{attn_same}"
-            attn_to_mlp_edge: str = f"{attn_same}_to_{mlp_same}"
-            mlp_to_res_edge: str = f"{mlp_same}_to_{res_same}"
-            print(
-                "Confounds:",
-                res_to_attn_edge,
-                attn_to_mlp_edge,
-                mlp_to_res_edge,
-            )
+            res_to_mlp_edge: str = f"{res_up}_to_{mlp_same}"
+            print("Match: ", overall_edge)
+            print("Confound: ", res_to_mlp_edge)
 
-            for confound in [
-                res_to_attn_edge,
-                attn_to_mlp_edge,
-                mlp_to_res_edge,
-            ]:
-                assert confound in edges_dict
+            assert res_to_mlp_edge in edges_dict
 
-                val -= edges_dict[confound]
+            val -= edges_dict[res_to_mlp_edge]
 
             # If it's error you don't need to also check projected.
             break
