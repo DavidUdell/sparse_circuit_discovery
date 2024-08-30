@@ -342,25 +342,28 @@ def dedupe(overall_edge: str, val, edges_dict: dict):
 
 # %%
 # Render the graph.
-for i, v in marginal_grads_dict.items():
+for edge_type, values in marginal_grads_dict.items():
     # Skip the res_to_mlp edges, which violate graph topology in GPT-2. We just
     # use them for double-counting correction.
-    if re.match("^res_.*?mlp_", i) is not None:
+    if re.match("^res_.*?mlp_", edge_type) is not None:
         continue
 
     # Fixes all double-counting.
-    v = dedupe(i, v, marginal_grads_dict)
-    # All corrections now done.
+    values = dedupe(edge_type, values, marginal_grads_dict)
+    # All corrections are now done.
 
     # We'll plot only the contributions of the final forward pass:
-    v = v.detach().squeeze(0)[-1, :]
+    values = values.detach().squeeze(0)[-1, :]
 
-    print(i)
-    values, indices = t.topk(v, NUM_TOP_EFFECTS)
-    # Negative topk as well.
-    values, indices = values.tolist(), indices.tolist()
-    for value, idx in zip(values, indices):
-        if round(value) == 0:
+    top_values, top_indices = t.topk(values, NUM_TOP_EFFECTS, largest=True)
+    top_values, top_indices = top_values.tolist(), top_indices.tolist()
+    bot_values, bot_indices = t.topk(values, NUM_TOP_EFFECTS, largest=False)
+    bot_values, bot_indices = bot_values.tolist(), bot_indices.tolist()
+
+    for v, dim in zip(top_values + bot_values, top_indices + bot_indices):
+        if round(v) == 0.0:
             continue
-        print(f"{idx}: {value:.2f}")
-    print("\n")
+
+        print(edge_type, dim, v)
+
+    print()
