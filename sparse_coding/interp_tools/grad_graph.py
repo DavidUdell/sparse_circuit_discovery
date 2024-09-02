@@ -216,16 +216,31 @@ with grads_manager(
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        if "res_" in loc:
+        if re.match("res_", loc) is not None:
+            mlp_confound: str = re.sub("(res_error_|res_)", "mlp_", loc)
+            mlp_error_confound: str = re.sub(
+                "(res_error_|res_)", "mlp_error_", loc
+            )
             # The jvp at an activation is a scalar with gradient tracking that
             # represents how well the model would do on the loss metric in that
             # forward pass, if all later modules were replaced with a best-fit
             # first-order Taylor approximation.
-            jvp = t.einsum("bsd,bsd->bs", grad, act).squeeze()
+            jvp = (
+                t.einsum(
+                    "...sd,...sd->...s",
+                    grads_dict[mlp_confound].detach(),
+                    acts_dict[mlp_confound],
+                ).squeeze()
+                + t.einsum(
+                    "...sd,...sd->...s",
+                    grads_dict[mlp_error_confound].detach(),
+                    acts_dict[mlp_error_confound],
+                ).squeeze()
+            )
             jvp[-1].backward(retain_graph=True)
             _, jvp_grads = acts_and_grads
 
-        weighted_prod = t.einsum("bsd,bsd->bsd", grad, act).squeeze()
+        weighted_prod = t.einsum("bsd,bsd->bsd", grad, act)[:, -1, :].squeeze()
         for dim_idx, prod in enumerate(weighted_prod):
             prod.backward(retain_graph=True)
             _, marginal_grads = acts_and_grads
@@ -264,13 +279,11 @@ with grads_manager(
                 ] = (
                     marginal_grads[f"res_{up_layer_idx}"]
                     - jvp_grads[f"res_{up_layer_idx}"]
-                    - jvp_grads[f"res_error_{up_layer_idx}"]
                 )
                 marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"res_error_{up_layer_idx}"]
-                    - jvp_grads[f"res_{up_layer_idx}"]
                     - jvp_grads[f"res_error_{up_layer_idx}"]
                 )
 
