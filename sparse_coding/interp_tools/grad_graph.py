@@ -213,145 +213,80 @@ with grads_manager(
     for loc, grad in grads_dict.items():
         assert loc in acts_dict
 
-        # The grad must be treated as a constant in the jvp calculation.
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        # The jvp at an activation is a scalar with gradient tracking that
-        # represents how well the model would do on the loss metric in that
-        # forward pass, if all later modules were replaced with a best-fit
-        # first-order Taylor approximation.
-        jvp = t.einsum("bsd,bsd->bs", grad, act).squeeze()
-        jvp[-1].backward(retain_graph=True)
-        _, marginal_grads = acts_and_grads
+        if "res_" in loc:
+            # The jvp at an activation is a scalar with gradient tracking that
+            # represents how well the model would do on the loss metric in that
+            # forward pass, if all later modules were replaced with a best-fit
+            # first-order Taylor approximation.
+            jvp = t.einsum("bsd,bsd->bs", grad, act).squeeze()
+            jvp[-1].backward(retain_graph=True)
+            _, jvp_grads = acts_and_grads
 
-        # The marginal grads are how much each activation scalar contributes to
-        # the jvp estimation of the loss. We define our edges here where the
-        # bottom node is the jvp position and the top node is the upstream
-        # activation position of our choice.
-        down_idx = int(loc.split("_")[-1])
-        up_idx = down_idx - 1
-        if up_idx not in layer_range:
-            continue
+        weighted_prod = t.einsum("bsd,bsd->bsd", grad, act).squeeze()
+        for dim_idx, prod in enumerate(weighted_prod):
+            prod.backward(retain_graph=True)
+            _, marginal_grads = acts_and_grads
 
-        # res_x
-        # mlp_x
-        # attn_x
-        # res_error_x
-        # mlp_error_x
-        # attn_error_x
-        if "attn_" in loc:
-            # Upstream res_
-            marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
-                f"res_{up_idx}"
-            ]
-            marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
-                marginal_grads[f"res_error_{up_idx}"]
-            )
-        elif "mlp_" in loc:
-            # Same-layer attn_
-            marginal_grads_dict[f"attn_{down_idx}_to_" + loc] = marginal_grads[
-                f"attn_{down_idx}"
-            ]
-            marginal_grads_dict[f"attn_error_{down_idx}_to_" + loc] = (
-                marginal_grads[f"attn_error_{down_idx}"]
-            )
+            down_layer_idx = int(loc.split("_")[-1])
+            up_layer_idx = down_layer_idx - 1
+            if up_layer_idx not in layer_range:
+                continue
 
-            # Upstream res_. This one is special: it isn't in the graph
-            # topology, but we need it for double-counting correction. Not to
-            # be plotted directly.
-            marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
-                f"res_{up_idx}"
-            ]
-            marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
-                marginal_grads[f"res_error_{up_idx}"]
-            )
-        elif "res_" in loc:
-            # Upstream res_
-            marginal_grads_dict[f"res_{up_idx}_to_" + loc] = marginal_grads[
-                f"res_{up_idx}"
-            ]
-            marginal_grads_dict[f"res_error_{up_idx}_to_" + loc] = (
-                marginal_grads[f"res_error_{up_idx}"]
-            )
+            # res_x
+            # mlp_x
+            # attn_x
+            # res_error_x
+            # mlp_error_x
+            # attn_error_x
+            if "attn_" in loc:
+                # Upstream res_
+                marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"res_{up_layer_idx}"]
+                marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"res_error_{up_layer_idx}"]
+            elif "mlp_" in loc:
+                # Same-layer attn_
+                marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"attn_{down_layer_idx}"]
+                marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"attn_error_{down_layer_idx}"]
+            elif "res_" in loc:
+                # Upstream res_; double-counting corrections.
+                marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = (
+                    marginal_grads[f"res_{up_layer_idx}"]
+                    - jvp_grads[f"res_{up_layer_idx}"]
+                    - jvp_grads[f"res_error_{up_layer_idx}"]
+                )
+                marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = (
+                    marginal_grads[f"res_error_{up_layer_idx}"]
+                    - jvp_grads[f"res_{up_layer_idx}"]
+                    - jvp_grads[f"res_error_{up_layer_idx}"]
+                )
 
-            # Same-layer mlp_
-            marginal_grads_dict[f"mlp_{down_idx}_to_" + loc] = marginal_grads[
-                f"mlp_{down_idx}"
-            ]
-            marginal_grads_dict[f"mlp_error_{down_idx}_to_" + loc] = (
-                marginal_grads[f"mlp_error_{down_idx}"]
-            )
-        else:
-            raise ValueError("Module location not recognized.")
-
-
-# %%
-# Double-counting correction functionality.
-def dedupe(overall_edge: str, val, edges_dict: dict):
-    """
-    Deduplicate effect sizes for GPT-2 edges.
-
-    These cases specifically need to account for double-counting: res_error_ to
-    res_error_ res_ to res_
-
-    The theory is a little involved:
-
-    We can assign a "frozen JVP" to each node in the computational graph. This
-    is a scalar telling us what the loss would be by that node, if the
-    remainder of the graph were a first-order approximation. Then, the grad of
-    the frozen JVP with respect to some upstream activation tells us how much
-    that upstream activation affected the loss _by way of_ the activations in
-    the JVP. We need to detach ("freeze") the grad of the loss w/r/t the node's
-    activation to take this grad (hence, "frozen" Jacobian-vector product).
-
-    Then, when the computational graph has a forked shape and we want to look
-    at the edge-level contribution due to just one fork, we need to subtract
-    off the contributions of the other fork. Those contributions are the grad
-    of the frozen JVP at the _last_ node in the other fork w/r/t the upstream
-    node's activation. Subtract that from the grad of the frozen JVP of the
-    sink node w/r/t the upstream node's activation. You now have the marginal
-    contribution of the fork edge, with no double counting.
-    """
-
-    # Regex: start of string, "x_", minimal selection of any characters, then
-    # "y_".
-    regexes: list[str] = [
-        "^res_error_.*?res_error_",
-        "^res_\d+.*?res_\d+",  # pylint: disable=anomalous-backslash-in-string
-    ]
-
-    for regex in regexes:
-        if re.match(regex, overall_edge) is not None:
-            edge_ends: tuple = overall_edge.split("_to_")
-            # Pieces
-            res_up: str = edge_ends[0]
-            res_same: str = edge_ends[-1]
-            mlp_same: str = res_same.replace("res_", "mlp_")
-
-            res_to_mlp_edge: str = f"{res_up}_to_{mlp_same}"
-            assert res_to_mlp_edge in edges_dict
-
-            val -= edges_dict[res_to_mlp_edge]
-
-            # If it's error you don't need to also check projected.
-            break
-
-    return val
-
+                # Same-layer mlp_
+                marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"mlp_{down_layer_idx}"]
+                marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"mlp_error_{down_layer_idx}"]
+            else:
+                raise ValueError("Module location not recognized.")
 
 # %%
 # Render the graph.
 for edge_type, values in marginal_grads_dict.items():
-    # Skip the res_to_mlp edges, which violate graph topology in GPT-2. We just
-    # use them for double-counting correction.
-    if re.match("^res_.*?mlp_", edge_type) is not None:
-        continue
-
-    # Fixes all double-counting.
-    values = dedupe(edge_type, values, marginal_grads_dict)
-    # All corrections are now done.
-
     # We'll plot only the contributions of the final forward pass:
     values = values.detach().squeeze(0)[-1, :]
 
