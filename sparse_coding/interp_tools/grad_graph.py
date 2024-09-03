@@ -253,7 +253,9 @@ with grads_manager(
             _, bottom_indices = t.topk(
                 weighted_prod, NUM_TOP_EFFECTS, largest=False
             )
-            indices: list = top_indices.tolist() + bottom_indices.tolist()
+            indices: list = list(
+                set(top_indices.tolist() + bottom_indices.tolist())
+            )
 
         for dim_idx in tqdm(indices, desc=loc):
             weighted_prod[dim_idx].backward(retain_graph=True)
@@ -313,19 +315,6 @@ with grads_manager(
 
 # %%
 # Render the graph.
-for edge_type, values in marginal_grads_dict.items():
-    # We'll plot only the contributions of the final forward pass:
-    values = values.detach().squeeze(0)[-1, :]
-
-    top_values, top_indices = t.topk(values, NUM_TOP_EFFECTS, largest=True)
-    top_values, top_indices = top_values.tolist(), top_indices.tolist()
-    bot_values, bot_indices = t.topk(values, NUM_TOP_EFFECTS, largest=False)
-    bot_values, bot_indices = bot_values.tolist(), bot_indices.tolist()
-
-    for v, dim in zip(top_values + bot_values, top_indices + bot_indices):
-        if round(v) == 0.0:
-            continue
-
-        print(edge_type, dim, v)
-
-    print()
+for edge_type, inner_dict in marginal_grads_dict.items():
+    print(edge_type)
+    print(len(inner_dict))
