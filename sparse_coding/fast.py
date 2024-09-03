@@ -1,11 +1,11 @@
 """Run the constant-time graph pipeline in one command."""
 
-from runpy import run_module
+from subprocess import run
 
 for script in [
-    "collect_acts",
-    "load_autoencoder",
-    "interp_tools.contexts",
-    "interp_tools.grad_graph",
+    "collect_acts.py",
+    "load_autoencoder.py",
+    "interp_tools/contexts.py",
+    "interp_tools/grad_graph.py",
 ]:
-    run_module(f"sparse_coding.{script}")
+    run(["python3", script], check=True)
