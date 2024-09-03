@@ -65,7 +65,7 @@ SEED = config.get("SEED")
 
 # Or some other means of thresholding approximated effects.
 NUM_TOP_BOTTOM_NODES: int = 10
-EDGES_THRESHOLD: float = 0.001
+EDGES_THRESHOLD: float = 0.01
 
 # %%
 # Reproducibility.
