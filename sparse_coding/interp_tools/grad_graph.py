@@ -243,8 +243,20 @@ with grads_manager(
             _, jvp_grads = acts_and_grads
 
         weighted_prod = t.einsum("bsd,bsd->bsd", grad, act)[:, -1, :].squeeze()
-        for dim_idx, prod in enumerate(tqdm(weighted_prod, desc=loc)):
-            prod.backward(retain_graph=True)
+
+        # Thresholding autoencoders.
+        indices: list = range(len(weighted_prod))
+        if "error_" not in loc:
+            _, top_indices = t.topk(
+                weighted_prod, NUM_TOP_EFFECTS, largest=True
+            )
+            _, bottom_indices = t.topk(
+                weighted_prod, NUM_TOP_EFFECTS, largest=False
+            )
+            indices: list = top_indices.tolist() + bottom_indices.tolist()
+
+        for dim_idx in tqdm(indices, desc=loc):
+            weighted_prod[dim_idx].backward(retain_graph=True)
             _, marginal_grads = acts_and_grads
 
             down_layer_idx = int(loc.split("_")[-1])
