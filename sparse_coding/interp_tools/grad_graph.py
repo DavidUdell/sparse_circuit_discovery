@@ -63,9 +63,9 @@ GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
-# Or some other means of thresholding approximated effects.
-NUM_TOP_BOTTOM_NODES: int = 10
-EDGES_THRESHOLD: float = 0.01
+# x2 for each: topk and bottomk nodes.
+NUM_DOWN_NODES: int = 10
+NUM_UP_NODES: int = 10
 
 # %%
 # Reproducibility.
@@ -250,10 +250,10 @@ with grads_manager(
         indices: list = range(len(weighted_prod))
         if "error_" not in loc:
             _, top_indices = t.topk(
-                weighted_prod, NUM_TOP_BOTTOM_NODES, largest=True
+                weighted_prod, NUM_DOWN_NODES, largest=True
             )
             _, bottom_indices = t.topk(
-                weighted_prod, NUM_TOP_BOTTOM_NODES, largest=False
+                weighted_prod, NUM_DOWN_NODES, largest=False
             )
             indices: list = list(
                 set(top_indices.tolist() + bottom_indices.tolist())
@@ -334,8 +334,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
         continue
 
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
-        for up_dim, effect in enumerate(up_values.squeeze()[-1, :]):
-            if abs(effect.item()) < EDGES_THRESHOLD:
+        up_values = up_values.squeeze()[-1, :]
+
+        _, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
+        _, bottom_indices = t.topk(up_values, NUM_UP_NODES, largest=False)
+        indices: list = list(
+            set(top_indices.tolist() + bottom_indices.tolist())
+        )
+
+        for up_dim, effect in enumerate(up_values):
+            if up_dim not in indices:
                 continue
 
             if "res" in up_layer_module:
