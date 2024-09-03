@@ -247,7 +247,6 @@ with grads_manager(
         weighted_prod = t.einsum("bsd,bsd->bsd", grad, act)[:, -1, :].squeeze()
 
         # Thresholding autoencoders.
-        indices: list = range(len(weighted_prod))
         if "error_" not in loc:
             _, top_indices = t.topk(
                 weighted_prod, NUM_DOWN_NODES, largest=True
@@ -258,6 +257,13 @@ with grads_manager(
             indices: list = list(
                 set(top_indices.tolist() + bottom_indices.tolist())
             )
+        elif "error_" in loc:
+            # Sum across the error tensors, since we don't care about the edges
+            # into the neuron basis.
+            weighted_prod = weighted_prod.sum().unsqueeze(0)
+            indices: list = [0]
+        else:
+            raise ValueError("Module location not recognized.")
 
         for dim_idx in tqdm(indices, desc=loc):
             weighted_prod[dim_idx].backward(retain_graph=True)
