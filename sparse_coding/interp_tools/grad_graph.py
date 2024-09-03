@@ -327,18 +327,21 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     up_layer_module: str = "".join(up_layer_split[:-1])
     down_layer_module: str = "".join(down_layer_split[:-1])
 
-    for down_dim, up_values in down_nodes.items():
-        for up_dim, effect in enumerate(up_values):
+    # Errors are skipped during graphing. Use these for ancillary graph
+    # statistics, though.
+    if "error" in up_layer_module or "error" in down_layer_module:
+        continue
+
+    for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
+        for up_dim, effect in enumerate(up_values.squeeze()[-1, :]):
             if abs(effect.item()) < 0.1:
                 continue
 
-            if "error_" in up_layer_module:
-                info: str = None
-            if "res_" in up_layer_module:
+            if "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
-            elif "attn_" in up_layer_module:
+            elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
-            elif "mlp_" in up_layer_module:
+            elif "mlp" in up_layer_module:
                 info: str = MLP_TOKENS_FILE
             else:
                 raise ValueError("Module location not recognized.")
@@ -369,13 +372,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += "</b></font></td></tr></table>>"
                 graph.add_node(up_dim_name, label=label, shape="box")
 
-            if "error_" in down_layer_module:
-                info: str = None
-            if "res_" in down_layer_module:
+            if "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
-            elif "attn_" in down_layer_module:
+            elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
-            elif "mlp_" in down_layer_module:
+            elif "mlp" in down_layer_module:
                 info: str = MLP_TOKENS_FILE
             else:
                 raise ValueError("Module location not recognized.")
