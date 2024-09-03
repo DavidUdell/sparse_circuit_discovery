@@ -11,6 +11,7 @@ import re
 import torch as t
 from accelerate import Accelerator
 from pygraphviz import AGraph
+from tqdm.auto import tqdm
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -25,6 +26,7 @@ from sparse_coding.utils.interface import (
     save_paths,
     slice_to_range,
 )
+from sparse_coding.utils.tasks import recursive_defaultdict
 from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
     prepare_autoencoder_and_indices,
@@ -175,7 +177,7 @@ print(PROMPT)
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 acts_dict: dict = None
 grads_dict: dict = None
-marginal_grads_dict: dict = {}
+marginal_grads_dict: dict = recursive_defaultdict()
 
 with grads_manager(
     model,
@@ -241,7 +243,7 @@ with grads_manager(
             _, jvp_grads = acts_and_grads
 
         weighted_prod = t.einsum("bsd,bsd->bsd", grad, act)[:, -1, :].squeeze()
-        for dim_idx, prod in enumerate(weighted_prod):
+        for dim_idx, prod in enumerate(tqdm(weighted_prod, desc=loc)):
             prod.backward(retain_graph=True)
             _, marginal_grads = acts_and_grads
 
