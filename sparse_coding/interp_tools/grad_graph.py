@@ -262,18 +262,18 @@ with grads_manager(
                 # Upstream res_
                 marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"res_{up_layer_idx}"]
+                ] = marginal_grads[f"res_{up_layer_idx}"].cpu()
                 marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"res_error_{up_layer_idx}"]
+                ] = marginal_grads[f"res_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
                 # Same-layer attn_
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_{down_layer_idx}"]
+                ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_error_{down_layer_idx}"]
+                ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
             elif "res_" in loc:
                 # Upstream res_; double-counting corrections.
                 marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
@@ -281,21 +281,21 @@ with grads_manager(
                 ] = (
                     marginal_grads[f"res_{up_layer_idx}"]
                     - jvp_grads[f"res_{up_layer_idx}"]
-                )
+                ).cpu()
                 marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"res_error_{up_layer_idx}"]
                     - jvp_grads[f"res_error_{up_layer_idx}"]
-                )
+                ).cpu()
 
                 # Same-layer mlp_
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"mlp_{down_layer_idx}"]
+                ] = marginal_grads[f"mlp_{down_layer_idx}"].cpu()
                 marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"mlp_error_{down_layer_idx}"]
+                ] = marginal_grads[f"mlp_error_{down_layer_idx}"].cpu()
             else:
                 raise ValueError("Module location not recognized.")
 
