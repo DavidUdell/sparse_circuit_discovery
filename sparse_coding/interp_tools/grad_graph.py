@@ -64,7 +64,8 @@ LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
 # Or some other means of thresholding approximated effects.
-NUM_TOP_EFFECTS: int = 10
+NUM_TOP_BOTTOM_NODES: int = 10
+EDGES_THRESHOLD: float = 0.001
 
 # %%
 # Reproducibility.
@@ -249,10 +250,10 @@ with grads_manager(
         indices: list = range(len(weighted_prod))
         if "error_" not in loc:
             _, top_indices = t.topk(
-                weighted_prod, NUM_TOP_EFFECTS, largest=True
+                weighted_prod, NUM_TOP_BOTTOM_NODES, largest=True
             )
             _, bottom_indices = t.topk(
-                weighted_prod, NUM_TOP_EFFECTS, largest=False
+                weighted_prod, NUM_TOP_BOTTOM_NODES, largest=False
             )
             indices: list = list(
                 set(top_indices.tolist() + bottom_indices.tolist())
@@ -315,7 +316,7 @@ with grads_manager(
                 raise ValueError("Module location not recognized.")
 
 # %%
-# Render the graph.
+# Populate graph.
 for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
@@ -334,7 +335,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         for up_dim, effect in enumerate(up_values.squeeze()[-1, :]):
-            if abs(effect.item()) < 0.1:
+            if abs(effect.item()) < EDGES_THRESHOLD:
                 continue
 
             if "res" in up_layer_module:
@@ -411,3 +412,15 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 up_dim_name,
                 down_dim_name,
             )
+
+# %%
+# Render graph
+graph.write(save_dot_path)
+graph.draw(save_graph_path, format="svg", prog="dot")
+
+print("Graph saved to:")
+print(save_graph_path)
+
+# %%
+# Close wandb.
+wandb.finish()
