@@ -27,6 +27,7 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
+from sparse_coding.interp_tools.utils.graphs import label_highlighting
 from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
     prepare_autoencoder_and_indices,
@@ -315,6 +316,97 @@ with grads_manager(
 
 # %%
 # Render the graph.
-for edge_type, inner_dict in marginal_grads_dict.items():
-    print(edge_type)
-    print(len(inner_dict))
+for edges_str, down_nodes in marginal_grads_dict.items():
+    node_types: tuple[str] = edges_str.split("_to_")
+    up_layer_split: tuple = node_types[0].split("_")
+    down_layer_split: tuple = node_types[1].split("_")
+
+    up_layer_idx: int = int(up_layer_split[-1])
+    down_layer_idx: int = int(down_layer_split[-1])
+
+    up_layer_module: str = "".join(up_layer_split[:-1])
+    down_layer_module: str = "".join(down_layer_split[:-1])
+
+    for down_dim, up_values in down_nodes.items():
+        for up_dim, effect in enumerate(up_values):
+            if abs(effect.item()) < 0.1:
+                continue
+
+            if "error_" in up_layer_module:
+                info: str = None
+            if "res_" in up_layer_module:
+                info: str = RESID_TOKENS_FILE
+            elif "attn_" in up_layer_module:
+                info: str = ATTN_TOKENS_FILE
+            elif "mlp_" in up_layer_module:
+                info: str = MLP_TOKENS_FILE
+            else:
+                raise ValueError("Module location not recognized.")
+            up_dim_name: str = f"{node_types[0]}.{up_dim}"
+
+            try:
+                graph.add_node(
+                    up_dim_name,
+                    label=label_highlighting(
+                        up_layer_idx,
+                        up_dim,
+                        MODEL_DIR,
+                        info,
+                        0,
+                        tokenizer,
+                        up_dim_name,
+                        {},
+                        __file__,
+                    ),
+                    shape="box",
+                )
+            except ValueError:
+                label: str = (
+                    '<<table border="0" cellborder="0" cellspacing="0">'
+                )
+                label += '<tr><td><font point-size="16"><b>'
+                label += up_dim_name
+                label += "</b></font></td></tr></table>>"
+                graph.add_node(up_dim_name, label=label, shape="box")
+
+            if "error_" in down_layer_module:
+                info: str = None
+            if "res_" in down_layer_module:
+                info: str = RESID_TOKENS_FILE
+            elif "attn_" in down_layer_module:
+                info: str = ATTN_TOKENS_FILE
+            elif "mlp_" in down_layer_module:
+                info: str = MLP_TOKENS_FILE
+            else:
+                raise ValueError("Module location not recognized.")
+            down_dim_name: str = f"{node_types[1]}.{down_dim}"
+
+            try:
+                graph.add_node(
+                    down_dim_name,
+                    label=label_highlighting(
+                        down_layer_idx,
+                        down_dim,
+                        MODEL_DIR,
+                        info,
+                        0,
+                        tokenizer,
+                        down_dim_name,
+                        {},
+                        __file__,
+                    ),
+                    shape="box",
+                )
+            except ValueError:
+                label: str = (
+                    '<<table border="0" cellborder="0" cellspacing="0">'
+                )
+                label += '<tr><td><font point-size="16"><b>'
+                label += down_dim_name
+                label += "</b></font></td></tr></table>>"
+                graph.add_node(down_dim_name, label=label, shape="box")
+
+            graph.add_edge(
+                up_dim_name,
+                down_dim_name,
+            )
