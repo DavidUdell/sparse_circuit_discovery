@@ -333,6 +333,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
     down_layer_split: tuple = node_types[1].split("_")
+
     down_layer_str: str = "".join(down_layer_split)
 
     up_layer_idx: int = int(up_layer_split[-1])
@@ -344,17 +345,18 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     # Graph error statistics.
     if "error" in up_layer_module and "error" not in down_layer_module:
         sublayer_unexplained: float = 0.0
-
         for down_dim, up_values in down_nodes.items():
             up_values = up_values.squeeze()[-1, :]
-            # Record absolute effects unexplained.
+            # Sublayer absolute effect unexplained.
             sublayer_unexplained += abs(up_values).sum().item()
 
+        # Store sublayer unexplained effect.
         if down_layer_str not in unexplained_dict:
             unexplained_dict[down_layer_str] = sublayer_unexplained
         else:
             unexplained_dict[down_layer_str] += sublayer_unexplained
 
+        # Log overall unexplained effect.
         effect_unexplained += sublayer_unexplained
 
         continue
@@ -363,10 +365,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     if "error" in up_layer_module or "error" in down_layer_module:
         continue
 
+    sublayer_explained: float = 0.0
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         up_values = up_values.squeeze()[-1, :]
-        # Record absolute effects explained.
-        effect_explained += abs(up_values).sum().item()
+        # Sublayer absolute effect explained.
+        sublayer_explained += abs(up_values).sum().item()
 
         top_values, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
         bottom_values, bottom_indices = t.topk(
@@ -476,16 +479,39 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 arrowsize=1.5,
             )
 
+    # Store sublayer explained effect.
+    if down_layer_str not in explained_dict:
+        explained_dict[down_layer_str] = sublayer_explained
+    else:
+        explained_dict[down_layer_str] += sublayer_explained
+
+    # Log overall explained effect.
+    effect_explained += sublayer_explained
+
 # %%
 # Graph annotation.
 if effect_explained == 0.0:
     raise ValueError("Effect plotted was 0.0; no additions to graph.")
 
-fraction_explained = round(
+total_frac_explained = round(
     effect_explained / (effect_explained + effect_unexplained), 2
 )
+
+for i in explained_dict:
+    assert i in unexplained_dict
+for i in unexplained_dict:
+    assert i in explained_dict
+
+label: str = ""
+for i, explained in explained_dict.items():
+    sublayer_frac_explained = round(
+        explained / (explained + unexplained_dict[i]), 2
+    )
+    label += f"\n{i}: ~{sublayer_frac_explained*100}%"
+
 graph.add_node(
-    f"Effect explained by autoencoders: ~{fraction_explained * 100}%."
+    f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"
+    + label
 )
 
 # %%
