@@ -323,6 +323,10 @@ with grads_manager(
 
 # %%
 # Populate graph.
+explained_dict: dict = {}
+effect_explained: float = 0.0
+effect_unexplained: float = 0.0
+
 for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
@@ -334,13 +338,23 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     up_layer_module: str = "".join(up_layer_split[:-1])
     down_layer_module: str = "".join(down_layer_split[:-1])
 
-    # Errors are skipped during graphing. Use these for ancillary graph
-    # statistics, though.
+    # Graph error statistics.
+    if "error" in up_layer_module and "error" not in down_layer_module:
+        for down_dim, up_values in down_nodes.items():
+            up_values = up_values.squeeze()[-1, :]
+            # Record absolute effects unexplained.
+            effect_unexplained += abs(up_values).sum().item()
+
+        continue
+
+    # All errors are skipped during graphing.
     if "error" in up_layer_module or "error" in down_layer_module:
         continue
 
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         up_values = up_values.squeeze()[-1, :]
+        # Record absolute effects explained.
+        effect_explained += abs(up_values).sum().item()
 
         top_values, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
         bottom_values, bottom_indices = t.topk(
@@ -449,6 +463,18 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 color=rgba,
                 arrowsize=1.5,
             )
+
+# %%
+# Graph annotation.
+if effect_explained == 0.0:
+    raise ValueError("Effect plotted was 0.0; no additions to graph.")
+
+fraction_explained = round(
+    effect_explained / (effect_explained + effect_unexplained), 2
+)
+graph.add_node(
+    f"Effect explained by autoencoders: ~{fraction_explained * 100}%."
+)
 
 # %%
 # Render graph
