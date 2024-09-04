@@ -342,14 +342,23 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         up_values = up_values.squeeze()[-1, :]
 
-        _, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
-        _, bottom_indices = t.topk(up_values, NUM_UP_NODES, largest=False)
+        top_values, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
+        bottom_values, bottom_indices = t.topk(
+            up_values, NUM_UP_NODES, largest=False
+        )
+        color_max_scalar: float = top_values[0].item()
+        color_min_scalar: float = bottom_values[0].item()
+
         indices: list = list(
             set(top_indices.tolist() + bottom_indices.tolist())
         )
 
         for up_dim, effect in enumerate(up_values):
             if up_dim not in indices:
+                continue
+
+            effect = effect.item()
+            if effect == 0.0:
                 continue
 
             if "res" in up_layer_module:
@@ -422,9 +431,23 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += "</b></font></td></tr></table>>"
                 graph.add_node(down_dim_name, label=label, shape="box")
 
+            # Edge coloration.
+            if effect > 0.0:
+                red, green = 0, 255
+            elif effect < 0.0:
+                red, green = 255, 0
+
+            alpha: int = int(
+                255
+                * abs(effect)
+                / max(abs(color_max_scalar), abs(color_min_scalar))
+            )
+            rgba: str = f"#{red:02X}{green:02X}00{alpha:02X}"
             graph.add_edge(
                 up_dim_name,
                 down_dim_name,
+                color=rgba,
+                arrowsize=1.5,
             )
 
 # %%
