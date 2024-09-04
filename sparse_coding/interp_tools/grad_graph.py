@@ -324,6 +324,8 @@ with grads_manager(
 # %%
 # Populate graph.
 explained_dict: dict = {}
+unexplained_dict: dict = {}
+
 effect_explained: float = 0.0
 effect_unexplained: float = 0.0
 
@@ -331,6 +333,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
     down_layer_split: tuple = node_types[1].split("_")
+    down_layer_str: str = "".join(down_layer_split)
 
     up_layer_idx: int = int(up_layer_split[-1])
     down_layer_idx: int = int(down_layer_split[-1])
@@ -340,10 +343,19 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
     # Graph error statistics.
     if "error" in up_layer_module and "error" not in down_layer_module:
+        sublayer_unexplained: float = 0.0
+
         for down_dim, up_values in down_nodes.items():
             up_values = up_values.squeeze()[-1, :]
             # Record absolute effects unexplained.
-            effect_unexplained += abs(up_values).sum().item()
+            sublayer_unexplained += abs(up_values).sum().item()
+
+        if down_layer_str not in unexplained_dict:
+            unexplained_dict[down_layer_str] = sublayer_unexplained
+        else:
+            unexplained_dict[down_layer_str] += sublayer_unexplained
+
+        effect_unexplained += sublayer_unexplained
 
         continue
 
