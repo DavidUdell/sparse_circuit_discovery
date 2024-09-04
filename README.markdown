@@ -24,6 +24,7 @@ DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery). The
 Docker image is especially good for pulling to a remote server.
 
 ## User's Guide
+### Naive Algorithm
 Your base of operations is `sparse_coding/config/central_config.yaml`.
 The most important hyperparameters are clustered up top:
 
@@ -69,6 +70,30 @@ The last cognition graph you generated is saved as both a `.svg` for you and as
 a `.dot` for the computer. If you run the interpretability pipeline again, the
 new data will expand upon that old `.dot` file. This way, you can progressively
 trace out circuits as you go.
+
+### Gradient-Based Algorithm
+There is also a gradient-based algorithm, an implementation of [Marks et al.
+(2024).](https://arxiv.org/abs/2403.19647) This algorithm has the advantage of
+plotting contributions to the cross-entropy loss _directly_, rather than
+plotting contributions to intermediate activation magnitudes. Its
+implementation here also extends to GPT-2's sublayers, not just the model's
+residual stream.
+
+Key hyperparameters:
+1. `ACTS_LAYERS_SLICE` works as above.
+2. `NUM_DOWN_NODES` is the number of nodes per sublayer to plot edges _for_. The
+   number of plotted notes is twice this value (top-k and bottom-k).
+3. `NUM_UP_NODES` is the number of nodes per sublayer to plot edges _to_, from
+   down nodes. The number of plotted edges per down node will be twice this
+   value.
+
+Save these values in `central_config.yaml`, then run interpretability:
+
+```cd sparse_coding```
+
+```python3 fast.py```
+
+Data appears as it does with the naive algorithm.
 
 ### Validating Circuits
 There's also an independent circuit validation pipeline, `val.py`. This script
