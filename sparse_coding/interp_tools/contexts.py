@@ -13,7 +13,6 @@ from collections import defaultdict
 import numpy as np
 import torch as t
 import transformers
-import wandb
 from accelerate import Accelerator
 from transformers import (
     AutoConfig,
@@ -23,6 +22,7 @@ from transformers import (
     PreTrainedTokenizer,
 )
 from tqdm.auto import tqdm
+import wandb
 
 from sparse_coding.utils import top_contexts
 from sparse_coding.utils.interface import (
@@ -50,9 +50,17 @@ MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
-ENCODER_FILE = config.get("ENCODER_FILE")
-ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
+ATTN_DATA_FILE = config.get("ATTN_DATA_FILE")
+MLP_DATA_FILE = config.get("MLP_DATA_FILE")
+RESID_ENCODER_FILE = config.get("ENCODER_FILE")
+RESID_BIASES_FILE = config.get("ENC_BIASES_FILE")
+ATTN_ENCODER_FILE = config.get("ATTN_ENCODER_FILE")
+ATTN_ENC_BIASES_FILE = config.get("ATTN_ENC_BIASES_FILE")
+MLP_ENCODER_FILE = config.get("MLP_ENCODER_FILE")
+MLP_ENC_BIASES_FILE = config.get("MLP_ENC_BIASES_FILE")
 TOP_K_INFO_FILE = config.get("TOP_K_INFO_FILE")
+ATTN_TOKEN_FILE = config.get("ATTN_TOKEN_FILE")
+MLP_TOKEN_FILE = config.get("MLP_TOKEN_FILE")
 SEED = config.get("SEED")
 tsfm_config = AutoConfig.from_pretrained(MODEL_DIR, token=HF_ACCESS_TOKEN)
 HIDDEN_DIM = tsfm_config.hidden_size
@@ -177,63 +185,92 @@ with warnings.catch_warnings():
 
 seq_layer_indices: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
+resid = {
+    "acts": ACTS_DATA_FILE,
+    "encoder": RESID_ENCODER_FILE,
+    "biases": RESID_BIASES_FILE,
+    "tokens": TOP_K_INFO_FILE,
+}
+attn = {
+    "acts": ATTN_DATA_FILE,
+    "encoder": ATTN_ENCODER_FILE,
+    "biases": ATTN_ENC_BIASES_FILE,
+    "tokens": ATTN_TOKEN_FILE,
+}
+mlp = {
+    "acts": MLP_DATA_FILE,
+    "encoder": MLP_ENCODER_FILE,
+    "biases": MLP_ENC_BIASES_FILE,
+    "tokens": MLP_TOKEN_FILE,
+}
+
 for layer_idx in seq_layer_indices:
-    ENCODER_PATH = save_paths(
-        __file__,
-        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENCODER_FILE}",
-    )
-    BIASES_PATH = save_paths(
-        __file__,
-        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ENC_BIASES_FILE}",
-    )
-    imported_weights: t.Tensor = t.load(ENCODER_PATH).T
-    imported_biases: t.Tensor = t.load(BIASES_PATH)
+    for sublayer in [resid, attn, mlp]:
+        acts_file: str = sublayer["acts"]
+        encoder_file: str = sublayer["encoder"]
+        biases_file: str = sublayer["biases"]
+        tokens_file: str = sublayer["tokens"]
 
-    # Initialize a concrete encoder for this layer.
-    model: Encoder = Encoder(imported_weights, imported_biases)
-    model = accelerator.prepare(model)
-
-    # Load and parallelize activations.
-    LAYER_ACTS_PATH = save_paths(
-        __file__,
-        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ACTS_DATA_FILE}",
-    )
-    layer_acts_data: t.Tensor = accelerator.prepare(t.load(LAYER_ACTS_PATH))
-
-    # Note that activations are stored as a list of question tensors from this
-    # function on out. Functions may internally unpack that into individual
-    # activations, but that's the general protocol between functions.
-    unpadded_acts: list[t.Tensor] = top_contexts.unpad_activations(
-        layer_acts_data, unpacked_prompts_ids
-    )
-
-    # If you want to _directly_ interpret the model's activations, assign
-    # `feature_acts` directly to `unpadded_acts` and ensure constants are set
-    # to the model's embedding dimensionality.
-    feature_acts: list[t.Tensor] = top_contexts.project_activations(
-        unpadded_acts, model, accelerator
-    )
-
-    # Calculate per-input-token summed activation, for each feature dimension.
-    effects: defaultdict[int, defaultdict[str, float]] = (
-        top_contexts.context_activations(
-            unpacked_prompts_ids,
-            feature_acts,
-            model,
+        ENCODER_PATH = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{encoder_file}",
         )
-    )
+        BIASES_PATH = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
+        )
+        imported_weights: t.Tensor = t.load(ENCODER_PATH).T
+        imported_biases: t.Tensor = t.load(BIASES_PATH)
 
-    # Select just the top-k effects.
-    truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
-        top_contexts.top_k_contexts(effects, VIEW, TOP_K)
-    )
+        # Initialize a concrete encoder for this layer.
+        model: Encoder = Encoder(imported_weights, imported_biases)
+        model = accelerator.prepare(model)
 
-    populate_table(
-        truncated_effects,
-        MODEL_DIR,
-        TOP_K_INFO_FILE,
-        layer_idx,
-    )
+        # Load and parallelize activations.
+        LAYER_ACTS_PATH = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
+        )
+        layer_acts_data: t.Tensor = accelerator.prepare(
+            t.load(LAYER_ACTS_PATH)
+        )
+
+        # Note that activations are stored as a list of question tensors from
+        # this function on out. Functions may internally unpack that into
+        # individual activations, but that's the general protocol between
+        # functions.
+        unpadded_acts: list[t.Tensor] = top_contexts.unpad_activations(
+            layer_acts_data, unpacked_prompts_ids
+        )
+
+        # If you want to _directly_ interpret the model's activations, assign
+        # `feature_acts` directly to `unpadded_acts` and ensure constants are
+        # set to the model's embedding dimensionality.
+        feature_acts: list[t.Tensor] = top_contexts.project_activations(
+            unpadded_acts, model, accelerator
+        )
+
+        # Calculate per-input-token summed activation, for each feature
+        # dimension.
+        effects: defaultdict[int, defaultdict[str, float]] = (
+            top_contexts.context_activations(
+                unpacked_prompts_ids,
+                feature_acts,
+                model,
+            )
+        )
+
+        # Select just the top-k effects.
+        truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
+            top_contexts.top_k_contexts(effects, VIEW, TOP_K)
+        )
+
+        populate_table(
+            truncated_effects,
+            MODEL_DIR,
+            tokens_file,
+            layer_idx,
+        )
 
 # %%
 # Wrap up logging.

@@ -8,19 +8,40 @@ PROMPT: "Copyright (C"
 # Layers Slice to Cache Activations From
 ACTS_LAYERS_SLICE: "7:9"
 
+# Topk thresholds for gradient-based method.
+NUM_DOWN_NODES: 10
+NUM_UP_NODES: 10
+
 # Autoencoder Size
 PROJECTION_FACTOR: 32
 
-# Smoke Test Save Files
-PROMPT_IDS_FILE: "smoke_test_activations_prompt_ids.npy"
-ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
+# Autoencoder Save Files
 ENCODER_FILE: "smoke_test_encoder.pt"
 ENC_BIASES_FILE: "smoke_test_enc_biases.pt"
 DECODER_FILE: "smoke_test_decoder.pt"
 DEC_BIASES_FILE: "smoke_test_dec_biases.pt"
+ATTN_ENCODER_FILE: "attn_encoder.pt"
+ATTN_ENC_BIASES_FILE: "attn_enc_biases.pt"
+ATTN_DECODER_FILE: "attn_decoder.pt"
+ATTN_DEC_BIASES_FILE: "attn_dec_biases.pt"
+MLP_ENCODER_FILE: "mlp_encoder.pt"
+MLP_ENC_BIASES_FILE: "mlp_enc_biases.pt"
+MLP_DECODER_FILE: "mlp_decoder.pt"
+MLP_DEC_BIASES_FILE: "mlp_dec_biases.pt"
+
+
+# Smoke Test Save Files
+PROMPT_IDS_FILE: "smoke_test_activations_prompt_ids.npy"
+ACTS_DATA_FILE: "smoke_test_activations_dataset.pt"
+ATTN_DATA_FILE: "attn_acts_dataset.pt"
+MLP_DATA_FILE: "mlp_acts_dataset.pt"
 TOP_K_INFO_FILE: "smoke_test_token_info.csv"
+ATTN_TOKEN_FILE: "attn_tokens.csv"
+MLP_TOKEN_FILE: "mlp_tokens.csv"
 GRAPH_FILE: "smoke_test_graph.svg"
 GRAPH_DOT_FILE: "smoke_test_graph.dot"
+GRADS_FILE: "grads_graph.svg"
+GRADS_DOT_FILE: "grads_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-4

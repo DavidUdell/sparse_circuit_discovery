@@ -9,6 +9,10 @@ THRESHOLD_EXP: 5.0
 # Only pin single dims per layer.
 DIMS_PINNED:
 
+# Topk thresholds for gradient-based method.
+NUM_DOWN_NODES: 10
+NUM_UP_NODES: 10
+
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
   1: [23433]
@@ -41,16 +45,34 @@ PROMPT: "Copyright (C"
 # Autoencoder Size
 PROJECTION_FACTOR: 32
 
-# Save Files
+# Autoencoder Save Files
+ENCODER_FILE: "resid_encoder.pt"
+ENC_BIASES_FILE: "resid_enc_biases.pt"
+DECODER_FILE: "resid_decoder.pt"
+DEC_BIASES_FILE: "resid_dec_biases.pt"
+ATTN_ENCODER_FILE: "attn_encoder.pt"
+ATTN_ENC_BIASES_FILE: "attn_enc_biases.pt"
+ATTN_DECODER_FILE: "attn_decoder.pt"
+ATTN_DEC_BIASES_FILE: "attn_dec_biases.pt"
+MLP_ENCODER_FILE: "mlp_encoder.pt"
+MLP_ENC_BIASES_FILE: "mlp_enc_biases.pt"
+MLP_DECODER_FILE: "mlp_decoder.pt"
+MLP_DEC_BIASES_FILE: "mlp_dec_biases.pt"
+
+# Other Save Files
 PROMPT_IDS_FILE: "activations_prompt_ids.npy"
-ACTS_DATA_FILE: "activations_dataset.pt"
-ENCODER_FILE: "learned_encoder.pt"
-ENC_BIASES_FILE: "learned_enc_biases.pt"
-DECODER_FILE: "learned_decoder.pt"
-DEC_BIASES_FILE: "learned_dec_biases.pt"
-TOP_K_INFO_FILE: "token_info.csv"
+ACTS_DATA_FILE: "resid_acts_dataset.pt"
+ATTN_DATA_FILE: "attn_acts_dataset.pt"
+MLP_DATA_FILE: "mlp_acts_dataset.pt"
+TOP_K_INFO_FILE: "resid_tokens.csv"
+ATTN_TOKEN_FILE: "attn_tokens.csv"
+MLP_TOKEN_FILE: "mlp_tokens.csv"
 GRAPH_FILE: "cognition_graph.svg"
 GRAPH_DOT_FILE: "cognition_graph.dot"
+JACOBIANS_FILE: "jacobians_graph.svg"
+JACOBIANS_DOT_FILE: "jacobians_graph.dot"
+GRADS_FILE: "grads_graph.svg"
+GRADS_DOT_FILE: "grads_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-2

@@ -1,14 +1,12 @@
 # %%
-"""Collect model activations during inference on `openwebtext`."""
+"""Collect model activations during inference."""
 
 
-import gc
 import warnings
 
 import numpy as np
 import torch as t
 import transformers
-import wandb
 from accelerate import Accelerator
 from transformers import (
     AutoModelForCausalLM,
@@ -16,6 +14,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
+import wandb
 
 from sparse_coding.utils.interface import (
     parse_slice,
@@ -26,6 +25,7 @@ from sparse_coding.utils.interface import (
     save_paths,
     pad_activations,
 )
+from sparse_coding.interp_tools.utils.hooks import attn_mlp_acts_manager
 
 
 assert (
@@ -43,6 +43,8 @@ MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
+ATTN_DATA_FILE = config.get("ATTN_DATA_FILE")
+MLP_DATA_FILE = config.get("MLP_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 NUM_SEQUENCES_EVALED = config.get("NUM_SEQUENCES_EVALED", 1000)
 MAX_SEQ_LEN = config.get("MAX_SEQ_LEN", 1000)
@@ -86,49 +88,52 @@ acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 # %%
 # Dataset. Poor man's fancy indexing.
 training_set: list[list[int]] = [
-        PROMPT,
+    PROMPT,
 ]
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
 # put into `activations`.
-activations: list[t.Tensor] = []
+resid_acts: list[t.Tensor] = []
+attn_acts: list[t.Tensor] = []
+mlp_acts: list[t.Tensor] = []
 prompt_ids_tensors: list[t.Tensor] = []
+
 for idx, batch in enumerate(training_set):
-    try:
-        inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
-        ).to(model.device)
+    inputs = tokenizer(
+        batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
+    ).to(model.device)
+
+    with attn_mlp_acts_manager(model, list(acts_layers_range)) as a:
         outputs = model(**inputs)
-        activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-        prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
-    except RuntimeError:
-        # Manually clear memory and try again.
-        gc.collect()
-        inputs = tokenizer(
-            batch, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LEN
-        ).to(model.device)
-        outputs = model(**inputs)
-        activations.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-        prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
+
+        resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
+
+        for i in acts_layers_range:
+            attn_acts.append(a[f"attn_{i}"])
+            mlp_acts.append(a[f"mlp_{i}"])
+
+    prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
 
 # %%
-# Save the prompt ids and activations.
+# Save prompt ids.
 prompt_ids_lists = []
 for tensor in prompt_ids_tensors:
     prompt_ids_lists.append([tensor.tolist()])
+
+# array of (x, 1) Each element along x is a list of ints, of seq len.
 prompt_ids_array: np.ndarray = np.array(prompt_ids_lists, dtype=object)
 np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
-# array of (x, 1)
-# Each element along x is a list of ints, of seq len.
 
-# Single layer case lacks outer tuple; this solves that.
-if isinstance(activations, list) and isinstance(activations[0], t.Tensor):
-    activations: list[tuple[t.Tensor]] = [(tensor,) for tensor in activations]
-# Tensors are of classic shape: (batch, seq, hidden)
+# %%
+# Save activations.
+# Single layer resid case lacks outer tuple; this solves that.
+if isinstance(resid_acts, list) and isinstance(resid_acts[0], t.Tensor):
+    # Tensors are of classic shape: (batch, seq, hidden)
+    resid_acts: list[tuple[t.Tensor]] = [(tensor,) for tensor in resid_acts]
 
 max_seq_length: int = max(
-    tensor.size(1) for layers_tuple in activations for tensor in layers_tuple
+    tensor.size(1) for layers_tuple in resid_acts for tensor in layers_tuple
 )
 
 for abs_idx, layer_idx in enumerate(acts_layers_range):
@@ -138,7 +143,7 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
             max_seq_length,
             accelerator,
         )
-        for layers_tuple in activations
+        for layers_tuple in resid_acts
     ]
     layer_activations: t.Tensor = t.cat(layer_activations, dim=0)
 
@@ -149,6 +154,23 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
         __file__,
         MODEL_DIR,
     )
+
+# Now attn-out and mlp-out.
+# acts: list
+for layer_acts in [attn_acts, mlp_acts]:
+    for idx, act in zip(acts_layers_range, layer_acts):
+        # In-place squeeze then unsqueeze, to regularize shapes.
+        act.squeeze_()
+        act.unsqueeze_(0)
+
+        # Only for single prompts, for now.
+        cache_layer_tensor(
+            act,
+            idx,
+            ATTN_DATA_FILE if layer_acts is attn_acts else MLP_DATA_FILE,
+            __file__,
+            MODEL_DIR,
+        )
 
 # %%
 # Wrap up logging.

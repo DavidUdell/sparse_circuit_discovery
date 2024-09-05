@@ -24,6 +24,7 @@ DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery). The
 Docker image is especially good for pulling to a remote server.
 
 ## User's Guide
+### Naive Algorithm
 Your base of operations is `sparse_coding/config/central_config.yaml`.
 The most important hyperparameters are clustered up top:
 
@@ -70,6 +71,30 @@ a `.dot` for the computer. If you run the interpretability pipeline again, the
 new data will expand upon that old `.dot` file. This way, you can progressively
 trace out circuits as you go.
 
+### Gradient-Based Algorithm
+There is also a gradient-based algorithm, an implementation of [Marks et al.
+(2024).](https://arxiv.org/abs/2403.19647) This algorithm has the advantage of
+plotting contributions to the cross-entropy loss _directly_, rather than
+plotting contributions to intermediate activation magnitudes. Its
+implementation here also extends to GPT-2's sublayers, not just the model's
+residual stream.
+
+Key hyperparameters:
+1. `ACTS_LAYERS_SLICE` works as above.
+2. `NUM_DOWN_NODES` is the number of nodes per sublayer to plot edges _for_. The
+   number of plotted notes is twice this value (top-k and bottom-k).
+3. `NUM_UP_NODES` is the number of nodes per sublayer to plot edges _to_, from
+   down nodes. The number of plotted edges per down node will be twice this
+   value.
+
+Save these values in `central_config.yaml`, then run interpretability:
+
+```cd sparse_coding```
+
+```python3 fast.py```
+
+Data appears as it does with the naive algorithm.
+
 ### Validating Circuits
 There's also an independent circuit validation pipeline, `val.py`. This script
 simultaneously ablates all the features that comprise a circuit, to see how the
@@ -107,7 +132,7 @@ _Blue tokens_ in sequences in each box represent top feature activations in
 their contexts, to a specified length out to either side.
 
 _Blue and red tokens_ in individual boxes at the bottom are the logits most
-upweighted/downweighted by that ablation. (_Gray_ is the 0.0 effect edge case.)
+upweighted/downweighted by that dimension. (_Gray_ is the 0.0 effect edge case.)
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
 Red arrows represent downweighting, blue arrows represent upweighting, and
@@ -130,7 +155,7 @@ downweighting effect.
   repo.
 
 ## Project Status
-Current version is 1.0.2.
+Current version is 1.1.0.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

@@ -3,6 +3,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
+from typing import Generator
 
 import numpy as np
 import torch as t
@@ -312,3 +313,371 @@ def hooks_manager(
         cache_hook_handle.remove()
         if ablate_during_run:
             ablate_hook_handle.remove()
+
+
+@contextmanager
+def jacobians_manager(
+    upstream_layer_idx: int,
+    model,
+    enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+) -> Generator[dict, None, None]:
+    """
+    Context manager for Jacobian-hooking forward passes.
+
+    Only residual stream autoencoders are supported here.
+    """
+    jac_dict: dict = {}
+
+    def composite_module(current_module: t.nn.Module) -> t.nn.Sequential:
+        """The relevant torch modules, composed."""
+
+        class OffsetBy(t.nn.Module):
+            """Subtract a bias from an input tensor."""
+
+            def __init__(self, bias: t.Tensor):
+                super().__init__()
+
+                self.bias = bias
+
+            def forward(self, x: t.Tensor) -> t.Tensor:
+                """Just subtract the bias from the input tensor."""
+
+                return x[0] - self.bias
+
+        decoder_1, dec_bias_1 = dec_tensors_per_layer[upstream_layer_idx]
+        _, dec_bias_2 = dec_tensors_per_layer[upstream_layer_idx + 1]
+        encoder_2, enc_bias_2 = enc_tensors_per_layer[upstream_layer_idx + 1]
+        # Recreates forward-pass section.
+        composed_mod = t.nn.Sequential(
+            t.nn.Linear(decoder_1.shape[1], decoder_1.shape[0]),
+            current_module,
+            OffsetBy(dec_bias_2),
+            t.nn.Linear(encoder_2.shape[1], encoder_2.shape[0]),
+            t.nn.ReLU(inplace=True),
+        )
+
+        # Assign weight and bias tensors to submodules.
+        composed_mod[0].weight = t.nn.Parameter(decoder_1.T)
+        composed_mod[0].bias = t.nn.Parameter(dec_bias_1)
+        composed_mod[3].weight = t.nn.Parameter(encoder_2.T)
+        composed_mod[3].bias = t.nn.Parameter(enc_bias_2)
+
+        return composed_mod
+
+    def splice_hook_fac(
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        decoder: t.Tensor,
+        dec_biases: t.Tensor,
+    ):
+        """
+        Create hooks that interfere with gradients to get proper jacobians.
+        """
+
+        def splice_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """
+            Splice zero tensors into a forward pass; divert them out; call a
+            torch Jacobian method on them.
+            """
+
+            # Project activations through the encoder. Bias usage corresponds
+            # to JBloom's.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    output[0] - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
+            )
+
+            jac_dict["point"] = projected_acts.detach()
+
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    projected_acts,
+                    decoder.T.to(model.device),
+                    bias=dec_biases.to(model.device),
+                )
+            )
+
+            return (projected_acts, output[1])
+
+        return splice_hook
+
+    def divert_hook_fac(
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        dec_biases: t.Tensor,
+    ):
+        """
+        Create the downstream hook that computes and caches the Jacobian.
+        """
+
+        def divert_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """
+            Divert the spliced acts tensor; call a torch Jacobian method on it;
+            put the Jacobian in a returned defaultdict with key data.
+            """
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    output[0] - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
+            )
+
+            differentiable_mod = composite_module(module)
+            # Functional. Note that a `chunk_size` can be set here other than
+            # the full tensor.
+            jacobian = t.func.jacfwd(differentiable_mod)
+            jac_dict["function"] = jacobian
+
+        return divert_hook
+
+    splice_encoder, splice_enc_bias = enc_tensors_per_layer[upstream_layer_idx]
+    splice_decoder, splice_dec_bias = dec_tensors_per_layer[upstream_layer_idx]
+    splice_hook_handle = model.transformer.h[
+        upstream_layer_idx
+    ].register_forward_hook(
+        splice_hook_fac(
+            splice_encoder, splice_enc_bias, splice_decoder, splice_dec_bias
+        )
+    )
+
+    divert_encoder, divert_enc_bias = enc_tensors_per_layer[
+        upstream_layer_idx + 1
+    ]
+    _, divert_dec_bias = dec_tensors_per_layer[upstream_layer_idx + 1]
+    divert_hook_handle = model.transformer.h[
+        upstream_layer_idx + 1
+    ].register_forward_hook(
+        divert_hook_fac(divert_encoder, divert_enc_bias, divert_dec_bias)
+    )
+
+    try:
+        yield jac_dict
+    finally:
+        splice_hook_handle.remove()
+        divert_hook_handle.remove()
+
+
+@contextmanager
+def grads_manager(
+    model: t.nn.Module,
+    layer_indices: list[int],
+    res_enc_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    res_dec_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    attn_enc_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    attn_dec_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    mlp_enc_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+    mlp_dec_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
+) -> Generator[tuple[dict, dict], None, None]:
+    """Context manager for backward hooks on autoencoder inserts."""
+
+    acts_dict: dict = {}
+    grads_dict: dict = {}
+    handles = []
+
+    def backward_hooks_fac(location: str):
+        """Allow backward hooks to label their dictionary entries."""
+
+        def backward_hook(grad):
+            """Label the gradient tensor with its location."""
+            grads_dict[location] = grad
+
+        return backward_hook
+
+    def forward_hooks_fac(
+        layer_idx: int,
+        encoder: t.Tensor,
+        enc_biases: t.Tensor,
+        decoder: t.Tensor,
+        dec_biases: t.Tensor,
+    ):
+        """
+        Pass activations through autoencoders where requested and register
+        backward hooks at the autoencoder tensors.
+        """
+
+        def forward_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """
+            Pass activations through autoencoder and register a backward hook
+            at the autoencoder tensor and error residual.
+            """
+
+            # Project activations through the encoder. Bias usage corresponds
+            # to JBloom's.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    output[0] - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            t.nn.functional.relu(
+                projected_acts,
+                inplace=True,
+            )
+
+            # Module detection
+            if "attention" in module.__class__.__name__.lower():
+                # "gpt2attention"
+                current_name: str = f"attn_{layer_idx}"
+                error_name: str = f"attn_error_{layer_idx}"
+            elif "mlp" in module.__class__.__name__.lower():
+                # "gpt2mlp"
+                current_name: str = f"mlp_{layer_idx}"
+                error_name: str = f"mlp_error_{layer_idx}"
+            elif "gpt2block" in module.__class__.__name__.lower():
+                # "gpt2block"
+                current_name: str = f"res_{layer_idx}"
+                error_name: str = f"res_error_{layer_idx}"
+            else:
+                raise ValueError("Unexpected module name.")
+
+            # Register backward hooks on the projected activations.
+            handles.append(
+                projected_acts.register_hook(backward_hooks_fac(current_name))
+            )
+            # Cache activations.
+            acts_dict[current_name] = projected_acts
+            acts_dict[error_name] = output[0]
+
+            # Decode projected acts.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    projected_acts,
+                    decoder.T.to(model.device),
+                    bias=dec_biases.to(model.device),
+                )
+            )
+
+            # Algebra for the error residual.
+            error = projected_acts - output[0]
+            # Then break gradient for the new error tensor.
+            error = error.detach()
+            error.requires_grad = True
+
+            handles.append(error.register_hook(backward_hooks_fac(error_name)))
+
+            # output[0] = projected_acts - error
+            if isinstance(output, tuple):
+                return projected_acts - error, output[1]
+            elif isinstance(output, t.Tensor):
+                return projected_acts - error
+            else:
+                raise ValueError("Unexpected output type.")
+
+        return forward_hook
+
+    # The context manager registers the initial forward hooks.
+    for layer_idx in layer_indices:
+        # Residual stream
+        res_enc, res_enc_bias = res_enc_per_layer[layer_idx]
+        res_dec, res_dec_bias = res_dec_per_layer[layer_idx]
+        handles.append(
+            model.transformer.h[layer_idx].register_forward_hook(
+                forward_hooks_fac(
+                    layer_idx, res_enc, res_enc_bias, res_dec, res_dec_bias
+                )
+            )
+        )
+
+        # Attention
+        attn_enc, attn_enc_bias = attn_enc_per_layer[layer_idx]
+        attn_dec, attn_dec_bias = attn_dec_per_layer[layer_idx]
+        handles.append(
+            model.transformer.h[layer_idx].attn.register_forward_hook(
+                forward_hooks_fac(
+                    layer_idx, attn_enc, attn_enc_bias, attn_dec, attn_dec_bias
+                )
+            )
+        )
+
+        # MLP
+        mlp_enc, mlp_enc_bias = mlp_enc_per_layer[layer_idx]
+        mlp_dec, mlp_dec_bias = mlp_dec_per_layer[layer_idx]
+        handles.append(
+            model.transformer.h[layer_idx].mlp.register_forward_hook(
+                forward_hooks_fac(
+                    layer_idx, mlp_enc, mlp_enc_bias, mlp_dec, mlp_dec_bias
+                )
+            )
+        )
+
+    try:
+        yield (acts_dict, grads_dict)
+    finally:
+        for handle in handles:
+            handle.remove()
+
+
+@contextmanager
+def attn_mlp_acts_manager(
+    model: t.nn.Module,
+    layer_indices: list[int],
+) -> Generator[dict[str, t.Tensor], None, None]:
+    """Retrieve select attn-out and MLP-out activations."""
+
+    acts_dict: dict[str, t.Tensor] = {}
+    handles = []
+
+    def forward_hooks_fac(layer_idx: int):
+        """Create attn-out and MLP-out forward act hooks for GPT-2-small."""
+
+        def forward_hook(  # pylint: disable=unused-argument, redefined-builtin
+            module, input, output
+        ) -> None:
+            """Cache activations."""
+
+            if "attention" in module.__class__.__name__.lower():
+                # "gpt2attention"
+                current_name: str = f"attn_{layer_idx}"
+            elif "mlp" in module.__class__.__name__.lower():
+                # "gpt2mlp"
+                current_name: str = f"mlp_{layer_idx}"
+            else:
+                raise ValueError("Unexpected module name.")
+
+            if current_name not in acts_dict:
+                acts_dict[current_name] = output[0]
+            else:
+                acts_dict[current_name] = t.cat(
+                    (acts_dict[current_name], output[0]),
+                    dim=0,
+                )
+
+        return forward_hook
+
+    for layer_idx in layer_indices:
+        handles.append(
+            model.transformer.h[layer_idx].attn.register_forward_hook(
+                forward_hooks_fac(layer_idx)
+            )
+        )
+        handles.append(
+            model.transformer.h[layer_idx].mlp.register_forward_hook(
+                forward_hooks_fac(layer_idx)
+            )
+        )
+
+    try:
+        yield acts_dict
+    finally:
+        for handle in handles:
+            handle.remove()

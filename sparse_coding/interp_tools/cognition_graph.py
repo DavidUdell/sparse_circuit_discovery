@@ -153,10 +153,6 @@ graph = load_preexisting_graph(MODEL_DIR, GRAPH_DOT_FILE, __file__)
 if graph is None:
     graph = AGraph(directed=True)
 
-minor_effects: int = 0
-total_effect: float = 0.0
-plotted_effect: float = 0.0
-
 save_graph_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_FILE}",
@@ -165,6 +161,10 @@ save_dot_path: str = save_paths(
     __file__,
     f"{sanitize_model_name(MODEL_DIR)}/{GRAPH_DOT_FILE}",
 )
+
+minor_effects: int = 0
+total_effect: float = 0.0
+plotted_effect: float = 0.0
 
 # %%
 # For the top sequence positions, run ablations and reduce the ouput.
