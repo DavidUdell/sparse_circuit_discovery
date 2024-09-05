@@ -6,6 +6,7 @@ Note that this integration test will necessarily be somewhat slow.
 
 import os
 from runpy import run_module
+import subprocess
 
 import pytest
 import yaml
@@ -131,16 +132,21 @@ def test_smoke_gradients_method(
     """Run the gradients method submodule scripts in sequence."""
 
     scripts = [
-        "collect_acts",
-        "load_autoencoder",
-        "interp_tools.contexts",
-        "interp_tools.grad_graph",
+        "collect_acts.py",
+        "load_autoencoder.py",
+        "interp_tools/contexts.py",
+        "interp_tools/grad_graph.py",
     ]
 
     for script in scripts:
         try:
             with wandb.init(mode="offline"):
-                run_module(f"sparse_coding.{script}")
+                subprocess.run(
+                    ["python3", f"../sparse_coding/{script}"],
+                    check=True,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
 
         except Exception as e:  # pylint: disable=broad-except
             pytest.fail(f"Smoke test for {script} failed: {e}")
