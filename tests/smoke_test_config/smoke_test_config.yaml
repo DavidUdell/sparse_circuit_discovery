@@ -8,6 +8,10 @@ PROMPT: "Copyright (C"
 # Layers Slice to Cache Activations From
 ACTS_LAYERS_SLICE: "7:9"
 
+# Topk thresholds for gradient-based method.
+NUM_DOWN_NODES: 10
+NUM_UP_NODES: 10
+
 # Autoencoder Size
 PROJECTION_FACTOR: 32
 
@@ -36,6 +40,8 @@ ATTN_TOKEN_FILE: "attn_tokens.csv"
 MLP_TOKEN_FILE: "mlp_tokens.csv"
 GRAPH_FILE: "smoke_test_graph.svg"
 GRAPH_DOT_FILE: "smoke_test_graph.dot"
+GRADS_FILE: "grads_graph.svg"
+GRADS_DOT_FILE: "grads_graph.dot"
 
 # Autoencoder Training
 LAMBDA_L1: 1e-4

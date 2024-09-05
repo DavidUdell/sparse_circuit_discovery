@@ -62,10 +62,9 @@ GRADS_FILE = config.get("GRADS_FILE")
 GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
-
 # x2 for each: topk and bottomk nodes.
-NUM_DOWN_NODES: int = 10
-NUM_UP_NODES: int = 10
+NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
+NUM_UP_NODES = config.get("NUM_UP_NODES")
 
 # %%
 # Reproducibility.

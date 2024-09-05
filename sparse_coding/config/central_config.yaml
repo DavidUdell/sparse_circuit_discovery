@@ -9,6 +9,10 @@ THRESHOLD_EXP: 5.0
 # Only pin single dims per layer.
 DIMS_PINNED:
 
+# Topk thresholds for gradient-based method.
+NUM_DOWN_NODES: 10
+NUM_UP_NODES: 10
+
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
   1: [23433]
