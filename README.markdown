@@ -154,6 +154,9 @@ downweighting effect.
   currently required, and Windows pathing will probably not play nice with the
   repo.
 
+- You're safe ignoring an Exception ignored error at cleanup after running
+  `fast.py`, about an `AGraph` object.
+
 ## Project Status
 Current version is 1.1.1.
 
