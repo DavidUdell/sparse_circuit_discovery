@@ -361,7 +361,8 @@ def prune_graph(
     # Prune out all the non-final-layer leaf nodes and append upstream relevant
     # nodes.
     for node in copy(leaf_nodes):
-        if int(node.split(".")[1]) != final_layer_idx:
+        layer_idx: int = int((node.split(".")[0]).split("_")[-1])
+        if layer_idx != final_layer_idx:
             upstream_nodes = graph.predecessors(node)
             graph.remove_node(node)
             upstream_childless_nodes = [

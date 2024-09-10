@@ -27,7 +27,10 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
-from sparse_coding.interp_tools.utils.graphs import label_highlighting
+from sparse_coding.interp_tools.utils.graphs import (
+    label_highlighting,
+    prune_graph,
+)
 from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
     prepare_autoencoder_and_indices,
@@ -511,6 +514,13 @@ for i, explained in explained_dict.items():
             explained / (explained + unexplained_dict[i]), 2
         )
     label += f"\n{i}: ~{sublayer_frac_explained*100}%"
+
+# Nuke singleton nodes.
+for node in graph.nodes():
+    if len(graph.edges(node)) == 0:
+        graph.remove_node(node)
+# Prune graph to source-to-sink subgraph.
+graph = prune_graph(graph)
 
 graph.add_node(
     f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"

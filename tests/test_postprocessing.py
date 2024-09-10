@@ -10,16 +10,16 @@ def test_prune_graph():
 
     # Create a simple graph.
     graph = pygraphviz.AGraph(strict=True, directed=True)
-    graph.add_node("A.0")
-    graph.add_node("B.1")
-    graph.add_node("C.1")
-    graph.add_node("D.2")
-    graph.add_node("E.2")
+    graph.add_node("res_0.5555")
+    graph.add_node("res_1.5555")
+    graph.add_node("res_error_1.5555")
+    graph.add_node("res_2.5555")
+    graph.add_node("res_error_2.5555")
 
-    graph.add_edge("A.0", "B.1")
-    graph.add_edge("A.0", "C.1")
-    graph.add_edge("C.1", "D.2")
-    graph.add_edge("C.1", "E.2")
+    graph.add_edge("res_0.5555", "res_1.5555")
+    graph.add_edge("res_0.5555", "res_error_1.5555")
+    graph.add_edge("res_error_1.5555", "res_2.5555")
+    graph.add_edge("res_error_1.5555", "res_error_2.5555")
 
     # Prune the graph.
     pruned_graph = prune_graph(graph, final_layer_idx=2)
@@ -27,9 +27,14 @@ def test_prune_graph():
     # Check the pruned graph.
     assert pruned_graph.number_of_nodes() == 4
     assert pruned_graph.number_of_edges() == 3
-    assert set(pruned_graph.nodes()) == {"A.0", "C.1", "D.2", "E.2"}
+    assert set(pruned_graph.nodes()) == {
+        "res_0.5555",
+        "res_error_1.5555",
+        "res_2.5555",
+        "res_error_2.5555",
+    }
     assert set(pruned_graph.edges()) == {
-        ("A.0", "C.1"),
-        ("C.1", "D.2"),
-        ("C.1", "E.2"),
+        ("res_0.5555", "res_error_1.5555"),
+        ("res_error_1.5555", "res_2.5555"),
+        ("res_error_1.5555", "res_error_2.5555"),
     }
