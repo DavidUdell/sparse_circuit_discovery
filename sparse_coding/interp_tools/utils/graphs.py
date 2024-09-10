@@ -1,6 +1,7 @@
 """Graph the causal effects of ablations."""
 
 import html
+from copy import copy
 from textwrap import dedent
 
 from tqdm.auto import tqdm
@@ -335,5 +336,47 @@ def graph_causal_effects(
             """
         )
     )
+
+    return graph
+
+
+def prune_graph(
+    graph: AGraph,
+    leaf_nodes: list | None = None,
+    final_layer_idx: int = 11,
+):
+    """
+    Filter a directed graph down to its source-to-sink subgraph.
+
+    The current default `final_layer_idx` presumes GPT-2-small.
+    """
+
+    # `leaf_nodes` starts off with all nodes without outgoing edges.
+    if leaf_nodes is None:
+        leaf_nodes: list = []
+        for node in graph.nodes():
+            if not graph.out_degree(node):
+                leaf_nodes.append(node)
+
+    # Prune out all the non-final-layer leaf nodes and append upstream relevant
+    # nodes.
+    for node in copy(leaf_nodes):
+        if int(node.split(".")[1]) != final_layer_idx:
+            print(node.split(".")[1])
+
+            upstream_nodes = graph.predecessors(node)
+            graph.remove(node)
+            upstream_childless_nodes = [
+                node for node in upstream_nodes if not graph.out_degree(node)
+            ]
+
+            leaf_nodes.extend(upstream_childless_nodes)
+
+        leaf_nodes.remove(node)
+
+    # Recurse if necessary.
+    if leaf_nodes:
+        leaf_nodes: list = list(set(leaf_nodes))
+        graph = prune_graph(graph, leaf_nodes)
 
     return graph
