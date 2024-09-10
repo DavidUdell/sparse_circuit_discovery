@@ -362,10 +362,8 @@ def prune_graph(
     # nodes.
     for node in copy(leaf_nodes):
         if int(node.split(".")[1]) != final_layer_idx:
-            print(node.split(".")[1])
-
             upstream_nodes = graph.predecessors(node)
-            graph.remove(node)
+            graph.remove_node(node)
             upstream_childless_nodes = [
                 node for node in upstream_nodes if not graph.out_degree(node)
             ]
