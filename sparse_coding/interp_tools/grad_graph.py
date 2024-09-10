@@ -503,9 +503,13 @@ for i in unexplained_dict:
 
 label: str = ""
 for i, explained in explained_dict.items():
-    sublayer_frac_explained = round(
-        explained / (explained + unexplained_dict[i]), 2
-    )
+    if explained + unexplained_dict[i] == 0.0:
+        sublayer_frac_explained: float = 0.0
+        print(f"Sublayer {i} logged 0.0 effects in neurons and autoencoder.")
+    else:
+        sublayer_frac_explained = round(
+            explained / (explained + unexplained_dict[i]), 2
+        )
     label += f"\n{i}: ~{sublayer_frac_explained*100}%"
 
 graph.add_node(
