@@ -194,18 +194,12 @@ with grads_manager(
     # Forward pass installs all backward hooks.
     output = model(**inputs)
 
-    loss = metric(output.logits.squeeze(), inputs["input_ids"].squeeze())
-
-    # Loss scaling based on autoencoder shape. Attn is used because it is the
-    # wider autoencoder.
-    scalar: t.Tensor = t.tensor(
-        attn_enc_and_biases[layer_range[0]][0].shape[-1], requires_grad=False
-    )
-    num_layers: t.Tensor = t.tensor(len(layer_range), requires_grad=False)
-    loss = loss * num_layers * scalar
-
     # Metric backward pass.
-    loss.backward(retain_graph=True)
+    metric(
+        output.logits.squeeze(),
+        inputs["input_ids"].squeeze(),
+    ).backward(retain_graph=True)
+
     acts_dict, grads_dict = acts_and_grads
 
     # Add model_dim activations to acts_dict, if needed.
