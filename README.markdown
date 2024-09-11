@@ -157,6 +157,10 @@ downweighting effect.
 - You're safe ignoring an Exception ignored error at cleanup after running
   `fast.py`, about an `AGraph` object.
 
+- `fast.py` uses a unique pruning strategy: it will take autoencoder dims in
+  the final `GPT-2 small` layer and prune up from them. So you should start
+  from the bottom of the model and progressively plot up from there.
+
 ## Project Status
 Current version is 1.1.1.
 
