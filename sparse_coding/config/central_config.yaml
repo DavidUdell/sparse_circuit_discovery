@@ -1,7 +1,7 @@
 ## Key Params
 # Throughout, leave out entries for None. Writing in `None` values will get
 # you the string "None".
-ACTS_LAYERS_SLICE: "3:5"
+ACTS_LAYERS_SLICE: "9:12"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
 THRESHOLD_EXP: 5.0

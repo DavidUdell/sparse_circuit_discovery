@@ -1,5 +1,10 @@
-# Sparse Circuit Discovery
 ![Feature graph](header.png)
+
+# Sparse Circuit Discovery
+[![Basic CI; testing and
+linting](https://github.com/DavidUdell/sparse_circuit_discovery/actions/workflows/CI.yaml/badge.svg)](https://github.com/DavidUdell/sparse_circuit_discovery/actions/workflows/CI.yaml)
+[![License:
+MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Circuit discovery in `GPT-2 small`, using sparse autoencoding
 
@@ -95,6 +100,11 @@ Save these values in `central_config.yaml`, then run interpretability:
 
 Data appears as it does with the naive algorithm.
 
+However, here you can also choose to render graphs as `.png` files. Change the
+extension of `GRADS_FILE` in `central_config.yaml` from `.svg` to `.png` for
+that. I separately use [PosteRazor](https://posterazor.sourceforge.io/) to tile
+print large `.png` graph files.
+
 ### Validating Circuits
 There's also an independent circuit validation pipeline, `val.py`. This script
 simultaneously ablates all the features that comprise a circuit, to see how the
@@ -135,9 +145,9 @@ _Blue and red tokens_ in individual boxes at the bottom are the logits most
 upweighted/downweighted by that dimension. (_Gray_ is the 0.0 effect edge case.)
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
-Red arrows represent downweighting, blue arrows represent upweighting, and
-arrow transparency represents magnitude. E.g., a pale red arrow is a minor
-downweighting effect.
+Red arrows represent downweighting, blue (green in `grad_graph.py`) arrows
+represent upweighting, and arrow transparency represents magnitude. E.g., a
+pale red arrow is a minor downweighting effect.
 
 ## Errors
 - I've gimped a lot of repository functionality for now: only `GPT-2 small` and
@@ -154,8 +164,15 @@ downweighting effect.
   currently required, and Windows pathing will probably not play nice with the
   repo.
 
+- You're safe ignoring an `Exception ignored TypeError` _at cleanup_ after
+  running `fast.py`, about an `AGraph` object and a `NoneType`.
+
+- `fast.py` uses a unique pruning strategy: it will take autoencoder dims in
+  the final `GPT-2 small` layer and prune up from them. So you should start
+  from the bottom of the model and progressively plot up from there.
+
 ## Project Status
-Current version is 1.1.0.
+Current version is 1.1.1.
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

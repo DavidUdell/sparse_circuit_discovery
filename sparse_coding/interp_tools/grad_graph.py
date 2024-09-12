@@ -27,7 +27,10 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
-from sparse_coding.interp_tools.utils.graphs import label_highlighting
+from sparse_coding.interp_tools.utils.graphs import (
+    label_highlighting,
+    prune_graph,
+)
 from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
     prepare_autoencoder_and_indices,
@@ -503,10 +506,21 @@ for i in unexplained_dict:
 
 label: str = ""
 for i, explained in explained_dict.items():
-    sublayer_frac_explained = round(
-        explained / (explained + unexplained_dict[i]), 2
-    )
+    if explained + unexplained_dict[i] == 0.0:
+        sublayer_frac_explained: float = 0.0
+        print(f"Sublayer {i} logged 0.0 effects in neurons and autoencoder.")
+    else:
+        sublayer_frac_explained = round(
+            explained / (explained + unexplained_dict[i]), 2
+        )
     label += f"\n{i}: ~{sublayer_frac_explained*100}%"
+
+# Nuke singleton nodes.
+for node in graph.nodes():
+    if len(graph.edges(node)) == 0:
+        graph.remove_node(node)
+# Prune graph to source-to-sink subgraph.
+graph = prune_graph(graph)
 
 graph.add_node(
     f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"
@@ -516,7 +530,8 @@ graph.add_node(
 # %%
 # Render graph
 graph.write(save_dot_path)
-graph.draw(save_graph_path, format="svg", prog="dot")
+# Format (.svg, .png) is inferred from file extension.
+graph.draw(save_graph_path, prog="dot")
 
 print("Graph saved to:")
 print(save_graph_path)
