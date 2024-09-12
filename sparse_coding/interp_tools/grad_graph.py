@@ -530,7 +530,8 @@ graph.add_node(
 # %%
 # Render graph
 graph.write(save_dot_path)
-graph.draw(save_graph_path, format="svg", prog="dot")
+# Format (.svg, .png) is inferred from file extension.
+graph.draw(save_graph_path, prog="dot")
 
 print("Graph saved to:")
 print(save_graph_path)
