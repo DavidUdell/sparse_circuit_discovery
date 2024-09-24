@@ -54,7 +54,7 @@ In order:
    your slice you'll plot. E.g., a fraction of `1.0` will try to plot every
    feature in the layer.
 3. `NUM_SEQUENCES_INTERPED` is the number of token sequences used during
-   plotting, for the purpose of caluculating logit effects and downstream
+   plotting, for the purpose of calculating logit effects and downstream
    feature effects.
 4. `THRESHOLD_EXP` is the threshold value exponent for activation differences
    plotted. Smaller differences in activation magnitude than `2**THRESHOLD_EXP`
@@ -172,7 +172,7 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.1.1.
+Current version is 1.2.0
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.
