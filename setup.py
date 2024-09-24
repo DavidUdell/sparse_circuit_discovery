@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "accelerate",
-        "datasets",
+        "datasets==2.21.0",
         "einops",
         "jupyter",
         "lightning",
