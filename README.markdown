@@ -84,13 +84,19 @@ plotting contributions to intermediate activation magnitudes. Its
 implementation here also extends to GPT-2's sublayers, not just the model's
 residual stream.
 
-Key hyperparameters:
+Key hyperparameters here are:
 1. `ACTS_LAYERS_SLICE` works as above.
-2. `NUM_DOWN_NODES` is the number of nodes per sublayer to plot edges _for_. The
-   number of plotted notes is twice this value (top-k and bottom-k).
-3. `NUM_UP_NODES` is the number of nodes per sublayer to plot edges _to_, from
-   down nodes. The number of plotted edges per down node will be twice this
-   value.
+```
+# Topk thresholds for gradient-based method.
+NUM_UP_NODES: 5
+NUM_DOWN_NODES: 5
+```
+
+2. `NUM_UP_NODES` fixes the number of sublayer nodes to plot edges _up to_, for
+   each sublayer down node. Note that the number of edges equals _twice_ this
+   value: you'll get this many top-k edges and this many _bottom-k_ edges.
+3. `NUM_DOWN_NODES` fixes the number of sublayer nodes that edges will then be
+   plotted _from_.
 
 Save these values in `central_config.yaml`, then run interpretability:
 
