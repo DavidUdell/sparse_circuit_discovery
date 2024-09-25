@@ -556,6 +556,9 @@ graph.draw(save_graph_path, prog="dot")
 print("Graph saved to:")
 print(save_graph_path)
 
+# Prevents an ugly exception ignored at cleanup time.
+graph.close()
+
 # %%
 # Close wandb.
 wandb.finish()

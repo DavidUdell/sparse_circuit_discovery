@@ -170,9 +170,6 @@ pale red arrow is a minor downweighting effect.
   currently required, and Windows pathing will probably not play nice with the
   repo.
 
-- You're safe ignoring an `Exception ignored TypeError` _at cleanup_ after
-  running `fast.py`, about an `AGraph` object and a `NoneType`.
-
 - `fast.py` uses a unique pruning strategy: it will take autoencoder dims in
   the final `GPT-2 small` layer and prune up from them. So you should start
   from the bottom of the model and progressively plot up from there.
