@@ -87,7 +87,9 @@ model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     output_hidden_states=True,
 )
-tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(
+    MODEL_DIR, clean_up_tokenization_spaces=True
+)
 accelerator: Accelerator = Accelerator()
 
 model = accelerator.prepare(model)

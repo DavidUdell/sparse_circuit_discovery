@@ -71,6 +71,7 @@ tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     use_fast=True,
     token=HF_ACCESS_TOKEN,
+    clean_up_tokenization_spaces=True,
 )
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)

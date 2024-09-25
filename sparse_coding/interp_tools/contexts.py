@@ -94,6 +94,7 @@ wandb.init(
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,
+    clean_up_tokenization_spaces=True,
 )
 accelerator: Accelerator = Accelerator()
 
