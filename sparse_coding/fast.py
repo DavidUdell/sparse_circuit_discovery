@@ -4,6 +4,7 @@ from subprocess import run
 
 for script in [
     "collect_acts.py",
+    # precluster.py will go here
     "load_autoencoder.py",
     "interp_tools/contexts.py",
     "interp_tools/grad_graph.py",
