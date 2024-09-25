@@ -177,6 +177,8 @@ metric = t.nn.CrossEntropyLoss()
 print("Prompt:")
 print()
 print(PROMPT)
+print()
+print("Backward passes:")
 
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 acts_dict: dict = None
@@ -323,8 +325,14 @@ with grads_manager(
             else:
                 raise ValueError("Module location not recognized.")
 
+# Here to have the newlines look nice in both the interactive notebooks and the
+# shell.
+print()
+
 # %%
 # Populate graph.
+print("Computing top-k/bottom-k graph edges:")
+
 explained_dict: dict = {}
 unexplained_dict: dict = {}
 
@@ -489,6 +497,10 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
     # Log overall explained effect.
     effect_explained += sublayer_explained
+
+# Here to have the newlines look nice in both the interactive notebooks and the
+# shell.
+print()
 
 # %%
 # Graph annotation.
