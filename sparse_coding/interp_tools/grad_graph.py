@@ -158,8 +158,14 @@ mlp_dec_and_biases, _ = prepare_autoencoder_and_indices(
 # %%
 # Load preexisting graph, if available.
 graph = load_preexisting_graph(MODEL_DIR, GRADS_DOT_FILE, __file__)
+
 if graph is None:
+    print("Graph status: No preexisting graph found; starting new graph.")
     graph = AGraph(directed=True)
+else:
+    print("Graph status: Preexisting graph loaded.")
+
+print()
 
 save_graph_path: str = save_paths(
     __file__, f"{sanitize_model_name(MODEL_DIR)}/{GRADS_FILE}"
