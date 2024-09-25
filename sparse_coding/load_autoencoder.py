@@ -13,6 +13,7 @@ from sparse_coding.utils.interface import (
     sanitize_model_name,
 )
 from sae_training.utils import (  # pylint: disable=unused-import
+    LanguageModelSAERunnerConfig,
     LMSparseAutoencoderSessionloader,
 )
 
@@ -49,6 +50,11 @@ assert PROJECTION_FACTOR == 32, "Projection factor must be 32."
 
 
 # %%
+# t.load safe globals addition.
+t.serialization.add_safe_globals([LanguageModelSAERunnerConfig])
+
+
+# %%
 # Residual autopencoder loading functionality.
 def load_resid_autoencoder(
     autoencoder_repository: str,
@@ -74,9 +80,11 @@ def load_resid_autoencoder(
 
         # Solves a GPU availability issue with CI runners.
         if not t.cuda.is_available():
-            tensors_dict = t.load(file_url, map_location="cpu")
+            tensors_dict = t.load(
+                file_url, map_location="cpu", weights_only=True
+            )
         else:
-            tensors_dict = t.load(file_url)
+            tensors_dict = t.load(file_url, weights_only=True)
 
         encoder = tensors_dict["state_dict"]["W_enc"]
         enc_biases = tensors_dict["state_dict"]["b_enc"]

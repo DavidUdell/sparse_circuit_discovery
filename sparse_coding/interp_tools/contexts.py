@@ -219,8 +219,8 @@ for layer_idx in seq_layer_indices:
             __file__,
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
         )
-        imported_weights: t.Tensor = t.load(ENCODER_PATH).T
-        imported_biases: t.Tensor = t.load(BIASES_PATH)
+        imported_weights: t.Tensor = t.load(ENCODER_PATH, weights_only=True).T
+        imported_biases: t.Tensor = t.load(BIASES_PATH, weights_only=True)
 
         # Initialize a concrete encoder for this layer.
         model: Encoder = Encoder(imported_weights, imported_biases)
@@ -232,7 +232,7 @@ for layer_idx in seq_layer_indices:
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
         )
         layer_acts_data: t.Tensor = accelerator.prepare(
-            t.load(LAYER_ACTS_PATH)
+            t.load(LAYER_ACTS_PATH, weights_only=True)
         )
 
         # Note that activations are stored as a list of question tensors from
