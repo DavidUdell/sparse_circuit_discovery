@@ -152,7 +152,7 @@ def populate_table(
         writer = csv.writer(file)
         writer.writerow(header)
 
-        for dim_idx in tqdm(contexts_and_effects, desc="Features Labeled"):
+        for dim_idx in tqdm(contexts_and_effects, desc=top_k_info_path):
             top_k_contexts = []
             top_activations = []
             # Context here has been stringified, so its length is not its token
@@ -205,6 +205,7 @@ mlp = {
     "tokens": MLP_TOKEN_FILE,
 }
 
+print("Annotating autoencoder dimensions:")
 for layer_idx in seq_layer_indices:
     for sublayer in [resid, attn, mlp]:
         acts_file: str = sublayer["acts"]
@@ -272,6 +273,9 @@ for layer_idx in seq_layer_indices:
             tokens_file,
             layer_idx,
         )
+
+# For clean spacing in stdout.
+print()
 
 # %%
 # Wrap up logging.
