@@ -1,6 +1,10 @@
 """Run the constant-time graph pipeline in one command."""
 
+import os
+
 from subprocess import run
+
+os.environ["WANDB_SILENT"] = "true"
 
 for script in [
     "collect_acts.py",
