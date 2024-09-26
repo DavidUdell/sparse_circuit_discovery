@@ -163,6 +163,13 @@ for layer_acts in [attn_acts, mlp_acts]:
         # In-place squeeze then unsqueeze, to regularize shapes.
         act.squeeze_()
         act.unsqueeze_(0)
+        # Single-token prompt edge case.
+        if act.dim() == 2:
+            act.unsqueeze_(0)
+
+        assert (
+            act.shape == layer_activations.shape
+        ), "Sublayer_out shapes should all match."
 
         # Only for single prompts, for now.
         cache_layer_tensor(

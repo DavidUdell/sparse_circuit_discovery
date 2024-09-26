@@ -256,10 +256,20 @@ with grads_manager(
                     acts_dict[mlp_error_confound],
                 ).squeeze()
             )
-            jvp[-1].backward(retain_graph=True)
+            if jvp.dim() == 0:
+                # Single-token prompt edge case.
+                jvp.backward(retain_graph=True)
+            else:
+                jvp[-1].backward(retain_graph=True)
+
             _, jvp_grads = acts_and_grads
 
-        weighted_prod = t.einsum("bsd,bsd->bsd", grad, act)[:, -1, :].squeeze()
+        weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
+        if weighted_prod.dim() == 2:
+            # Single-token prompt edge case.
+            weighted_prod = weighted_prod[-1, :].squeeze()
+        else:
+            weighted_prod = weighted_prod[:, -1, :].squeeze()
 
         # Thresholding autoencoders.
         if "error_" not in loc:
@@ -367,7 +377,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     if "error" in up_layer_module and "error" not in down_layer_module:
         sublayer_unexplained: float = 0.0
         for down_dim, up_values in down_nodes.items():
-            up_values = up_values.squeeze()[-1, :]
+            up_values = up_values.squeeze()
+            if up_values.dim() == 2:
+                up_values = up_values[-1, :]
+            assert up_values.dim() == 1
+
             # Sublayer absolute effect unexplained.
             sublayer_unexplained += abs(up_values).sum().item()
 
@@ -388,7 +402,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
     sublayer_explained: float = 0.0
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
-        up_values = up_values.squeeze()[-1, :]
+        up_values = up_values.squeeze()
+        if up_values.dim() == 2:
+            up_values = up_values[-1, :]
+        assert up_values.dim() == 1
+
         # Sublayer absolute effect explained.
         sublayer_explained += abs(up_values).sum().item()
 
