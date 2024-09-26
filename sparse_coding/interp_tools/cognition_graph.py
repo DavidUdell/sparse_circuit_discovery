@@ -22,7 +22,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from tqdm.auto import tqdm
 import wandb
 
-from sparse_coding.interp_tools.utils.computations import calc_act_diffs
+from sparse_coding.interp_tools.utils.computations import (
+    calc_act_diffs,
+    ExactlyZeroEffectError,
+)
 from sparse_coding.interp_tools.utils.graphs import (
     color_range_from_scalars,
     label_highlighting,
@@ -343,7 +346,8 @@ for node in graph.nodes():
         unlinked_nodes += 1
 
 if total_effect == 0.0:
-    raise ValueError("Total effect logged was 0.0")
+    raise ExactlyZeroEffectError()
+
 fraction_included = round(plotted_effect / total_effect, 2)
 graph.add_node(f"Effects plotted out of collected: ~{fraction_included*100}%.")
 

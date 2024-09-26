@@ -27,6 +27,9 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
+from sparse_coding.interp_tools.utils.computations import (
+    ExactlyZeroEffectError,
+)
 from sparse_coding.interp_tools.utils.graphs import (
     label_highlighting,
     prune_graph,
@@ -513,7 +516,7 @@ print()
 # %%
 # Graph annotation.
 if effect_explained == 0.0:
-    raise ValueError("Effect plotted was 0.0; no additions to graph.")
+    raise ExactlyZeroEffectError()
 
 total_frac_explained = round(
     effect_explained / (effect_explained + effect_unexplained), 2

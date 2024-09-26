@@ -160,8 +160,8 @@ pale red arrow is a minor downweighting effect.
   a projection factor of 32 are supported, to take advantage of a set of
   preexisting sparse autoencoders.
 
-- When there is an "exactly `0.0` effect from ablations" error, check whether
-  your layers slice is compatible with your pinned dim.
+- If an ExactlyZeroEffectError is raised, you should double-check whether your
+  layers slice is compatible with your pinned dim.
 
 - If you're encountering cryptic env variable bugs, ensure you're running CUDA
   Toolkit 12.2 or newer.
