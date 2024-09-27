@@ -113,8 +113,8 @@ else:
 # put into `resid_acts`, `attn_acts`, `mlp_acts`.
 prompt_ids_tensors: list[t.Tensor] = []
 resid_acts: list[tuple[t.Tensor]] = []
-attn_acts: list[tuple[t.Tensor]] = [tuple() for _ in acts_layers_range]
-mlp_acts: list[tuple[t.Tensor]] = [tuple() for _ in acts_layers_range]
+attn_acts: list[tuple[t.Tensor]] = []
+mlp_acts: list[tuple[t.Tensor]] = []
 
 for idx, batch in enumerate(training_set):
     inputs = tokenizer(
@@ -125,11 +125,18 @@ for idx, batch in enumerate(training_set):
         outputs = model(**inputs)
 
         resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
-
-        attn_acts += tuple(a[f"attn_{i}"] for i in acts_layers_range)
-        mlp_acts += tuple(a[f"mlp_{i}"] for i in acts_layers_range)
+        attn_acts.append(tuple(a[f"attn_{i}"] for i in acts_layers_range))
+        # mlp acts save with a different convention.
+        mlp_acts.append(
+            tuple(a[f"mlp_{i}"].unsqueeze(0) for i in acts_layers_range)
+        )
 
     prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
+
+# Handle single layer resid case lacking outer tuples.
+if isinstance(resid_acts, list) and isinstance(resid_acts[0], t.Tensor):
+    # Tensors are of classic shape: (batch, seq, hidden)
+    resid_acts: list[tuple[t.Tensor]] = [(tensor,) for tensor in resid_acts]
 
 # %%
 # Save prompt ids.
@@ -142,68 +149,46 @@ prompt_ids_array: np.ndarray = np.array(prompt_ids_lists, dtype=object)
 np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 
 # %%
-# Save activations.
-# Save resid-out activations. Single layer resid case lacks outer tuple; this
-# solves that.
-if isinstance(resid_acts, list) and isinstance(resid_acts[0], t.Tensor):
-    # Tensors are of classic shape: (batch, seq, hidden)
-    resid_acts: list[tuple[t.Tensor]] = [(tensor,) for tensor in resid_acts]
+# Save sublayer activations.
+sublayers_acts = [resid_acts, attn_acts, mlp_acts]
+sublayer_paths = [ACTS_DATA_FILE, ATTN_DATA_FILE, MLP_DATA_FILE]
 
-max_seq_length: int = max(
-    tensor.size(1) for layers_tuple in resid_acts for tensor in layers_tuple
+# Sanity checks
+assert len(resid_acts) == len(attn_acts) == len(mlp_acts)
+assert len(resid_acts[0]) == len(attn_acts[0]) == len(mlp_acts[0])
+assert len(resid_acts[-1]) == len(attn_acts[-1]) == len(mlp_acts[-1])
+assert resid_acts[0][0].dim() == attn_acts[0][0].dim() == mlp_acts[0][0].dim()
+assert (
+    resid_acts[-1][-1].dim()
+    == attn_acts[-1][-1].dim()
+    == mlp_acts[-1][-1].dim()
 )
 
-# resid_acts: list[tuple[t.Tensor...]]: [batch]
-# layers_tuple: tuple[t.Tensor...]: [num_layers]
-# act: t.Tensor: [1, seq, hidden]
-for abs_idx, layer_idx in enumerate(acts_layers_range):
-    layer_activations: list[t.Tensor] = [
-        pad_activations(
-            accelerator.prepare(layers_tuple[abs_idx]),
-            max_seq_length,
-            accelerator,
-        )
-        for layers_tuple in resid_acts
-    ]
-    layer_activations: t.Tensor = t.cat(layer_activations, dim=0)
-
-    cache_layer_tensor(
-        layer_activations,
-        layer_idx,
-        ACTS_DATA_FILE,
-        __file__,
-        MODEL_DIR,
+for sublayer_acts, sublayer_path in zip(sublayers_acts, sublayer_paths):
+    max_seq_length: int = max(
+        tensor.size(1)
+        for layers_tuple in sublayer_acts
+        for tensor in layers_tuple
     )
 
-# Save attn-out and mlp-out activations.
-assert (
-    isinstance(attn_acts, list)
-    and isinstance(mlp_acts, list)
-    and isinstance(attn_acts[0], tuple)
-    and isinstance(mlp_acts[0], tuple)
-)
+    # sublayer_acts: list[tuple[t.Tensor...]]: [batch]
+    # layers_tuple: tuple[t.Tensor...]: [num_layers]
+    # tensor: t.Tensor: [1, seq, hidden]
+    for abs_idx, layer_idx in enumerate(acts_layers_range):
+        layer_activations: list[t.Tensor] = [
+            pad_activations(
+                accelerator.prepare(layers_tuple[abs_idx]),
+                max_seq_length,
+                accelerator,
+            )
+            for layers_tuple in resid_acts
+        ]
+        layer_activations: t.Tensor = t.cat(layer_activations, dim=0)
 
-# layer_acts: list[t.Tensor...]: [num_layers*batch]
-# act: t.Tensor: [1, seq, hidden]
-for layer_acts in [attn_acts, mlp_acts]:
-    for idx, act in zip(acts_layers_range, layer_acts):
-        print(act.shape)
-        # In-place squeeze then unsqueeze, to regularize shapes.
-        act.squeeze_()
-        act.unsqueeze_(0)
-        # Single-token prompt edge case.
-        if act.dim() == 2:
-            act.unsqueeze_(0)
-
-        assert (
-            act.shape == layer_activations.shape
-        ), "Sublayer_out shapes should all match."
-
-        # Only for single prompts, for now.
         cache_layer_tensor(
-            act,
-            idx,
-            ATTN_DATA_FILE if layer_acts is attn_acts else MLP_DATA_FILE,
+            layer_activations,
+            layer_idx,
+            sublayer_path,
             __file__,
             MODEL_DIR,
         )
