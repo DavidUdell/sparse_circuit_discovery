@@ -110,11 +110,12 @@ else:
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
-# put into `activations`.
-resid_acts: list[tuple[t.Tensor]] = []
-attn_acts: list[t.Tensor] = []
-mlp_acts: list[t.Tensor] = []
+# put into `resid_acts`, `attn_acts`, `mlp_acts`.
 prompt_ids_tensors: list[t.Tensor] = []
+resid_acts: list[tuple[t.Tensor]] = []
+attn_acts: list[tuple[t.Tensor]] = [tuple() for _ in acts_layers_range]
+mlp_acts: list[tuple[t.Tensor]] = [tuple() for _ in acts_layers_range]
+print(attn_acts)
 
 for idx, batch in enumerate(training_set):
     inputs = tokenizer(
@@ -126,9 +127,9 @@ for idx, batch in enumerate(training_set):
 
         resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
 
-        for i in acts_layers_range:
-            attn_acts.append(a[f"attn_{i}"])
-            mlp_acts.append(a[f"mlp_{i}"])
+        for abs_idx, idx in enumerate(acts_layers_range):
+            attn_acts[abs_idx] += (a[f"attn_{idx}"],)
+            mlp_acts[abs_idx] += (a[f"mlp_{idx}"],)
 
     prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
 
