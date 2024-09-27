@@ -115,7 +115,6 @@ prompt_ids_tensors: list[t.Tensor] = []
 resid_acts: list[tuple[t.Tensor]] = []
 attn_acts: list[tuple[t.Tensor]] = [tuple() for _ in acts_layers_range]
 mlp_acts: list[tuple[t.Tensor]] = [tuple() for _ in acts_layers_range]
-print(attn_acts)
 
 for idx, batch in enumerate(training_set):
     inputs = tokenizer(
@@ -127,9 +126,8 @@ for idx, batch in enumerate(training_set):
 
         resid_acts.append(outputs.hidden_states[ACTS_LAYERS_SLICE])
 
-        for abs_idx, idx in enumerate(acts_layers_range):
-            attn_acts[abs_idx] += (a[f"attn_{idx}"],)
-            mlp_acts[abs_idx] += (a[f"mlp_{idx}"],)
+        attn_acts += tuple(a[f"attn_{i}"] for i in acts_layers_range)
+        mlp_acts += tuple(a[f"mlp_{i}"] for i in acts_layers_range)
 
     prompt_ids_tensors.append(inputs["input_ids"].squeeze().cpu())
 
