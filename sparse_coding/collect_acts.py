@@ -153,6 +153,9 @@ max_seq_length: int = max(
     tensor.size(1) for layers_tuple in resid_acts for tensor in layers_tuple
 )
 
+# resid_acts: list[tuple[t.Tensor...]]: [batch]
+# layers_tuple: tuple[t.Tensor...]: [num_layers]
+# act: t.Tensor: [1, seq, hidden]
 for abs_idx, layer_idx in enumerate(acts_layers_range):
     layer_activations: list[t.Tensor] = [
         pad_activations(
@@ -173,7 +176,8 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
     )
 
 # Now attn-out and mlp-out.
-# acts: list
+# layer_acts: list[t.Tensor...]: [num_layers*batch]
+# act: t.Tensor: [1, seq, hidden]
 for layer_acts in [attn_acts, mlp_acts]:
     for idx, act in zip(acts_layers_range, layer_acts):
         print(act.shape)
