@@ -111,7 +111,7 @@ else:
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
 # put into `activations`.
-resid_acts: list[t.Tensor] = []
+resid_acts: list[tuple[t.Tensor]] = []
 attn_acts: list[t.Tensor] = []
 mlp_acts: list[t.Tensor] = []
 prompt_ids_tensors: list[t.Tensor] = []
@@ -144,7 +144,8 @@ np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 
 # %%
 # Save activations.
-# Single layer resid case lacks outer tuple; this solves that.
+# Save resid-out activations. Single layer resid case lacks outer tuple; this
+# solves that.
 if isinstance(resid_acts, list) and isinstance(resid_acts[0], t.Tensor):
     # Tensors are of classic shape: (batch, seq, hidden)
     resid_acts: list[tuple[t.Tensor]] = [(tensor,) for tensor in resid_acts]
@@ -175,7 +176,14 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
         MODEL_DIR,
     )
 
-# Now attn-out and mlp-out.
+# Save attn-out and mlp-out activations.
+assert (
+    isinstance(attn_acts, list)
+    and isinstance(mlp_acts, list)
+    and isinstance(attn_acts[0], tuple)
+    and isinstance(mlp_acts[0], tuple)
+)
+
 # layer_acts: list[t.Tensor...]: [num_layers*batch]
 # act: t.Tensor: [1, seq, hidden]
 for layer_acts in [attn_acts, mlp_acts]:
