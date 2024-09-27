@@ -1,5 +1,10 @@
 # %%
-"""Collect model activations during inference."""
+"""
+Collect model activations during inference.
+
+If a dataset is specified, activations are collected for the dataset.
+Otherwise, activations are collected for the prompt specified.
+"""
 
 
 import warnings
@@ -39,6 +44,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+DATASET = config.get("DATASET")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -88,6 +94,9 @@ acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Dataset. Poor man's fancy indexing.
+if DATASET is not None:
+    print(DATASET)
+
 training_set: list[list[int]] = [
     PROMPT,
 ]

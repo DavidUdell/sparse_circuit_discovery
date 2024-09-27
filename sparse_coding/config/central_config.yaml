@@ -37,6 +37,10 @@ MODEL_DIR: "openai-community/gpt2"
 # Prompt
 PROMPT: "Copyright (C"
 
+# Dataset
+# A specified dataset will override the prompt.
+DATASET: Elriggs/openwebtext-100k
+
 # Layers Slice to Cache Activations From
 # Put a Python slice here, in str format. Put ":" to use data from all model
 # layers.

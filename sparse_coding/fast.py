@@ -8,7 +8,7 @@ os.environ["WANDB_SILENT"] = "true"
 
 for script in [
     "collect_acts.py",
-    # precluster.py will go here
+    "precluster.py",
     "load_autoencoder.py",
     "interp_tools/contexts.py",
     "interp_tools/grad_graph.py",
