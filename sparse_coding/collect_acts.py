@@ -13,6 +13,7 @@ import numpy as np
 import torch as t
 import transformers
 from accelerate import Accelerator
+from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -93,13 +94,19 @@ validate_slice(model, ACTS_LAYERS_SLICE)
 acts_layers_range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
-# Dataset. Poor man's fancy indexing.
+# Dataset xor prompt.
 if DATASET is not None:
-    print(DATASET)
-
-training_set: list[list[int]] = [
-    PROMPT,
-]
+    dataset: list[list[int]] = load_dataset(DATASET, split="train")["text"]
+    # Indexing this way separates out a test set.
+    dataset_indices = np.random.choice(
+        len(dataset), size=len(dataset), replace=False
+    )
+    training_indices = dataset_indices[:NUM_SEQUENCES_EVALED]
+    training_set: list[list[int]] = [dataset[idx] for idx in training_indices]
+else:
+    training_set: list[list[int]] = [
+        PROMPT,
+    ]
 
 # %%
 # Tokenization and inference. The taut constraint here is how much memory you
@@ -169,6 +176,7 @@ for abs_idx, layer_idx in enumerate(acts_layers_range):
 # acts: list
 for layer_acts in [attn_acts, mlp_acts]:
     for idx, act in zip(acts_layers_range, layer_acts):
+        print(act.shape)
         # In-place squeeze then unsqueeze, to regularize shapes.
         act.squeeze_()
         act.unsqueeze_(0)
