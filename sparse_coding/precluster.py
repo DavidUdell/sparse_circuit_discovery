@@ -1,6 +1,8 @@
 # %%
-"""Partition the dataset into k clusters based on activation cosines."""
+"""Partition the dataset into k-clusters based on activation cosines."""
 
+
+import sys
 
 import datasets
 import numpy as np
@@ -25,4 +27,9 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+DATASET = config.get("DATASET")
 MODEL_DIR = config.get("MODEL_DIR")
+
+if DATASET is None:
+    print("DATASET not set; not partitioning forward passes.")
+    sys.exit(0)
