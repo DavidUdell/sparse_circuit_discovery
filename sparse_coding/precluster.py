@@ -35,4 +35,4 @@ if DATASET is None:
     sys.exit(0)
 else:
     dataset_name: str = DATASET.split("/")[-1]
-    print(f"Partitioning dataset {dataset_name}")
+    print(f"Partitioning dataset: {dataset_name}")
