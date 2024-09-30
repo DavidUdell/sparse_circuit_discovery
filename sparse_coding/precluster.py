@@ -19,11 +19,12 @@ from transformers import (
 import wandb
 
 from sparse_coding.utils.interface import (
-    parse_slice,
-    slice_to_range,
     load_input_token_ids,
     load_yaml_constants,
+    parse_slice,
+    sanitize_model_name,
     save_paths,
+    slice_to_range,
 )
 
 
@@ -37,6 +38,9 @@ WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
+RESID_DATA_FILE = config.get("ACTS_DATA_FILE")
+ATTN_DATA_FILE = config.get("ATTN_DATA_FILE")
+MLP_DATA_FILE = config.get("MLP_DATA_FILE")
 DATASET = config.get("DATASET")
 SEED = config.get("SEED")
 
@@ -46,6 +50,12 @@ if DATASET is None:
 else:
     dataset_name: str = DATASET.split("/")[-1]
     print(f"Partitioning dataset: {dataset_name}")
+
+datafiles: list[str] = [
+    RESID_DATA_FILE,
+    ATTN_DATA_FILE,
+    MLP_DATA_FILE,
+]
 
 # %%
 # Reproducibility
@@ -65,7 +75,7 @@ with warnings.catch_warnings():
     )
 accelerator: Accelerator = Accelerator()
 # Ranges are iterable while slices aren't.
-layers_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
+acts_layers_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
 # %%
 # Load token ids.
@@ -73,5 +83,10 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 # %%
 # Main loop
-for i in layers_range:
-    print(i)
+for layer_idx in acts_layers_range:
+    for datafile in datafiles:
+        acts_path = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
+        )
+        print(acts_path)
