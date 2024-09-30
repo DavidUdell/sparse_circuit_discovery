@@ -33,3 +33,6 @@ MODEL_DIR = config.get("MODEL_DIR")
 if DATASET is None:
     print("DATASET not set; not partitioning forward passes.")
     sys.exit(0)
+else:
+    dataset_name: str = DATASET.split("/")[-1]
+    print(f"Partitioning dataset {dataset_name}")
