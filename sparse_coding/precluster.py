@@ -6,8 +6,9 @@ import sys
 import warnings
 
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import normalize
 import torch as t
-from accelerate import Accelerator
 from transformers import (
     AutoModelForCausalLM,
     PreTrainedModel,
@@ -65,13 +66,12 @@ np.random.seed(SEED)
 wandb.init(project=WANDB_PROJECT, entity=WANDB_ENTITY, config=config)
 
 # %%
-# Model and accelerator
+# Load model.
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR, token=HF_ACCESS_TOKEN
     )
-accelerator: Accelerator = Accelerator()
 # Ranges are iterable while slices aren't.
 acts_layers_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 
@@ -82,15 +82,19 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 # %%
 # Cluster into k-partitions.
 print(f"Partitioning into {NUM_CLUSTERS} clusters.")
+
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
         acts_path: str = save_paths(
             __file__,
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
         )
-        acts: t.Tensor = accelerator.prepare(
-            t.load(acts_path, weights_only=True)
-        )
-
-        # `acts_list` maps onto `token_ids`
+        acts: t.Tensor = t.load(acts_path, weights_only=True)
         acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
+        seq_by_hidden_acts: t.Tensor = t.cat(acts_list, dim=0).cpu()
+
+        # Cluster using cosine similarity.
+        normed_acts = normalize(seq_by_hidden_acts, norm="l2", axis=1)
+        # Initialize repeatedly to maintain reproducibility with the seed.
+        kmeans = KMeans(n_clusters=NUM_CLUSTERS, random_state=SEED)
+        clusters = kmeans.fit_predict(normed_acts)
