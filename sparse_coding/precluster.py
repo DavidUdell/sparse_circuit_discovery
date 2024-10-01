@@ -39,6 +39,7 @@ RESID_DATA_FILE = config.get("ACTS_DATA_FILE")
 ATTN_DATA_FILE = config.get("ATTN_DATA_FILE")
 MLP_DATA_FILE = config.get("MLP_DATA_FILE")
 DATASET = config.get("DATASET")
+NUM_CLUSTERS = config.get("NUM_CLUSTERS")
 SEED = config.get("SEED")
 
 if DATASET is None:
@@ -79,7 +80,8 @@ acts_layers_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 # %%
-# Main loop
+# Cluster into k-partitions.
+print(f"Partitioning into {NUM_CLUSTERS} clusters.")
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
         acts_path: str = save_paths(
@@ -90,7 +92,5 @@ for layer_idx in acts_layers_range:
             t.load(acts_path, weights_only=True)
         )
 
+        # `acts_list` maps onto `token_ids`
         acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
-        print(len(acts_list))
-        print(acts_list[0].shape)
-        print()
