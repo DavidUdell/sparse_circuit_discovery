@@ -41,6 +41,7 @@ ATTN_DATA_FILE = config.get("ATTN_DATA_FILE")
 MLP_DATA_FILE = config.get("MLP_DATA_FILE")
 DATASET = config.get("DATASET")
 NUM_CLUSTERS = config.get("NUM_CLUSTERS")
+KEEPER_CLUSTER_INDEX = config.get("KEEPER_CLUSTER_INDEX")
 SEED = config.get("SEED")
 
 if DATASET is None:
@@ -82,6 +83,7 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 # %%
 # Cluster into k-partitions.
 print(f"Partitioning into {NUM_CLUSTERS} clusters.")
+old_acts = t.Tensor([])
 
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
@@ -90,11 +92,19 @@ for layer_idx in acts_layers_range:
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
         )
         acts: t.Tensor = t.load(acts_path, weights_only=True)
+
+        assert not t.equal(acts.cpu(), old_acts.cpu())
         acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
         seq_by_hidden_acts: t.Tensor = t.cat(acts_list, dim=0).cpu()
 
         # Cluster using cosine similarity.
         normed_acts = normalize(seq_by_hidden_acts, norm="l2", axis=1)
         # Initialize repeatedly to maintain reproducibility with the seed.
-        kmeans = KMeans(n_clusters=NUM_CLUSTERS, random_state=SEED)
-        clusters = kmeans.fit_predict(normed_acts)
+        kmeans = KMeans(n_clusters=NUM_CLUSTERS, random_state=SEED, n_init=10)
+        clusters_indices = kmeans.fit_predict(normed_acts)
+
+        # Save select cluster.
+        cluster = seq_by_hidden_acts[clusters_indices == KEEPER_CLUSTER_INDEX]
+        print(cluster.shape)
+
+        old_acts = acts

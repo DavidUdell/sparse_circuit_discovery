@@ -111,6 +111,7 @@ MAX_SEQ_LEN: 50
 
 # `precluster.py`
 NUM_CLUSTERS: 10
+KEEPER_CLUSTER_INDEX: 0
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
