@@ -5,16 +5,12 @@
 import sys
 import warnings
 
-import datasets
 import numpy as np
 import torch as t
-import transformers
 from accelerate import Accelerator
 from transformers import (
     AutoModelForCausalLM,
-    AutoTokenizer,
     PreTrainedModel,
-    PreTrainedTokenizer,
 )
 import wandb
 
@@ -26,6 +22,7 @@ from sparse_coding.utils.interface import (
     save_paths,
     slice_to_range,
 )
+from sparse_coding.utils.top_contexts import unpad_activations
 
 
 # %%
@@ -89,9 +86,11 @@ for layer_idx in acts_layers_range:
             __file__,
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
         )
-        print(acts_path)
         acts: t.Tensor = accelerator.prepare(
             t.load(acts_path, weights_only=True)
         )
-        print(acts.shape)
+
+        acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
+        print(len(acts_list))
+        print(acts_list[0].shape)
         print()
