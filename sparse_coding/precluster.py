@@ -85,8 +85,13 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 # Main loop
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
-        acts_path = save_paths(
+        acts_path: str = save_paths(
             __file__,
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
         )
         print(acts_path)
+        acts: t.Tensor = accelerator.prepare(
+            t.load(acts_path, weights_only=True)
+        )
+        print(acts.shape)
+        print()
