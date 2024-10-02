@@ -171,7 +171,7 @@ for sublayer_acts, sublayer_path in zip(sublayers_acts, sublayer_paths):
                 max_seq_length,
                 accelerator,
             )
-            for layers_tuple in resid_acts
+            for layers_tuple in sublayer_acts
         ]
         layer_activations: t.Tensor = t.cat(layer_activations, dim=0)
 
@@ -184,9 +184,9 @@ for sublayer_acts, sublayer_path in zip(sublayers_acts, sublayer_paths):
         )
 
 # Sanity check the saved tensors.
-old_resid: t.Tensor = accelerator.prepare(t.Tensor([]))
-old_attn: t.Tensor = accelerator.prepare(t.Tensor([]))
-old_mlp: t.Tensor = accelerator.prepare(t.Tensor([]))
+old_resid: t.Tensor = t.Tensor([])
+old_attn: t.Tensor = t.Tensor([])
+old_mlp: t.Tensor = t.Tensor([])
 
 for layer_idx in acts_layers_range:
     resid_path: str = save_paths(
@@ -208,6 +208,10 @@ for layer_idx in acts_layers_range:
     assert not t.equal(resid_acts, attn_acts), f"{layer_idx}"
     assert not t.equal(attn_acts, mlp_acts), f"{layer_idx}"
     assert not t.equal(mlp_acts, resid_acts), f"{layer_idx}"
+
+    old_resid = old_resid.to(resid_acts.device)
+    old_attn = old_attn.to(attn_acts.device)
+    old_mlp = old_mlp.to(mlp_acts.device)
 
     assert not t.equal(resid_acts, old_resid), f"{layer_idx}, {layer_idx - 1}"
     assert not t.equal(attn_acts, old_attn), f"{layer_idx}, {layer_idx - 1}"
