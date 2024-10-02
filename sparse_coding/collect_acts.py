@@ -23,13 +23,14 @@ from transformers import (
 import wandb
 
 from sparse_coding.utils.interface import (
-    parse_slice,
-    validate_slice,
     cache_layer_tensor,
-    slice_to_range,
     load_yaml_constants,
-    save_paths,
     pad_activations,
+    parse_slice,
+    sanitize_model_name,
+    save_paths,
+    slice_to_range,
+    validate_slice,
 )
 from sparse_coding.interp_tools.utils.hooks import attn_mlp_acts_manager
 
@@ -49,7 +50,7 @@ DATASET = config.get("DATASET")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
-ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
+RESID_DATA_FILE = config.get("ACTS_DATA_FILE")
 ATTN_DATA_FILE = config.get("ATTN_DATA_FILE")
 MLP_DATA_FILE = config.get("MLP_DATA_FILE")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -151,18 +152,7 @@ np.save(PROMPT_IDS_PATH, prompt_ids_array, allow_pickle=True)
 # %%
 # Save sublayer activations.
 sublayers_acts = [resid_acts, attn_acts, mlp_acts]
-sublayer_paths = [ACTS_DATA_FILE, ATTN_DATA_FILE, MLP_DATA_FILE]
-
-# Sanity checks
-assert len(resid_acts) == len(attn_acts) == len(mlp_acts)
-assert len(resid_acts[0]) == len(attn_acts[0]) == len(mlp_acts[0])
-assert len(resid_acts[-1]) == len(attn_acts[-1]) == len(mlp_acts[-1])
-assert resid_acts[0][0].dim() == attn_acts[0][0].dim() == mlp_acts[0][0].dim()
-assert (
-    resid_acts[-1][-1].dim()
-    == attn_acts[-1][-1].dim()
-    == mlp_acts[-1][-1].dim()
-)
+sublayer_paths = [RESID_DATA_FILE, ATTN_DATA_FILE, MLP_DATA_FILE]
 
 for sublayer_acts, sublayer_path in zip(sublayers_acts, sublayer_paths):
     max_seq_length: int = max(
@@ -192,6 +182,28 @@ for sublayer_acts, sublayer_path in zip(sublayers_acts, sublayer_paths):
             __file__,
             MODEL_DIR,
         )
+
+# Sanity check saved tensors
+for layer_idx in acts_layers_range:
+    resid_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{RESID_DATA_FILE}",
+    )
+    resid_acts: t.Tensor = t.load(resid_path, weights_only=True)
+    attn_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{ATTN_DATA_FILE}",
+    )
+    attn_acts: t.Tensor = t.load(attn_path, weights_only=True)
+    mlp_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{MLP_DATA_FILE}",
+    )
+    mlp_acts: t.Tensor = t.load(mlp_path, weights_only=True)
+
+    assert not t.equal(resid_acts, attn_acts), f"{layer_idx}"
+    assert not t.equal(attn_acts, mlp_acts), f"{layer_idx}"
+    assert not t.equal(mlp_acts, resid_acts), f"{layer_idx}"
 
 # %%
 # Wrap up logging.
