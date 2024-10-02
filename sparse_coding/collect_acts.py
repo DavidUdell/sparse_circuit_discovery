@@ -183,7 +183,11 @@ for sublayer_acts, sublayer_path in zip(sublayers_acts, sublayer_paths):
             MODEL_DIR,
         )
 
-# Sanity check saved tensors
+# Sanity check the saved tensors.
+old_resid: t.Tensor = accelerator.prepare(t.Tensor([]))
+old_attn: t.Tensor = accelerator.prepare(t.Tensor([]))
+old_mlp: t.Tensor = accelerator.prepare(t.Tensor([]))
+
 for layer_idx in acts_layers_range:
     resid_path: str = save_paths(
         __file__,
@@ -204,6 +208,14 @@ for layer_idx in acts_layers_range:
     assert not t.equal(resid_acts, attn_acts), f"{layer_idx}"
     assert not t.equal(attn_acts, mlp_acts), f"{layer_idx}"
     assert not t.equal(mlp_acts, resid_acts), f"{layer_idx}"
+
+    assert not t.equal(resid_acts, old_resid), f"{layer_idx}, {layer_idx - 1}"
+    assert not t.equal(attn_acts, old_attn), f"{layer_idx}, {layer_idx - 1}"
+    assert not t.equal(mlp_acts, old_mlp), f"{layer_idx}, {layer_idx - 1}"
+
+    old_resid = resid_acts
+    old_attn = attn_acts
+    old_mlp = mlp_acts
 
 # %%
 # Wrap up logging.

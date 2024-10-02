@@ -83,7 +83,6 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 # %%
 # Cluster into k-partitions.
 print(f"Partitioning into {NUM_CLUSTERS} clusters.")
-old_acts = t.Tensor([])
 
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
@@ -93,7 +92,6 @@ for layer_idx in acts_layers_range:
         )
         acts: t.Tensor = t.load(acts_path, weights_only=True)
 
-        assert not t.equal(acts.cpu(), old_acts.cpu())
         acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
         seq_by_hidden_acts: t.Tensor = t.cat(acts_list, dim=0).cpu()
 
@@ -105,6 +103,3 @@ for layer_idx in acts_layers_range:
 
         # Save select cluster.
         cluster = seq_by_hidden_acts[clusters_indices == KEEPER_CLUSTER_INDEX]
-        print(cluster.shape)
-
-        old_acts = acts
