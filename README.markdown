@@ -34,15 +34,21 @@ Your base of operations is `sparse_coding/config/central_config.yaml`.
 The most important hyperparameters are clustered up top:
 
 ```
-## Key Params
-# Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
-ACTS_LAYERS_SLICE: "3:5"
+# Note: leave out entries for None. Writing in `None` values will get you the
+# string "None".
+
+## ------------------------------------------------------------------------- ##
+## --------------------------- Key Hyperparameters ------------------------- ##
+## ------------------------------------------------------------------------- ##
+
+# ACTS_LAYERS_SLICE should be a Python slice, in str format. Set it to ":" to
+# plot data from all model layers.
+ACTS_LAYERS_SLICE: "9:12"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
 THRESHOLD_EXP: 5.0
 
-# Only pin single dims per layer.
+# Only pin single dims per layer. If not set, every ablation effect is plotted.
 DIMS_PINNED:
   3: [331]
 ```
@@ -118,11 +124,8 @@ _overall_ circuit behaves under ablation (rather than just looking at separate
 features under independent ablations, the way `pipe.py` cognition graphs do).
 
 To set this up, first set `ACTS_LAYERS_SLICE` to encompass the relevant layers
-in GPT-2 small, including one extra layer after
+in GPT-2 small, including one full extra layer after,
 ```
-## Key Params
-# Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
 ACTS_LAYERS_SLICE: "6:9"
 ```
 and then pin all the features that comprise a given circuit in
