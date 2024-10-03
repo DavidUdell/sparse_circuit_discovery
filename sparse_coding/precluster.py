@@ -15,7 +15,6 @@ from transformers import (
     AutoModelForCausalLM,
     PreTrainedModel,
 )
-import wandb
 
 from sparse_coding.utils.interface import (
     load_input_token_ids,
