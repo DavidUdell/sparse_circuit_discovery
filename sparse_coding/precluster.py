@@ -4,8 +4,10 @@
 
 import sys
 import warnings
+from textwrap import dedent
 
 import numpy as np
+from accelerate import Accelerator
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
 import torch as t
@@ -18,6 +20,7 @@ import wandb
 from sparse_coding.utils.interface import (
     load_input_token_ids,
     load_yaml_constants,
+    pad_activations,
     parse_slice,
     sanitize_model_name,
     save_paths,
@@ -73,6 +76,8 @@ with warnings.catch_warnings():
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR, token=HF_ACCESS_TOKEN
     )
+accelerator: Accelerator = Accelerator()
+
 # Ranges are subscriptable while slices aren't.
 acts_layers_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 target_layer: int = acts_layers_range[0]
@@ -85,7 +90,12 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 # %%
 # Cluster into k-partitions.
 print(
-    f"Partitioning into {NUM_CLUSTERS} clusters; keeping cluster {KEEPER_CLUSTER_INDEX}."
+    dedent(
+        f"""
+        Partitioning into {NUM_CLUSTERS} clusters; keeping cluster
+        {KEEPER_CLUSTER_INDEX}.
+        """
+    )
 )
 
 acts_path: str = save_paths(
@@ -100,12 +110,28 @@ seq_by_hidden_acts: t.Tensor = t.cat(acts_list, dim=0).cpu()
 # Cluster using cosine similarity.
 normed_acts = normalize(seq_by_hidden_acts, norm="l2", axis=1)
 kmeans = KMeans(n_clusters=NUM_CLUSTERS, random_state=SEED, n_init=10)
-clusters_indices = kmeans.fit_predict(normed_acts)
+flat_clusters_indices = kmeans.fit_predict(normed_acts)
 
-mask = clusters_indices == KEEPER_CLUSTER_INDEX
-cluster = seq_by_hidden_acts[mask]
+# Reassemble flat_cluster_indices into the original shape.
+cluster_brick = []
+for seq in token_ids:
+    cluster_brick.append(flat_clusters_indices[: len(seq)])
+    flat_clusters_indices = flat_clusters_indices[len(seq) :]
 
-# Apply mask to prompt ids and all tensors.
+filtered_token_ids: list[list[int]] = []
+for seq, tokens in zip(cluster_brick, token_ids):
+    if not any(x == KEEPER_CLUSTER_INDEX for x in seq):
+        continue
+
+    filtered_seq = []
+    for x, token in zip(seq, tokens):
+        filtered_seq.append(token)
+        if x == KEEPER_CLUSTER_INDEX:
+            break
+
+    filtered_token_ids.append(filtered_seq)
+
+# Mirror the filtered_token_ids pattern in the activations.
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
         acts_path: str = save_paths(
@@ -113,24 +139,36 @@ for layer_idx in acts_layers_range:
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
         )
         acts = t.load(acts_path, weights_only=True)
+        # Unpacked original activations
         acts_list = unpad_activations(acts, token_ids)
-        seq_by_hidden_acts = t.cat(acts_list, dim=0).cpu()
-        cluster = seq_by_hidden_acts[mask]
-        t.save(cluster, acts_path)
 
-# token_ids: list[list[int]]: (NUM_SEQUENCES_EVALED, SEQ_LEN)
-flat_token_ids: list[int] = [id for seq in token_ids for id in seq]
-tensor_token_ids: t.Tensor = t.tensor(flat_token_ids, dtype=t.int64)
-masked_token_ids = tensor_token_ids[mask]
+        # Filtered activations list
+        filtered_acts_list = []
+        for seq, tokens in zip(cluster_brick, acts_list):
+            if not any(x == KEEPER_CLUSTER_INDEX for x in seq):
+                continue
 
-assert (
-    masked_token_ids.shape == cluster.shape[:1]
-), f"{masked_token_ids.shape} != {cluster.shape[:1]}"
+            filtered_seq = t.Tensor([])
+            for x, token in zip(seq, tokens):
+                filtered_seq = t.cat(
+                    [filtered_seq, token.to(filtered_seq.device)]
+                )
+                if x == KEEPER_CLUSTER_INDEX:
+                    break
+
+            filtered_acts_list.append(filtered_seq)
+
+        max_seq_len: int = max(len(seq) for seq in filtered_acts_list)
+        padded_acts_list: list[t.Tensor] = [
+            pad_activations(seq, max_seq_len, accelerator)
+            for seq in filtered_acts_list
+        ]
+        new_acts: t.Tensor = t.cat(padded_acts_list, dim=0)
+        t.save(new_acts, acts_path)
 
 # Save new token ids.
 new_token_ids: list = []
-for tensor in masked_token_ids:
-    new_token_ids.append([tensor.tolist()])
-
+for sublist in filtered_token_ids:
+    new_token_ids.append(sublist)
 new_token_ids = np.array(new_token_ids, dtype=object)
 np.save(PROMPT_IDS_PATH, new_token_ids, allow_pickle=True)
