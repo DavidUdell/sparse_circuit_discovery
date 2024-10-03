@@ -153,7 +153,7 @@ for layer_idx in acts_layers_range:
                 # Restore seq dimension
                 act = act.unsqueeze(0)
                 filtered_seq_acts = t.cat(
-                    [filtered_seq_acts, act.to(filtered_seq_acts.device)]
+                    [filtered_seq_acts.to(act.device), act]
                 )
                 if c == KEEPER_CLUSTER_INDEX:
                     break
@@ -172,6 +172,6 @@ for layer_idx in acts_layers_range:
 # Save new token ids.
 new_token_ids: list = []
 for sublist in filtered_token_ids:
-    new_token_ids.append(sublist)
+    new_token_ids.append([sublist])
 new_token_ids = np.array(new_token_ids, dtype=object)
 np.save(PROMPT_IDS_PATH, new_token_ids, allow_pickle=True)

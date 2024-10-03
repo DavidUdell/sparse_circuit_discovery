@@ -102,6 +102,8 @@ accelerator: Accelerator = Accelerator()
 # Input token ids are constant across layers.
 unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
+assert isinstance(unpacked_prompts_ids[0], list)
+
 
 # %%
 # Define the encoder class, taking imported_weights and biases as
