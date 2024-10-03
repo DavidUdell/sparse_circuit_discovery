@@ -73,8 +73,10 @@ with warnings.catch_warnings():
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR, token=HF_ACCESS_TOKEN
     )
-# Ranges are iterable while slices aren't.
+# Ranges are subscriptable while slices aren't.
 acts_layers_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
+target_layer: int = acts_layers_range[0]
+print(f"Target layer: {target_layer} residual.")
 
 # %%
 # Load token ids.
@@ -82,24 +84,53 @@ token_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 # %%
 # Cluster into k-partitions.
-print(f"Partitioning into {NUM_CLUSTERS} clusters.")
+print(
+    f"Partitioning into {NUM_CLUSTERS} clusters; keeping cluster {KEEPER_CLUSTER_INDEX}."
+)
 
+acts_path: str = save_paths(
+    __file__,
+    f"{sanitize_model_name(MODEL_DIR)}/{target_layer}/{RESID_DATA_FILE}",
+)
+acts: t.Tensor = t.load(acts_path, weights_only=True)
+
+acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
+seq_by_hidden_acts: t.Tensor = t.cat(acts_list, dim=0).cpu()
+
+# Cluster using cosine similarity.
+normed_acts = normalize(seq_by_hidden_acts, norm="l2", axis=1)
+kmeans = KMeans(n_clusters=NUM_CLUSTERS, random_state=SEED, n_init=10)
+clusters_indices = kmeans.fit_predict(normed_acts)
+
+mask = clusters_indices == KEEPER_CLUSTER_INDEX
+cluster = seq_by_hidden_acts[mask]
+
+# Apply mask to prompt ids and all tensors.
 for layer_idx in acts_layers_range:
     for datafile in datafiles:
         acts_path: str = save_paths(
             __file__,
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{datafile}",
         )
-        acts: t.Tensor = t.load(acts_path, weights_only=True)
+        acts = t.load(acts_path, weights_only=True)
+        acts_list = unpad_activations(acts, token_ids)
+        seq_by_hidden_acts = t.cat(acts_list, dim=0).cpu()
+        cluster = seq_by_hidden_acts[mask]
+        t.save(cluster, acts_path)
 
-        acts_list: list[t.Tensor] = unpad_activations(acts, token_ids)
-        seq_by_hidden_acts: t.Tensor = t.cat(acts_list, dim=0).cpu()
+# token_ids: list[list[int]]: (NUM_SEQUENCES_EVALED, SEQ_LEN)
+flat_token_ids: list[int] = [id for seq in token_ids for id in seq]
+tensor_token_ids: t.Tensor = t.tensor(flat_token_ids, dtype=t.int64)
+masked_token_ids = tensor_token_ids[mask]
 
-        # Cluster using cosine similarity.
-        normed_acts = normalize(seq_by_hidden_acts, norm="l2", axis=1)
-        # Initialize repeatedly to maintain reproducibility with the seed.
-        kmeans = KMeans(n_clusters=NUM_CLUSTERS, random_state=SEED, n_init=10)
-        clusters_indices = kmeans.fit_predict(normed_acts)
+assert (
+    masked_token_ids.shape == cluster.shape[:1]
+), f"{masked_token_ids.shape} != {cluster.shape[:1]}"
 
-        # Save select cluster.
-        cluster = seq_by_hidden_acts[clusters_indices == KEEPER_CLUSTER_INDEX]
+# Save new token ids.
+new_token_ids: list = []
+for tensor in masked_token_ids:
+    new_token_ids.append([tensor.tolist()])
+
+new_token_ids = np.array(new_token_ids, dtype=object)
+np.save(PROMPT_IDS_PATH, new_token_ids, allow_pickle=True)
