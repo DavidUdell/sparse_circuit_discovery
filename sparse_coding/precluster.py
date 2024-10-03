@@ -144,24 +144,27 @@ for layer_idx in acts_layers_range:
 
         # Filtered activations list
         filtered_acts_list = []
-        for seq, tokens in zip(cluster_brick, acts_list):
-            if not any(x == KEEPER_CLUSTER_INDEX for x in seq):
+        for seq_clusters, seq_acts in zip(cluster_brick, acts_list):
+            if not any(c == KEEPER_CLUSTER_INDEX for c in seq_clusters):
                 continue
 
-            filtered_seq = t.Tensor([])
-            for x, token in zip(seq, tokens):
-                filtered_seq = t.cat(
-                    [filtered_seq, token.to(filtered_seq.device)]
+            filtered_seq_acts = t.Tensor([])
+            for c, act in zip(seq_clusters, seq_acts):
+                # Restore seq dimension
+                act = act.unsqueeze(0)
+                filtered_seq_acts = t.cat(
+                    [filtered_seq_acts, act.to(filtered_seq_acts.device)]
                 )
-                if x == KEEPER_CLUSTER_INDEX:
+                if c == KEEPER_CLUSTER_INDEX:
                     break
 
-            filtered_acts_list.append(filtered_seq)
+            # Restore batch dimension
+            filtered_acts_list.append(filtered_seq_acts.unsqueeze(0))
 
-        max_seq_len: int = max(len(seq) for seq in filtered_acts_list)
+        max_seq_len: int = max(seq.shape[-1] for seq in filtered_acts_list)
         padded_acts_list: list[t.Tensor] = [
-            pad_activations(seq, max_seq_len, accelerator)
-            for seq in filtered_acts_list
+            pad_activations(act, max_seq_len, accelerator)
+            for act in filtered_acts_list
         ]
         new_acts: t.Tensor = t.cat(padded_acts_list, dim=0)
         t.save(new_acts, acts_path)
