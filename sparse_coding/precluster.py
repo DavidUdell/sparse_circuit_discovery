@@ -66,10 +66,6 @@ _ = t.manual_seed(SEED)
 np.random.seed(SEED)
 
 # %%
-# Log config to wandb.
-wandb.init(project=WANDB_PROJECT, entity=WANDB_ENTITY, config=config)
-
-# %%
 # Load model.
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
