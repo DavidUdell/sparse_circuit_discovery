@@ -9,7 +9,7 @@ setup(
     long_description=open("README.markdown", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="David Udell",
-    version="1.2.0",
+    version="1.2.1",
     license="MIT",
     packages=find_packages(),
     install_requires=[
