@@ -1,8 +1,6 @@
 name: Publish Docker Image to GitHub Container Registry
 
-on:
-  release:
-    types: [published]
+on: push
 
 permissions:
   contents: read
@@ -12,6 +10,9 @@ jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
     steps:
+      - name: Delete unneeded tools directory
+        run: rm -rf /opt/hostedtoolcache
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -34,6 +35,6 @@ jobs:
         with:
           context: .
           push: true
+          # ghcr.io/${{env.REPOSITORY_NAME}}:${{github.event.release.tag_name}}
           tags: |
-            ghcr.io/${{env.REPOSITORY_NAME}}:${{github.event.release.tag_name}}
             ghcr.io/${{env.REPOSITORY_NAME}}:latest
