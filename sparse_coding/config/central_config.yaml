@@ -47,7 +47,7 @@ PROMPT: "Copyright (C"
 
 # Dataset
 # A specified dataset will override the prompt.
-DATASET: Elriggs/openwebtext-100k
+# DATASET: Elriggs/openwebtext-100k
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
