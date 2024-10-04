@@ -24,9 +24,11 @@ To manually install, just run these commands in the shell:
 
 `pip install -e .`
 
-Alternatively, I have a Docker image [on
-DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery). The
-Docker image is especially good for pulling to a remote server.
+Alternatively, I have a Docker image on
+[DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery) and
+on the [GitHub Container
+Registry](https://github.com/DavidUdell/sparse_circuit_discovery/pkgs/container/sparse_circuit_discovery).
+The Docker image is especially good for pulling to a remote server.
 
 ## User's Guide
 ### Naive Algorithm
