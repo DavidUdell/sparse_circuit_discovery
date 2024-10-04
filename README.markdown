@@ -34,15 +34,21 @@ Your base of operations is `sparse_coding/config/central_config.yaml`.
 The most important hyperparameters are clustered up top:
 
 ```
-## Key Params
-# Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
-ACTS_LAYERS_SLICE: "3:5"
+# Note: leave out entries for None. Writing in `None` values will get you the
+# string "None".
+
+## ------------------------------------------------------------------------- ##
+## --------------------------- Key Hyperparameters ------------------------- ##
+## ------------------------------------------------------------------------- ##
+
+# ACTS_LAYERS_SLICE should be a Python slice, in str format. Set it to ":" to
+# plot data from all model layers.
+ACTS_LAYERS_SLICE: "9:12"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
 THRESHOLD_EXP: 5.0
 
-# Only pin single dims per layer.
+# Only pin single dims per layer. If not set, every ablation effect is plotted.
 DIMS_PINNED:
   3: [331]
 ```
@@ -54,7 +60,7 @@ In order:
    your slice you'll plot. E.g., a fraction of `1.0` will try to plot every
    feature in the layer.
 3. `NUM_SEQUENCES_INTERPED` is the number of token sequences used during
-   plotting, for the purpose of caluculating logit effects and downstream
+   plotting, for the purpose of calculating logit effects and downstream
    feature effects.
 4. `THRESHOLD_EXP` is the threshold value exponent for activation differences
    plotted. Smaller differences in activation magnitude than `2**THRESHOLD_EXP`
@@ -84,13 +90,19 @@ plotting contributions to intermediate activation magnitudes. Its
 implementation here also extends to GPT-2's sublayers, not just the model's
 residual stream.
 
-Key hyperparameters:
+Key hyperparameters here are:
 1. `ACTS_LAYERS_SLICE` works as above.
-2. `NUM_DOWN_NODES` is the number of nodes per sublayer to plot edges _for_. The
-   number of plotted notes is twice this value (top-k and bottom-k).
-3. `NUM_UP_NODES` is the number of nodes per sublayer to plot edges _to_, from
-   down nodes. The number of plotted edges per down node will be twice this
-   value.
+```
+# Topk thresholds for gradient-based method.
+NUM_UP_NODES: 5
+NUM_DOWN_NODES: 5
+```
+
+2. `NUM_UP_NODES` fixes the number of sublayer nodes to plot edges _up to_, for
+   each sublayer down node. Note that the number of edges equals _twice_ this
+   value: you'll get this many top-k edges and this many _bottom-k_ edges.
+3. `NUM_DOWN_NODES` fixes the number of sublayer nodes that edges will then be
+   plotted _from_.
 
 Save these values in `central_config.yaml`, then run interpretability:
 
@@ -112,11 +124,8 @@ _overall_ circuit behaves under ablation (rather than just looking at separate
 features under independent ablations, the way `pipe.py` cognition graphs do).
 
 To set this up, first set `ACTS_LAYERS_SLICE` to encompass the relevant layers
-in GPT-2 small, including one extra layer after
+in GPT-2 small, including one full extra layer after,
 ```
-## Key Params
-# Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
 ACTS_LAYERS_SLICE: "6:9"
 ```
 and then pin all the features that comprise a given circuit in
@@ -154,8 +163,8 @@ pale red arrow is a minor downweighting effect.
   a projection factor of 32 are supported, to take advantage of a set of
   preexisting sparse autoencoders.
 
-- When there is an "exactly `0.0` effect from ablations" error, check whether
-  your layers slice is compatible with your pinned dim.
+- If an ExactlyZeroEffectError is raised, you should double-check whether your
+  layers slice is compatible with your pinned dim.
 
 - If you're encountering cryptic env variable bugs, ensure you're running CUDA
   Toolkit 12.2 or newer.
@@ -164,15 +173,12 @@ pale red arrow is a minor downweighting effect.
   currently required, and Windows pathing will probably not play nice with the
   repo.
 
-- You're safe ignoring an `Exception ignored TypeError` _at cleanup_ after
-  running `fast.py`, about an `AGraph` object and a `NoneType`.
-
 - `fast.py` uses a unique pruning strategy: it will take autoencoder dims in
   the final `GPT-2 small` layer and prune up from them. So you should start
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.1.1.
+Current version is 1.2.0
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

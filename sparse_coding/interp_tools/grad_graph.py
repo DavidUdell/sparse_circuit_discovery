@@ -27,6 +27,9 @@ from sparse_coding.utils.interface import (
     slice_to_range,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
+from sparse_coding.interp_tools.utils.computations import (
+    ExactlyZeroEffectError,
+)
 from sparse_coding.interp_tools.utils.graphs import (
     label_highlighting,
     prune_graph,
@@ -87,7 +90,9 @@ model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     output_hidden_states=True,
 )
-tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(
+    MODEL_DIR, clean_up_tokenization_spaces=True
+)
 accelerator: Accelerator = Accelerator()
 
 model = accelerator.prepare(model)
@@ -158,8 +163,14 @@ mlp_dec_and_biases, _ = prepare_autoencoder_and_indices(
 # %%
 # Load preexisting graph, if available.
 graph = load_preexisting_graph(MODEL_DIR, GRADS_DOT_FILE, __file__)
+
 if graph is None:
+    print("Graph status: No preexisting graph found; starting new graph.")
     graph = AGraph(directed=True)
+else:
+    print("Graph status: Preexisting graph loaded.")
+
+print()
 
 save_graph_path: str = save_paths(
     __file__, f"{sanitize_model_name(MODEL_DIR)}/{GRADS_FILE}"
@@ -177,6 +188,8 @@ metric = t.nn.CrossEntropyLoss()
 print("Prompt:")
 print()
 print(PROMPT)
+print()
+print("Backward passes:")
 
 inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
 acts_dict: dict = None
@@ -243,10 +256,20 @@ with grads_manager(
                     acts_dict[mlp_error_confound],
                 ).squeeze()
             )
-            jvp[-1].backward(retain_graph=True)
+            if jvp.dim() == 0:
+                # Single-token prompt edge case.
+                jvp.backward(retain_graph=True)
+            else:
+                jvp[-1].backward(retain_graph=True)
+
             _, jvp_grads = acts_and_grads
 
-        weighted_prod = t.einsum("bsd,bsd->bsd", grad, act)[:, -1, :].squeeze()
+        weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
+        if weighted_prod.dim() == 2:
+            # Single-token prompt edge case.
+            weighted_prod = weighted_prod[-1, :].squeeze()
+        else:
+            weighted_prod = weighted_prod[:, -1, :].squeeze()
 
         # Thresholding autoencoders.
         if "error_" not in loc:
@@ -323,8 +346,14 @@ with grads_manager(
             else:
                 raise ValueError("Module location not recognized.")
 
+# Here to have the newlines look nice in both the interactive notebooks and the
+# shell.
+print()
+
 # %%
 # Populate graph.
+print("Computing top-k/bottom-k graph edges:")
+
 explained_dict: dict = {}
 unexplained_dict: dict = {}
 
@@ -348,7 +377,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     if "error" in up_layer_module and "error" not in down_layer_module:
         sublayer_unexplained: float = 0.0
         for down_dim, up_values in down_nodes.items():
-            up_values = up_values.squeeze()[-1, :]
+            up_values = up_values.squeeze()
+            if up_values.dim() == 2:
+                up_values = up_values[-1, :]
+            assert up_values.dim() == 1
+
             # Sublayer absolute effect unexplained.
             sublayer_unexplained += abs(up_values).sum().item()
 
@@ -369,7 +402,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
     sublayer_explained: float = 0.0
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
-        up_values = up_values.squeeze()[-1, :]
+        up_values = up_values.squeeze()
+        if up_values.dim() == 2:
+            up_values = up_values[-1, :]
+        assert up_values.dim() == 1
+
         # Sublayer absolute effect explained.
         sublayer_explained += abs(up_values).sum().item()
 
@@ -490,10 +527,14 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     # Log overall explained effect.
     effect_explained += sublayer_explained
 
+# Here to have the newlines look nice in both the interactive notebooks and the
+# shell.
+print()
+
 # %%
 # Graph annotation.
 if effect_explained == 0.0:
-    raise ValueError("Effect plotted was 0.0; no additions to graph.")
+    raise ExactlyZeroEffectError()
 
 total_frac_explained = round(
     effect_explained / (effect_explained + effect_unexplained), 2
@@ -535,6 +576,9 @@ graph.draw(save_graph_path, prog="dot")
 
 print("Graph saved to:")
 print(save_graph_path)
+
+# Prevents an ugly exception ignored at cleanup time.
+graph.close()
 
 # %%
 # Close wandb.

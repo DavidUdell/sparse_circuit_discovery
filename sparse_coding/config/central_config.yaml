@@ -1,17 +1,23 @@
-## Key Params
-# Throughout, leave out entries for None. Writing in `None` values will get
-# you the string "None".
+# Note: leave out entries for None. Writing in `None` values will get you the
+# string "None".
+
+## ------------------------------------------------------------------------- ##
+## --------------------------- Key Hyperparameters ------------------------- ##
+## ------------------------------------------------------------------------- ##
+
+# ACTS_LAYERS_SLICE should be a Python slice, in str format. Set it to ":" to
+# plot data from all model layers.
 ACTS_LAYERS_SLICE: "9:12"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
 THRESHOLD_EXP: 5.0
 
-# Only pin single dims per layer.
+# Only pin single dims per layer. If not set, every ablation effect is plotted.
 DIMS_PINNED:
 
 # Topk thresholds for gradient-based method.
-NUM_DOWN_NODES: 10
-NUM_UP_NODES: 10
+NUM_UP_NODES: 5
+NUM_DOWN_NODES: 5
 
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
@@ -26,8 +32,10 @@ VALIDATION_DIMS_PINNED:
   9: [15232, 768, 5147]
   10: [6807, 9817, 10944]
 
-#
-## Main Config
+## ------------------------------------------------------------------------- ##
+## ------------------------------ Main Config ------------------------------ ##
+## ------------------------------------------------------------------------- ##
+
 # Model
 # "EleutherAI/pythia-70m"
 # "meta-llama/Llama-2-7b-hf"
@@ -37,10 +45,9 @@ MODEL_DIR: "openai-community/gpt2"
 # Prompt
 PROMPT: "Copyright (C"
 
-# Layers Slice to Cache Activations From
-# Put a Python slice here, in str format. Put ":" to use data from all model
-# layers.
-# ACTS_LAYERS_SLICE: "4:6"
+# Dataset
+# A specified dataset will override the prompt.
+# DATASET: Elriggs/openwebtext-100k
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
@@ -82,18 +89,12 @@ NUM_WORKERS: 8
 ACCUMULATE_GRAD_BATCHES: 4
 
 # Cognition Graph
-# Disable pinning to plot every ablation effect. Dims are pinned by setting a
-# layer and dim index as keys and values.
 LOGIT_TOKENS: 10
-# INIT_THINNING_FACTOR: 0.01
-# DIMS_PINNED:
-# THRESHOLD: 5.0
 
-# Validate Circuits
-# VALIDATION_DIMS_PINNED:
+## ------------------------------------------------------------------------- ##
+## ----------------------------- Dev Constants ----------------------------- ##
+## ------------------------------------------------------------------------- ##
 
-#
-## Stable Dev Constants
 # `wandb` logging
 WANDB_PROJECT: "sparse_circuit_discovery"
 WANDB_ENTITY: "davidudell"
@@ -102,8 +103,12 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 1000
-MAX_SEQ_LEN: 100
+NUM_SEQUENCES_EVALED: 50
+MAX_SEQ_LEN: 50
+
+# `precluster.py`
+NUM_CLUSTERS: 10
+KEEPER_CLUSTER_INDEX: 0
 
 # `train_autoencoder.py`
 LOG_EVERY_N_STEPS: 1
@@ -119,7 +124,6 @@ VIEW: 5
 # NUM_SEQUENCES_EVALED in `collect_acts.py`.
 MAX_SEQ_INTERPED_LEN: 100
 SEQ_PER_DIM_CAP: 100
-# NUM_SEQUENCES_INTERPED: 250
 
 # `cognition_graph_mc.py`
 # Currently, only NUM_QUESTIONS_INTERPED: 1 is really supported. Larger values

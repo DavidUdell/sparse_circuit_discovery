@@ -94,12 +94,15 @@ wandb.init(
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,
+    clean_up_tokenization_spaces=True,
 )
 accelerator: Accelerator = Accelerator()
 
 # %%
 # Input token ids are constant across layers.
 unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
+
+assert isinstance(unpacked_prompts_ids[0], list)
 
 
 # %%
@@ -151,7 +154,7 @@ def populate_table(
         writer = csv.writer(file)
         writer.writerow(header)
 
-        for dim_idx in tqdm(contexts_and_effects, desc="Features Labeled"):
+        for dim_idx in tqdm(contexts_and_effects, desc=top_k_info_path):
             top_k_contexts = []
             top_activations = []
             # Context here has been stringified, so its length is not its token
@@ -204,6 +207,7 @@ mlp = {
     "tokens": MLP_TOKEN_FILE,
 }
 
+print("Annotating autoencoder dimensions:")
 for layer_idx in seq_layer_indices:
     for sublayer in [resid, attn, mlp]:
         acts_file: str = sublayer["acts"]
@@ -219,8 +223,8 @@ for layer_idx in seq_layer_indices:
             __file__,
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
         )
-        imported_weights: t.Tensor = t.load(ENCODER_PATH).T
-        imported_biases: t.Tensor = t.load(BIASES_PATH)
+        imported_weights: t.Tensor = t.load(ENCODER_PATH, weights_only=True).T
+        imported_biases: t.Tensor = t.load(BIASES_PATH, weights_only=True)
 
         # Initialize a concrete encoder for this layer.
         model: Encoder = Encoder(imported_weights, imported_biases)
@@ -232,7 +236,7 @@ for layer_idx in seq_layer_indices:
             f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
         )
         layer_acts_data: t.Tensor = accelerator.prepare(
-            t.load(LAYER_ACTS_PATH)
+            t.load(LAYER_ACTS_PATH, weights_only=True)
         )
 
         # Note that activations are stored as a list of question tensors from
@@ -271,6 +275,9 @@ for layer_idx in seq_layer_indices:
             tokens_file,
             layer_idx,
         )
+
+# For clean spacing in stdout.
+print()
 
 # %%
 # Wrap up logging.

@@ -11,6 +11,9 @@ from transformers import (
 )
 import wandb
 
+from sparse_coding.interp_tools.utils.computations import (
+    ExactlyZeroEffectError,
+)
 from sparse_coding.interp_tools.utils.graphs import label_highlighting
 from sparse_coding.utils.interface import (
     load_preexisting_graph,
@@ -254,7 +257,7 @@ for node in graph.nodes():
 print(f"{num_bare_nodes} node(s) not recognized & plotted bare.")
 
 if total_effect == 0.0:
-    raise ValueError("Total effect graphed was 0.0")
+    raise ExactlyZeroEffectError()
 
 fraction_included = round(graphed_effect / total_effect, 2)
 graph.add_node(f"Jacobian graphed out of overall: ~{fraction_included*100}%.")

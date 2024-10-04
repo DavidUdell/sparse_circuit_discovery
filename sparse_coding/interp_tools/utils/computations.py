@@ -46,3 +46,11 @@ def calc_overall_effects(
     assert overall_effects != 0.0, "Hook absolute effects sum to exactly 0.0."
 
     return overall_effects
+
+
+class ExactlyZeroEffectError(ValueError):
+    """Raised when logged absolute effects sum to exactly 0.0"""
+
+    def __init__(self):
+        message: str = "Total effect logged was exactly 0.0; exiting."
+        super().__init__(message)

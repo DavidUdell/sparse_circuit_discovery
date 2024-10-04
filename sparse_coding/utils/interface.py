@@ -1,6 +1,5 @@
 """Read from and write to the module-level interface."""
 
-
 import csv
 import gc
 import os
@@ -259,7 +258,8 @@ def load_layer_tensors(
                 + "/"
                 + encoder_file
             ),
-        )
+        ),
+        weights_only=True,
     )
 
     bias = t.load(
@@ -272,7 +272,8 @@ def load_layer_tensors(
                 + "/"
                 + biases_file
             ),
-        )
+        ),
+        weights_only=True,
     )
 
     return encoder, bias

@@ -1,6 +1,5 @@
 """Functions for processing autoencoders into top-k contexts."""
 
-
 from collections import defaultdict
 
 import torch as t
@@ -16,7 +15,9 @@ def context_activations(
     at each input token."""
 
     contexts_and_activations = defaultdict(list)
-    assert len(context_token_ids) == len(context_acts)
+    assert len(context_token_ids) == len(
+        context_acts
+    ), f"{len(context_token_ids)} != {len(context_acts)}"
 
     for context, activation in zip(context_token_ids, context_acts):
         for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
@@ -88,7 +89,7 @@ def top_k_contexts(
             # the first, in case of collisions.
             max_position = acts.index(max(acts))
             # To complete the open end of the slice, we add 1 to that side.
-            view_slice = slice(max_position-view, max_position+view+1)
+            view_slice = slice(max_position - view, max_position + view + 1)
             # Fixes singleton unpadded _contexts_.
             if isinstance(context, int):
                 context: list = [context]
