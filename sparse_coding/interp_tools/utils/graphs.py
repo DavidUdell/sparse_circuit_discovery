@@ -390,8 +390,8 @@ def neuronpedia_api(
     layer_idx: int,
     dim_idx: int,
     neuronpedia_key: str,
-    sublayer_tokens_file: str,
-):
+    sublayer_type: str,
+) -> str:
     """
     Pulls down Neuronpedia API annotations for given graph nodes.
 
@@ -438,10 +438,9 @@ def neuronpedia_api(
     # neuronpedia_dict: dict = response.json()
 
     URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
-
     # url: str = URL_PREFIX + str(layer_idx) + URL_POST_RES + str(dim_idx)
     URL_POST_RES = "-res-jb/"
     URL_POST_ATTN = "-att_128k-oai/"
     URL_POST_MLP = "-mlp_128k-oai/"
 
-    pass
+    print(sublayer_type)

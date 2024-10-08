@@ -33,6 +33,7 @@ from sparse_coding.interp_tools.utils.computations import (
 )
 from sparse_coding.interp_tools.utils.graphs import (
     label_highlighting,
+    neuronpedia_api,
     prune_graph,
 )
 from sparse_coding.interp_tools.utils.hooks import (
@@ -484,6 +485,12 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += up_dim_name
+                # label += neuronpedia_api(
+                #     up_layer_idx,
+                #     up_dim,
+                #     NEURONPEDIA_KEY,
+                #     up_layer_module,
+                # )
                 label += "</b></font></td></tr></table>>"
                 graph.add_node(up_dim_name, label=label, shape="box")
 
