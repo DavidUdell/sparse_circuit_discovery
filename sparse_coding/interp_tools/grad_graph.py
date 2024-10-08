@@ -43,8 +43,9 @@ from sparse_coding.interp_tools.utils.hooks import (
 
 # %%
 # Load constants.
-_, config = load_yaml_constants(__file__)
+access, config = load_yaml_constants(__file__)
 
+NEURONPEDIA_KEY = access.get("NEURONPEDIA_KEY")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
@@ -78,6 +79,20 @@ URL_POST_RES = "-res_jb"
 URL_POST_ATTN = "-att_128k-oai"
 URL_POST_MLP = "-mlp_128k-oai"
 
+# %%
+# Neuronpedia API call
+url: str = URL_PREFIX + URL_POST_RES
+response = requests.get(
+    url,
+    headers={"X-Api-Key": NEURONPEDIA_KEY},
+    timeout=300,
+)
+
+print("Neuronpedia response code:", response.status_code)
+# print(response.text)
+# print(response.json())
+
+# raise ValueError("REPL Breakpoint")
 
 # %%
 # Reproducibility.

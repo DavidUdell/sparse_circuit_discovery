@@ -194,6 +194,7 @@ def load_yaml_constants(base_file):
         print("hf_access.yaml not found. Creating it now.")
         with open(hf_access_path, "w", encoding="utf-8") as w:
             w.write('HF_ACCESS_TOKEN: ""\n')
+            w.write('NEURONPEDIA_KEY: ""\n')
         access = {}
     except yaml.YAMLError as e:
         print(e)
