@@ -24,9 +24,7 @@ To manually install, just run these commands in the shell:
 
 `pip install -e .`
 
-Alternatively, I have a Docker image on
-[DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery) and
-on the [GitHub Container
+Alternatively, I have a Docker image on the [GitHub Container
 Registry](https://github.com/DavidUdell/sparse_circuit_discovery/pkgs/container/sparse_circuit_discovery).
 The Docker image is especially good for pulling to a remote server.
 
@@ -180,7 +178,7 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.2.3
+Current version is 1.3.0
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.
