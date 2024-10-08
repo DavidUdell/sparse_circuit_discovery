@@ -4,6 +4,7 @@ import html
 from copy import copy
 from textwrap import dedent
 
+import requests
 from tqdm.auto import tqdm
 import torch as t
 from pygraphviz import AGraph
@@ -395,7 +396,7 @@ def neuronpedia_api(
     """
     Pulls down Neuronpedia API annotations for given graph nodes.
 
-    Keys for the returned processed-json dict:
+    Keys for `neuronpedia_dict`:
         modelId
         layer
         index
@@ -435,14 +436,31 @@ def neuronpedia_api(
         comments
     """
 
-    # neuronpedia_dict: dict = response.json()
-
-    # sublayer_type: str = "res" | "attn" | "mlp"
-
     URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
-    # url: str = URL_PREFIX + str(layer_idx) + URL_POST_RES + str(dim_idx)
     URL_POST_RES = "-res-jb/"
     URL_POST_ATTN = "-att_128k-oai/"
     URL_POST_MLP = "-mlp_128k-oai/"
 
-    print(sublayer_type)
+    # sublayer_type: str = "res" | "attn" | "mlp"
+    if sublayer_type == "res":
+        url_post: str = URL_POST_RES
+    elif sublayer_type == "attn":
+        url_post: str = URL_POST_ATTN
+    elif sublayer_type == "mlp":
+        url_post: str = URL_POST_MLP
+    else:
+        raise ValueError("Sublayer type not recognized:", sublayer_type)
+
+    url: str = URL_PREFIX + str(layer_idx) + url_post + str(dim_idx)
+
+    response = requests.get(
+        url,
+        headers={"X-Api-Key": neuronpedia_key},
+        timeout=300,
+    )
+
+    assert (
+        response.status_code != 404
+    ), "Neuronpedia API connection failed: 404"
+
+    neuronpedia_dict: dict = response.json()
