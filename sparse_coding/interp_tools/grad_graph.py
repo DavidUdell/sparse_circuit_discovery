@@ -8,6 +8,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 
 import re
 
+import requests
 import torch as t
 from accelerate import Accelerator
 from pygraphviz import AGraph
@@ -71,6 +72,12 @@ SEED = config.get("SEED")
 # x2 for each: topk and bottomk nodes.
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
+
+URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
+URL_POST_RES = "-res_jb"
+URL_POST_ATTN = "-att_128k-oai"
+URL_POST_MLP = "-mlp_128k-oai"
+
 
 # %%
 # Reproducibility.
