@@ -437,6 +437,8 @@ def neuronpedia_api(
 
     # neuronpedia_dict: dict = response.json()
 
+    # sublayer_type: str = "res" | "attn" | "mlp"
+
     URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
     # url: str = URL_PREFIX + str(layer_idx) + URL_POST_RES + str(dim_idx)
     URL_POST_RES = "-res-jb/"
