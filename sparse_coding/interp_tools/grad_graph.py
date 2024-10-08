@@ -75,24 +75,25 @@ NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
 
 URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
-URL_POST_RES = "-res_jb"
+URL_POST_RES = "-res-jb/14057"
 URL_POST_ATTN = "-att_128k-oai"
 URL_POST_MLP = "-mlp_128k-oai"
 
 # %%
 # Neuronpedia API call
-url: str = URL_PREFIX + URL_POST_RES
+url: str = URL_PREFIX + "0" + URL_POST_RES
 response = requests.get(
     url,
     headers={"X-Api-Key": NEURONPEDIA_KEY},
     timeout=300,
 )
 
-print("Neuronpedia response code:", response.status_code)
-# print(response.text)
-# print(response.json())
+if response.status_code == 404:
+    raise ValueError("Neuronpedia API 404 error")
 
-# raise ValueError("REPL Breakpoint")
+neuronpedia: dict = response.json()
+
+raise ValueError("REPL Breakpoint")
 
 # %%
 # Reproducibility.
