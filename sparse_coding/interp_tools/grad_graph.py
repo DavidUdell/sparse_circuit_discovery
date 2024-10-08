@@ -89,6 +89,7 @@ wandb.init(
 model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     output_hidden_states=True,
+    return_dict_in_generate=True,
 )
 tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR, clean_up_tokenization_spaces=True

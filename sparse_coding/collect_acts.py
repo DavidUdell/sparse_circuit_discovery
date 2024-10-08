@@ -87,6 +87,7 @@ with warnings.catch_warnings():
         MODEL_DIR,
         token=HF_ACCESS_TOKEN,
         output_hidden_states=True,
+        return_dict_in_generate=True,
     )
 model = accelerator.prepare(model)
 model.eval()
