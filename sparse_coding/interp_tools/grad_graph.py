@@ -122,8 +122,11 @@ URL_POST_MLP = "-mlp_128k-oai/"
 
 # %%
 # Neuronpedia API test call.
+test_url: str = (
+    "https://www.neuronpedia.org/api/feature/gpt2-small/0-res-jb/14057"
+)
 test_response = requests.get(
-    "https://www.neuronpedia.org/api/feature/gpt2-small/0-res-jb/14057",
+    test_url,
     headers={"X-Api-Key": NEURONPEDIA_KEY},
     timeout=300,
 )
