@@ -74,12 +74,12 @@ SEED = config.get("SEED")
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
 
+# url: str = URL_PREFIX + str(layer_idx) + URL_POST_RES + str(dim_idx)
 URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
-URL_POST_RES = "-res-jb/14057"
-URL_POST_ATTN = "-att_128k-oai"
-URL_POST_MLP = "-mlp_128k-oai"
+URL_POST_RES = "-res-jb/"
+URL_POST_ATTN = "-att_128k-oai/"
+URL_POST_MLP = "-mlp_128k-oai/"
 
-# url: str = URL_PREFIX + "0" + URL_POST_RES
 # neuronpedia: dict = response.json()
 # modelId
 # layer
@@ -133,8 +133,8 @@ assert isinstance(http_status, int)
 
 if http_status == 404:
     raise ValueError("Neuronpedia API test connection failed: 404")
-else:
-    print("Neuronpedia API test connection successful:", http_status)
+
+print("Neuronpedia API test connection successful:", http_status)
 
 # %%
 # Reproducibility.
