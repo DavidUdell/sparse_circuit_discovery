@@ -79,17 +79,8 @@ URL_POST_RES = "-res-jb/14057"
 URL_POST_ATTN = "-att_128k-oai"
 URL_POST_MLP = "-mlp_128k-oai"
 
-# %%
-# Neuronpedia API test call.
 # url: str = URL_PREFIX + "0" + URL_POST_RES
-test_response = requests.get(
-    "https://www.neuronpedia.org/api/feature/gpt2-small/0-res-jb/14057",
-    headers={"X-Api-Key": NEURONPEDIA_KEY},
-    timeout=300,
-)
-if test_response.status_code == 404:
-    raise ValueError("404 error at Neuronpedia API test.")
-
+# neuronpedia: dict = response.json()
 # modelId
 # layer
 # index
@@ -127,7 +118,23 @@ if test_response.status_code == 404:
 # activations
 # explanations
 # comments
-# neuronpedia: dict = response.json()
+
+
+# %%
+# Neuronpedia API test call.
+test_response = requests.get(
+    "https://www.neuronpedia.org/api/feature/gpt2-small/0-res-jb/14057",
+    headers={"X-Api-Key": NEURONPEDIA_KEY},
+    timeout=300,
+)
+http_status: int = test_response.status_code
+
+assert isinstance(http_status, int)
+
+if http_status == 404:
+    raise ValueError("Neuronpedia API test connection failed: 404")
+else:
+    print("Neuronpedia API test connection successful:", http_status)
 
 # %%
 # Reproducibility.
