@@ -105,6 +105,7 @@ def label_highlighting(
     address: str,
     prob_diffs,
     base_file,
+    neuronpedia=False,
 ) -> str:
     """Highlight contexts using cached activation data."""
 
@@ -194,6 +195,10 @@ def label_highlighting(
 
             label += f"{cell_tag}{token}</td>"
         label += "</tr>"
+
+    if neuronpedia:
+        # Add on Neuronpedia API annotations.
+        pass
 
     label += "</table>>"
 
@@ -379,3 +384,64 @@ def prune_graph(
         graph = prune_graph(graph, leaf_nodes)
 
     return graph
+
+
+def neuronpedia_api(
+    layer_idx: int,
+    dim_idx: int,
+    neuronpedia_key: str,
+    sublayer_tokens_file: str,
+):
+    """
+    Pulls down Neuronpedia API annotations for given graph nodes.
+
+    Keys for the returned processed-json dict:
+        modelId
+        layer
+        index
+        sourceSetName
+        creatorId
+        createdAt
+        maxActApprox
+        neuron_alignment_indices
+        neuron_alignment_values
+        neuron_alignment_l1
+        correlated_neurons_indices
+        correlated_neurons_pearson
+        correlated_neurons_l1
+        correlated_features_indices
+        correlated_features_pearson
+        correlated_features_l1
+        neg_str
+        neg_values
+        pos_str
+        pos_values
+        frac_nonzero
+        freq_hist_data_bar_heights
+        freq_hist_data_bar_values
+        logits_hist_data_bar_heights
+        logits_hist_data_bar_values
+        decoder_weights_dist
+        umap_cluster
+        umap_log_feature_sparsity
+        umap_x
+        umap_y
+        model
+        lists
+        source
+        sourceSet
+        activations
+        explanations
+        comments
+    """
+
+    # neuronpedia_dict: dict = response.json()
+
+    URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
+
+    # url: str = URL_PREFIX + str(layer_idx) + URL_POST_RES + str(dim_idx)
+    URL_POST_RES = "-res-jb/"
+    URL_POST_ATTN = "-att_128k-oai/"
+    URL_POST_MLP = "-mlp_128k-oai/"
+
+    pass
