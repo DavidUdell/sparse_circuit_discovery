@@ -10,6 +10,7 @@ import torch as t
 from pygraphviz import AGraph
 import wandb
 
+from sparse_coding.utils import top_k_contexts
 from sparse_coding.interp_tools.utils.computations import calc_overall_effects
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
@@ -488,17 +489,13 @@ def neuronpedia_api(
     # "binContains"
     # "qualifyingTokenIndex"
 
-    assert isinstance(data, list), f"{type(data)}, {data}"
-    assert isinstance(data[0], dict), f"{type(data[0])}, {data[0]}"
-
     appendable: str = ""
     for seq_dict in data:
         tokens: list = seq_dict["tokens"]
-        tokens_str: str = "".join(tokens)
-
         values: list = seq_dict["values"]
-        values_str: str = "".join([str(value) for value in values])
 
-        appendable += f"{tokens_str}: {values_str}\n"
+        top_k = top_k_contexts()
+
+        # appendable += f"{tokens_str}: {values_str}\n"
 
     return appendable

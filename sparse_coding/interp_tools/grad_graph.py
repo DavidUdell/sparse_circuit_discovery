@@ -480,6 +480,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                     shape="box",
                 )
             except ValueError:
+                # Temporary debugging print.
+                print(
+                    neuronpedia_api(
+                        up_layer_idx,
+                        up_dim,
+                        NEURONPEDIA_KEY,
+                        up_layer_module,
+                    )
+                )
+
                 label: str = (
                     '<<table border="0" cellborder="0" cellspacing="0">'
                 )
