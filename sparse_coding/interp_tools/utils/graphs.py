@@ -309,6 +309,7 @@ def graph_causal_effects(
             blue = 0
         else:
             raise ValueError("Should be unreachable.")
+
         alpha = int(
             255 * abs(effect.item()) / (max(abs(max_scalar), abs(min_scalar)))
         )
@@ -495,15 +496,14 @@ def neuronpedia_api(
 
     appendable: str = ""
     for seq_dict in data:
-        tokens: list = seq_dict["tokens"]
-        values: list = seq_dict["values"]
+        tokens: list[str] = seq_dict["tokens"]
+        values: list[int | float] = seq_dict["values"]
 
-        # Need to bully this into the right struct.
         contexts_and_activations: dict[
             int, list[tuple[list[str], list[float]]]
-        ] = {layer_idx: [(tokens, values)]}
+        ] = {dim_idx: [(tokens, values)]}
 
-        top_k = top_k_contexts(contexts_and_activations, view, top_k)
+        top_contexts = top_k_contexts(contexts_and_activations, view, top_k)
 
         # appendable += f"{tokens_str}: {values_str}\n"
 
