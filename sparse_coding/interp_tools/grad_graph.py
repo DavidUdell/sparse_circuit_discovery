@@ -71,6 +71,8 @@ GRADS_FILE = config.get("GRADS_FILE")
 GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
+TOP_K = config.get("TOP_K")
+VIEW = config.get("VIEW")
 # x2 for each: topk and bottomk nodes.
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
@@ -487,6 +489,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         up_dim,
                         NEURONPEDIA_KEY,
                         up_layer_module,
+                        TOP_K,
+                        VIEW,
                     )
                 )
 
@@ -544,6 +548,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 red, green = 0, 255
             elif effect < 0.0:
                 red, green = 255, 0
+            else:
+                raise ValueError("Should be unreachable.")
 
             alpha: int = int(
                 255

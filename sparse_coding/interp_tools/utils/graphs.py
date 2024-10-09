@@ -10,7 +10,7 @@ import torch as t
 from pygraphviz import AGraph
 import wandb
 
-from sparse_coding.utils import top_k_contexts
+from sparse_coding.utils.top_contexts import top_k_contexts
 from sparse_coding.interp_tools.utils.computations import calc_overall_effects
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
@@ -393,6 +393,8 @@ def neuronpedia_api(
     dim_idx: int,
     neuronpedia_key: str,
     sublayer_type: str,
+    top_k: int,
+    view: int,
 ) -> str:
     """
     Pulls down Neuronpedia API annotations for given graph nodes.
@@ -494,7 +496,12 @@ def neuronpedia_api(
         tokens: list = seq_dict["tokens"]
         values: list = seq_dict["values"]
 
-        top_k = top_k_contexts()
+        # Need to bully this into the right struct.
+        contexts_and_activations: dict[
+            int, list[tuple[list[str], list[float]]]
+        ] = {layer_idx: [(tokens, values)]}
+
+        top_k = top_k_contexts(contexts_and_activations, view, top_k)
 
         # appendable += f"{tokens_str}: {values_str}\n"
 

@@ -77,6 +77,8 @@ def top_k_contexts(
     top_k_contexts_acts = defaultdict(list)
     top_k_views = defaultdict(list)
 
+    assert isinstance(top_k, int), f"top_k was of type {type(top_k)}"
+
     for dim_idx, contexts_acts in contexts_and_activations.items():
         ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
             contexts_acts,
