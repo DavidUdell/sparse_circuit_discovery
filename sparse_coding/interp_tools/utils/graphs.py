@@ -494,7 +494,9 @@ def neuronpedia_api(
     # "binContains"
     # "qualifyingTokenIndex"
 
-    appendable: str = ""
+    # Spacing
+    label: str = "<tr><td></td></tr><tr><td></td></tr>"
+    label += "<tr>"
     for seq_dict in data:
         tokens: list[str] = seq_dict["tokens"]
         values: list[int | float] = seq_dict["values"]
@@ -505,9 +507,30 @@ def neuronpedia_api(
 
         top_contexts = top_k_contexts(contexts_and_activations, view, top_k)
 
-        # appendable += f"{tokens_str}: {values_str}\n"
+        # len(top_contexts[dim_idx]) == 1
+        # len(context) == len(acts)
+        context, acts = top_contexts[dim_idx][0]
 
-    # Also, maybe the existing pulldown from the .csv function can be used here
-    # to postprocess the trimmed data. I forget whether I have a modular
-    # function already set up for that specifically.
-    return appendable
+        if not context:
+            continue
+
+        max_a: int | float = max(acts)
+
+        for token, act in zip(context, acts):
+            token = html.escape(token)
+            token = token.encode("unicode_escape").decode("utf-8")
+
+            if act <= 0.0:
+                label += f'<td bgcolor="#ffffff">{token}</td>'
+            else:
+                blue_prop = act / max_a
+                rg_prop = 1.0 - blue_prop
+
+                rg_shade = f"{int(96 + (159*rg_prop)):02x}"
+                b_shade = f"{255:02x}"
+                shade = f"#{rg_shade}{rg_shade}{b_shade}"
+                cell_tag = f'<td bgcolor="{shade}">'
+                label += f"{cell_tag}{token}</td>"
+
+    label += "</tr>"
+    return label
