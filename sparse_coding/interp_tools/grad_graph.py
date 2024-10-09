@@ -484,30 +484,21 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                     shape="box",
                 )
             except ValueError:
-                # Temporary debugging print.
-                print(
-                    neuronpedia_api(
-                        up_layer_idx,
-                        up_dim,
-                        NEURONPEDIA_KEY,
-                        up_layer_module,
-                        TOP_K,
-                        VIEW,
-                    )
-                )
-
                 label: str = (
                     '<<table border="0" cellborder="0" cellspacing="0">'
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += up_dim_name
-                # label += neuronpedia_api(
-                #     up_layer_idx,
-                #     up_dim,
-                #     NEURONPEDIA_KEY,
-                #     up_layer_module,
-                # )
-                label += "</b></font></td></tr></table>>"
+                label += "</b></font></td></tr>"
+                label += neuronpedia_api(
+                    up_layer_idx,
+                    up_dim,
+                    NEURONPEDIA_KEY,
+                    up_layer_module,
+                    TOP_K,
+                    VIEW,
+                )
+                label += "</table>>"
                 graph.add_node(up_dim_name, label=label, shape="box")
 
             if "res" in down_layer_module:

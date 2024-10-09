@@ -495,8 +495,8 @@ def neuronpedia_api(
     # "qualifyingTokenIndex"
 
     # Spacing
-    label: str = "<tr><td></td></tr><tr><td></td></tr>"
-    label += "<tr>"
+    label: str = "<tr><td></td></tr>"
+    label += "<tr><td></td>"
     for seq_dict in data:
         tokens: list[str] = seq_dict["tokens"]
         values: list[int | float] = seq_dict["values"]
