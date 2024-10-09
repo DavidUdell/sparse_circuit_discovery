@@ -494,9 +494,7 @@ def neuronpedia_api(
     # "binContains"
     # "qualifyingTokenIndex"
 
-    # Spacing
     label: str = "<tr><td></td></tr>"
-    label += "<tr><td></td>"
     for seq_dict in data:
         tokens: list[str] = seq_dict["tokens"]
         values: list[int | float] = seq_dict["values"]
@@ -515,7 +513,8 @@ def neuronpedia_api(
             continue
 
         max_a: int | float = max(acts)
-
+        label += "<tr>"
+        # It is known that the context is not empty by here.
         for token, act in zip(context, acts):
             token = html.escape(token)
             token = token.encode("unicode_escape").decode("utf-8")
@@ -531,6 +530,6 @@ def neuronpedia_api(
                 shade = f"#{rg_shade}{rg_shade}{b_shade}"
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
+        label += "</tr>"
 
-    label += "</tr>"
     return label
