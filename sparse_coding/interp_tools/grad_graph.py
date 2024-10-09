@@ -353,7 +353,9 @@ with grads_manager(
                     dim_idx
                 ] = (
                     marginal_grads[f"res_{up_layer_idx}"]
-                    - jvp_grads[f"res_{up_layer_idx}"]
+                    - jvp_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"res_{up_layer_idx}"
+                    ]
                 ).cpu()
                 marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
                     dim_idx

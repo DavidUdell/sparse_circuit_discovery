@@ -307,6 +307,8 @@ def graph_causal_effects(
         elif effect.item() < 0.0:
             red = 255
             blue = 0
+        else:
+            raise ValueError("Should be unreachable.")
         alpha = int(
             255 * abs(effect.item()) / (max(abs(max_scalar), abs(min_scalar)))
         )
