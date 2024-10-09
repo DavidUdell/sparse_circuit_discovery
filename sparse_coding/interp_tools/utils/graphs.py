@@ -464,8 +464,41 @@ def neuronpedia_api(
     ), "Neuronpedia API connection failed: 404"
 
     neuronpedia_dict: dict = response.json()
-    appendable: str = neuronpedia_dict["activations"]
+    data: list[dict] = neuronpedia_dict["activations"]
+    # "id"
+    # "tokens"
+    # "dataIndex"
+    # "index"
+    # "layer"
+    # "modelId"
+    # "dataSource"
+    # "maxValue"
+    # "maxValueTokenIndex"
+    # "minValue"
+    # "values"
+    # "dfaValues"
+    # "dfaTargetIndex"
+    # "dfaMaxValue"
+    # "creatorId"
+    # "createdAt"
+    # "lossValues"
+    # "logitContributions"
+    # "binMin"
+    # "binMax"
+    # "binContains"
+    # "qualifyingTokenIndex"
 
-    assert isinstance(appendable, str)
+    assert isinstance(data, list), f"{type(data)}, {data}"
+    assert isinstance(data[0], dict), f"{type(data[0])}, {data[0]}"
+
+    appendable: str = ""
+    for seq_dict in data:
+        tokens: list = seq_dict["tokens"]
+        tokens_str: str = "".join(tokens)
+
+        values: list = seq_dict["values"]
+        values_str: str = "".join([str(value) for value in values])
+
+        appendable += f"{tokens_str}: {values_str}\n"
 
     return appendable
