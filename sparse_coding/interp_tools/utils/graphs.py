@@ -401,45 +401,6 @@ def neuronpedia_api(
 ) -> str:
     """
     Pulls down Neuronpedia API annotations for given graph nodes.
-
-    Keys for `neuronpedia_dict`:
-        modelId
-        layer
-        index
-        sourceSetName
-        creatorId
-        createdAt
-        maxActApprox
-        neuron_alignment_indices
-        neuron_alignment_values
-        neuron_alignment_l1
-        correlated_neurons_indices
-        correlated_neurons_pearson
-        correlated_neurons_l1
-        correlated_features_indices
-        correlated_features_pearson
-        correlated_features_l1
-        neg_str
-        neg_values
-        pos_str
-        pos_values
-        frac_nonzero
-        freq_hist_data_bar_heights
-        freq_hist_data_bar_values
-        logits_hist_data_bar_heights
-        logits_hist_data_bar_values
-        decoder_weights_dist
-        umap_cluster
-        umap_log_feature_sparsity
-        umap_x
-        umap_y
-        model
-        lists
-        source
-        sourceSet
-        activations
-        explanations
-        comments
     """
 
     url_prefix: str = "https://www.neuronpedia.org/api/feature/gpt2-small/"
@@ -471,28 +432,6 @@ def neuronpedia_api(
 
     neuronpedia_dict: dict = response.json()
     data: list[dict] = neuronpedia_dict["activations"]
-    # "id"
-    # "tokens"
-    # "dataIndex"
-    # "index"
-    # "layer"
-    # "modelId"
-    # "dataSource"
-    # "maxValue"
-    # "maxValueTokenIndex"
-    # "minValue"
-    # "values"
-    # "dfaValues"
-    # "dfaTargetIndex"
-    # "dfaMaxValue"
-    # "creatorId"
-    # "createdAt"
-    # "lossValues"
-    # "logitContributions"
-    # "binMin"
-    # "binMax"
-    # "binContains"
-    # "qualifyingTokenIndex"
 
     label: str = "<tr><td></td></tr>"
     for seq_dict in data:

@@ -77,8 +77,6 @@ def top_k_contexts(
     top_k_contexts_acts = defaultdict(list)
     top_k_views = defaultdict(list)
 
-    assert isinstance(top_k, int), f"top_k was of type {type(top_k)}"
-
     for dim_idx, contexts_acts in contexts_and_activations.items():
         ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
             contexts_acts,
@@ -86,6 +84,9 @@ def top_k_contexts(
             reverse=True,
         )
         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
+
+        print(top_k_contexts_acts[dim_idx])
+
         for context, acts in top_k_contexts_acts[dim_idx]:
             # index() should always return a unique index. It will prioritize
             # the first, in case of collisions.
