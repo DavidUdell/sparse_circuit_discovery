@@ -436,22 +436,22 @@ def neuronpedia_api(
         comments
     """
 
-    URL_PREFIX = "https://www.neuronpedia.org/api/feature/gpt2-small/"
-    URL_POST_RES = "-res-jb/"
-    URL_POST_ATTN = "-att_128k-oai/"
-    URL_POST_MLP = "-mlp_128k-oai/"
+    url_prefix: str = "https://www.neuronpedia.org/api/feature/gpt2-small/"
+    url_post_res: str = "-res-jb/"
+    url_post_attn: str = "-att_128k-oai/"
+    url_post_mlp: str = "-mlp_128k-oai/"
 
     # sublayer_type: str = "res" | "attn" | "mlp"
     if sublayer_type == "res":
-        url_post: str = URL_POST_RES
+        url_post: str = url_post_res
     elif sublayer_type == "attn":
-        url_post: str = URL_POST_ATTN
+        url_post: str = url_post_attn
     elif sublayer_type == "mlp":
-        url_post: str = URL_POST_MLP
+        url_post: str = url_post_mlp
     else:
         raise ValueError("Sublayer type not recognized:", sublayer_type)
 
-    url: str = URL_PREFIX + str(layer_idx) + url_post + str(dim_idx)
+    url: str = url_prefix + str(layer_idx) + url_post + str(dim_idx)
 
     response = requests.get(
         url,
@@ -464,5 +464,8 @@ def neuronpedia_api(
     ), "Neuronpedia API connection failed: 404"
 
     neuronpedia_dict: dict = response.json()
+    appendable: str = neuronpedia_dict["activations"]
 
-    pass
+    assert isinstance(appendable, str)
+
+    return appendable
