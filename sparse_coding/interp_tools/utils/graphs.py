@@ -498,4 +498,7 @@ def neuronpedia_api(
 
         # appendable += f"{tokens_str}: {values_str}\n"
 
+    # Also, maybe the existing pulldown from the .csv function can be used here
+    # to postprocess the trimmed data. I forget whether I have a modular
+    # function already set up for that specifically.
     return appendable
