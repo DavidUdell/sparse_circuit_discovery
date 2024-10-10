@@ -85,7 +85,14 @@ test_url: str = (
 )
 test_response = requests.get(
     test_url,
-    headers={"X-Api-Key": NEURONPEDIA_KEY},
+    headers={
+        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "max-age=0",
+        "Upgrade-Insecure-Requests": "1",
+        "X-Api-Key": NEURONPEDIA_KEY,
+    },
     timeout=300,
 )
 http_status: int = test_response.status_code

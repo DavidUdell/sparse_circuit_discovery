@@ -442,7 +442,14 @@ def neuronpedia_api(
 
     response = requests.get(
         url,
-        headers={"X-Api-Key": neuronpedia_key},
+        headers={
+            "Accept": "text/html,application/xhtml+xml,application/xml",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "max-age=0",
+            "Upgrade-Insecure-Requests": "1",
+            "X-Api-Key": neuronpedia_key,
+        },
         timeout=300,
     )
 

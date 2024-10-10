@@ -67,8 +67,5 @@ def deduplicate_sequences(
         for context, acts in contexts_acts:
             if (context, acts) not in deduplicated_contexts_and_acts[dim_idx]:
                 deduplicated_contexts_and_acts[dim_idx].append((context, acts))
-            # Debugging print
-            else:
-                print(context)
 
     return deduplicated_contexts_and_acts
