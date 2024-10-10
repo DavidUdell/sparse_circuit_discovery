@@ -529,6 +529,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         down_dim_name,
                         {},
                         __file__,
+                        neuronpedia=True,
+                        sublayer_type=down_layer_module,
+                        top_k=TOP_K,
+                        view=VIEW,
+                        neuronpedia_key=NEURONPEDIA_KEY,
                     ),
                     shape="box",
                 )
