@@ -54,3 +54,18 @@ class ExactlyZeroEffectError(ValueError):
     def __init__(self):
         message: str = "Total effect logged was exactly 0.0; exiting."
         super().__init__(message)
+
+
+def deduplicate_sequences(
+    contexts_and_acts: defaultdict[int, list[tuple[list[str], list[float]]]]
+) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
+    """Deduplicate sequences when necessary."""
+
+    deduplicated_contexts_and_acts = defaultdict(list)
+
+    for dim_idx, contexts_acts in contexts_and_acts.items():
+        for context, acts in contexts_acts:
+            if (context, acts) not in deduplicated_contexts_and_acts[dim_idx]:
+                deduplicated_contexts_and_acts[dim_idx].append((context, acts))
+
+    return deduplicated_contexts_and_acts

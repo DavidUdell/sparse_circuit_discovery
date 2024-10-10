@@ -65,7 +65,7 @@ def top_k_contexts(
     ],
     view: int,
     top_k: int,
-) -> defaultdict[int, list[tuple[str, list[float]]]]:
+) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
     """
     Select the top-k contexts for each feature.
 
@@ -84,6 +84,7 @@ def top_k_contexts(
             reverse=True,
         )
         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
+
         for context, acts in top_k_contexts_acts[dim_idx]:
             # index() should always return a unique index. It will prioritize
             # the first, in case of collisions.

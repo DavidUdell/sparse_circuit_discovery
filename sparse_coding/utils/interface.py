@@ -166,15 +166,15 @@ def load_yaml_constants(base_file):
     """Load config files."""
 
     current_dir = Path(base_file).parent
-    hf_access_file: str = "config/hf_access.yaml"
+    api_access_file: str = "config/api_access.yaml"
     central_config_file: str = "config/central_config.yaml"
 
     if current_dir.name == "sparse_coding":
-        hf_access_path = current_dir / hf_access_file
+        api_access_path = current_dir / api_access_file
         central_config_path = current_dir / central_config_file
 
     elif current_dir.name in ("interp_tools", "rasp"):
-        hf_access_path = current_dir.parent / hf_access_file
+        api_access_path = current_dir.parent / api_access_file
         central_config_path = current_dir.parent / central_config_file
 
     else:
@@ -188,12 +188,13 @@ def load_yaml_constants(base_file):
         )
 
     try:
-        with open(hf_access_path, "r", encoding="utf-8") as f:
+        with open(api_access_path, "r", encoding="utf-8") as f:
             access = yaml.safe_load(f)
     except FileNotFoundError:
-        print("hf_access.yaml not found. Creating it now.")
-        with open(hf_access_path, "w", encoding="utf-8") as w:
+        print("api_access.yaml not found. Creating it now.")
+        with open(api_access_path, "w", encoding="utf-8") as w:
             w.write('HF_ACCESS_TOKEN: ""\n')
+            w.write('NEURONPEDIA_KEY: ""\n')
         access = {}
     except yaml.YAMLError as e:
         print(e)

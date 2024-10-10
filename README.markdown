@@ -24,9 +24,7 @@ To manually install, just run these commands in the shell:
 
 `pip install -e .`
 
-Alternatively, I have a Docker image on
-[DockerHub](https://hub.docker.com/r/davidudell/sparse_circuit_discovery) and
-on the [GitHub Container
+Alternatively, I have a Docker image on the [GitHub Container
 Registry](https://github.com/DavidUdell/sparse_circuit_discovery/pkgs/container/sparse_circuit_discovery).
 The Docker image is especially good for pulling to a remote server.
 
@@ -112,12 +110,16 @@ Save these values in `central_config.yaml`, then run interpretability:
 
 ```python3 fast.py```
 
-Data appears as it does with the naive algorithm.
+Data appears in `sparse_coding/data/`, as it does with the naive algorithm.
 
-However, here you can also choose to render graphs as `.png` files. Change the
-extension of `GRADS_FILE` in `central_config.yaml` from `.svg` to `.png` for
-that. I separately use [PosteRazor](https://posterazor.sourceforge.io/) to tile
-print large `.png` graph files.
+This interpretability pipeline will also pull down more comprehensive
+interpretability data from Neuronpedia and append it to each node, when
+available.
+
+Here you can also choose to render graphs as `.png` files. Change the extension
+of `GRADS_FILE` in `central_config.yaml` from `.svg` to `.png` for that. I
+separately use [PosteRazor](https://posterazor.sourceforge.io/) to tile print
+large `.png` graph files, when a physical copy is desired.
 
 ### Validating Circuits
 There's also an independent circuit validation pipeline, `val.py`. This script
@@ -180,7 +182,7 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.2.3
+Current version is 1.3.0
 
 The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
 his pretrained sparse autoencoders from HF Hub.

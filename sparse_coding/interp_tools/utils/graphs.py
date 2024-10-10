@@ -1,15 +1,21 @@
 """Graph the causal effects of ablations."""
 
 import html
+from collections import defaultdict
 from copy import copy
 from textwrap import dedent
 
+import requests
 from tqdm.auto import tqdm
 import torch as t
 from pygraphviz import AGraph
 import wandb
 
-from sparse_coding.interp_tools.utils.computations import calc_overall_effects
+from sparse_coding.utils.top_contexts import top_k_contexts
+from sparse_coding.interp_tools.utils.computations import (
+    calc_overall_effects,
+    deduplicate_sequences,
+)
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
     load_preexisting_graph,
@@ -105,6 +111,11 @@ def label_highlighting(
     address: str,
     prob_diffs,
     base_file,
+    neuronpedia: bool = False,
+    sublayer_type: str = None,
+    top_k: int = None,
+    view: int = None,
+    neuronpedia_key: str = None,
 ) -> str:
     """Highlight contexts using cached activation data."""
 
@@ -194,6 +205,22 @@ def label_highlighting(
 
             label += f"{cell_tag}{token}</td>"
         label += "</tr>"
+
+    if neuronpedia:
+        assert (
+            sublayer_type is not None
+            and top_k is not None
+            and view is not None
+        )
+
+        label += neuronpedia_api(
+            layer_idx,
+            neuron_idx,
+            neuronpedia_key,
+            sublayer_type,
+            top_k,
+            view,
+        )
 
     label += "</table>>"
 
@@ -300,6 +327,9 @@ def graph_causal_effects(
         elif effect.item() < 0.0:
             red = 255
             blue = 0
+        else:
+            raise ValueError("Should be unreachable.")
+
         alpha = int(
             255 * abs(effect.item()) / (max(abs(max_scalar), abs(min_scalar)))
         )
@@ -379,3 +409,92 @@ def prune_graph(
         graph = prune_graph(graph, leaf_nodes)
 
     return graph
+
+
+def neuronpedia_api(
+    layer_idx: int,
+    dim_idx: int,
+    neuronpedia_key: str,
+    sublayer_type: str,
+    top_k: int,
+    view: int,
+) -> str:
+    """
+    Pulls down Neuronpedia API annotations for given graph nodes.
+    """
+
+    url_prefix: str = "https://www.neuronpedia.org/api/feature/gpt2-small/"
+    url_post_res: str = "-res-jb/"
+    url_post_attn: str = "-att_128k-oai/"
+    url_post_mlp: str = "-mlp_128k-oai/"
+
+    # sublayer_type: str = "res" | "attn" | "mlp"
+    if sublayer_type == "res":
+        url_post: str = url_post_res
+    elif sublayer_type == "attn":
+        url_post: str = url_post_attn
+    elif sublayer_type == "mlp":
+        url_post: str = url_post_mlp
+    else:
+        raise ValueError("Sublayer type not recognized:", sublayer_type)
+
+    url: str = url_prefix + str(layer_idx) + url_post + str(dim_idx)
+
+    response = requests.get(
+        url,
+        headers={
+            "Accept": "text/html,application/xhtml+xml,application/xml",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "max-age=0",
+            "Upgrade-Insecure-Requests": "1",
+            "X-Api-Key": neuronpedia_key,
+        },
+        timeout=300,
+    )
+
+    assert (
+        response.status_code != 404
+    ), "Neuronpedia API connection failed: 404"
+
+    neuronpedia_dict: dict = response.json()
+    data: list[dict] = neuronpedia_dict["activations"]
+
+    label: str = "<tr><td></td></tr>"
+
+    # defaultdict[int, list[tuple[list[str], list[float]]]]
+    contexts_and_activations = defaultdict(list)
+    for seq_dict in data:
+        tokens: list[str] = seq_dict["tokens"]
+        values: list[float | int] = seq_dict["values"]
+
+        contexts_and_activations[dim_idx].append((tokens, values))
+
+    top_contexts = top_k_contexts(contexts_and_activations, view, top_k)
+    top_contexts = deduplicate_sequences(top_contexts)
+
+    for context, acts in top_contexts[dim_idx]:
+        if not context:
+            continue
+
+        max_a: int | float = max(acts)
+        label += "<tr>"
+        # It is known that the context is not empty by here.
+        for token, act in zip(context, acts):
+            token = html.escape(token)
+            token = token.encode("unicode_escape").decode("utf-8")
+
+            if act <= 0.0:
+                label += f'<td bgcolor="#ffffff">{token}</td>'
+            else:
+                blue_prop = act / max_a
+                rg_prop = 1.0 - blue_prop
+
+                rg_shade = f"{int(96 + (159*rg_prop)):02x}"
+                b_shade = f"{255:02x}"
+                shade = f"#{rg_shade}{rg_shade}{b_shade}"
+                cell_tag = f'<td bgcolor="{shade}">'
+                label += f"{cell_tag}{token}</td>"
+        label += "</tr>"
+
+    return label

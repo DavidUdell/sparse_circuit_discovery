@@ -8,6 +8,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 
 import re
 
+import requests
 import torch as t
 from accelerate import Accelerator
 from pygraphviz import AGraph
@@ -32,6 +33,7 @@ from sparse_coding.interp_tools.utils.computations import (
 )
 from sparse_coding.interp_tools.utils.graphs import (
     label_highlighting,
+    neuronpedia_api,
     prune_graph,
 )
 from sparse_coding.interp_tools.utils.hooks import (
@@ -42,8 +44,9 @@ from sparse_coding.interp_tools.utils.hooks import (
 
 # %%
 # Load constants.
-_, config = load_yaml_constants(__file__)
+access, config = load_yaml_constants(__file__)
 
+NEURONPEDIA_KEY = access.get("NEURONPEDIA_KEY")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
@@ -68,9 +71,38 @@ GRADS_FILE = config.get("GRADS_FILE")
 GRADS_DOT_FILE = config.get("GRADS_DOT_FILE")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
+TOP_K = config.get("TOP_K")
+VIEW = config.get("VIEW")
 # x2 for each: topk and bottomk nodes.
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
+
+
+# %%
+# Neuronpedia API test call.
+test_url: str = (
+    "https://www.neuronpedia.org/api/feature/gpt2-small/0-res-jb/14057"
+)
+test_response = requests.get(
+    test_url,
+    headers={
+        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "max-age=0",
+        "Upgrade-Insecure-Requests": "1",
+        "X-Api-Key": NEURONPEDIA_KEY,
+    },
+    timeout=300,
+)
+http_status: int = test_response.status_code
+
+assert isinstance(http_status, int)
+
+if http_status == 404:
+    raise ValueError("Neuronpedia API test connection failed: 404")
+
+print("Neuronpedia API test connection successful:", http_status)
 
 # %%
 # Reproducibility.
@@ -89,6 +121,7 @@ wandb.init(
 model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     output_hidden_states=True,
+    return_dict_in_generate=True,
 )
 tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR, clean_up_tokenization_spaces=True
@@ -327,7 +360,9 @@ with grads_manager(
                     dim_idx
                 ] = (
                     marginal_grads[f"res_{up_layer_idx}"]
-                    - jvp_grads[f"res_{up_layer_idx}"]
+                    - jvp_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"res_{up_layer_idx}"
+                    ]
                 ).cpu()
                 marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
                     dim_idx
@@ -452,6 +487,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         up_dim_name,
                         {},
                         __file__,
+                        neuronpedia=True,
+                        sublayer_type=up_layer_module,
+                        top_k=TOP_K,
+                        view=VIEW,
+                        neuronpedia_key=NEURONPEDIA_KEY,
                     ),
                     shape="box",
                 )
@@ -461,7 +501,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += up_dim_name
-                label += "</b></font></td></tr></table>>"
+                label += "</b></font></td></tr>"
+                label += neuronpedia_api(
+                    up_layer_idx,
+                    up_dim,
+                    NEURONPEDIA_KEY,
+                    up_layer_module,
+                    TOP_K,
+                    VIEW,
+                )
+                label += "</table>>"
                 graph.add_node(up_dim_name, label=label, shape="box")
 
             if "res" in down_layer_module:
@@ -487,6 +536,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         down_dim_name,
                         {},
                         __file__,
+                        neuronpedia=True,
+                        sublayer_type=down_layer_module,
+                        top_k=TOP_K,
+                        view=VIEW,
+                        neuronpedia_key=NEURONPEDIA_KEY,
                     ),
                     shape="box",
                 )
@@ -496,7 +550,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += down_dim_name
-                label += "</b></font></td></tr></table>>"
+                label += "</b></font></td></tr>"
+                label += neuronpedia_api(
+                    down_layer_idx,
+                    down_dim,
+                    NEURONPEDIA_KEY,
+                    down_layer_module,
+                    TOP_K,
+                    VIEW,
+                )
+                label += "</table>>"
                 graph.add_node(down_dim_name, label=label, shape="box")
 
             # Edge coloration.
@@ -504,6 +567,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 red, green = 0, 255
             elif effect < 0.0:
                 red, green = 255, 0
+            else:
+                raise ValueError("Should be unreachable.")
 
             alpha: int = int(
                 255

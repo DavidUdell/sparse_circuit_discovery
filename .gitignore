@@ -16,8 +16,8 @@ rasp_feature_graph.png
 *.json
 wandb/
 
-# HF access tokens
-hf_access.yaml
+# API access tokens
+api_access.yaml
 
 # Testing
 tests/smoke_test_data/smoke_test_token_info.csv
