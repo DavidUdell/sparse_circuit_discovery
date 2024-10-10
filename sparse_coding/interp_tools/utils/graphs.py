@@ -108,7 +108,11 @@ def label_highlighting(
     address: str,
     prob_diffs,
     base_file,
-    neuronpedia=False,
+    neuronpedia: bool = False,
+    sublayer_type: str = None,
+    top_k: int = None,
+    view: int = None,
+    neuronpedia_key: str = None,
 ) -> str:
     """Highlight contexts using cached activation data."""
 
@@ -200,8 +204,20 @@ def label_highlighting(
         label += "</tr>"
 
     if neuronpedia:
-        # Add on Neuronpedia API annotations.
-        pass
+        assert (
+            sublayer_type is not None
+            and top_k is not None
+            and view is not None
+        )
+
+        label += neuronpedia_api(
+            layer_idx,
+            neuron_idx,
+            neuronpedia_key,
+            sublayer_type,
+            top_k,
+            view,
+        )
 
     label += "</table>>"
 
