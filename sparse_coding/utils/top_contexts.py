@@ -65,7 +65,7 @@ def top_k_contexts(
     ],
     view: int,
     top_k: int,
-) -> defaultdict[int, list[tuple[str, list[float]]]]:
+) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
     """
     Select the top-k contexts for each feature.
 

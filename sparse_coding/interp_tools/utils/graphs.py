@@ -12,7 +12,10 @@ from pygraphviz import AGraph
 import wandb
 
 from sparse_coding.utils.top_contexts import top_k_contexts
-from sparse_coding.interp_tools.utils.computations import calc_overall_effects
+from sparse_coding.interp_tools.utils.computations import (
+    calc_overall_effects,
+    deduplicate_sequences,
+)
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
     load_preexisting_graph,
@@ -461,6 +464,7 @@ def neuronpedia_api(
         contexts_and_activations[dim_idx].append((tokens, values))
 
     top_contexts = top_k_contexts(contexts_and_activations, view, top_k)
+    top_contexts = deduplicate_sequences(top_contexts)
 
     for context, acts in top_contexts[dim_idx]:
         if not context:
