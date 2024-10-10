@@ -85,8 +85,6 @@ def top_k_contexts(
         )
         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
 
-        print(top_k_contexts_acts[dim_idx])
-
         for context, acts in top_k_contexts_acts[dim_idx]:
             # index() should always return a unique index. It will prioritize
             # the first, in case of collisions.

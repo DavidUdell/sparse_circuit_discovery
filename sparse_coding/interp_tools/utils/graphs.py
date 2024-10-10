@@ -1,6 +1,7 @@
 """Graph the causal effects of ablations."""
 
 import html
+from collections import defaultdict
 from copy import copy
 from textwrap import dedent
 
@@ -434,20 +435,18 @@ def neuronpedia_api(
     data: list[dict] = neuronpedia_dict["activations"]
 
     label: str = "<tr><td></td></tr>"
+
+    # defaultdict[int, list[tuple[list[str], list[float]]]]
+    contexts_and_activations = defaultdict(list)
     for seq_dict in data:
         tokens: list[str] = seq_dict["tokens"]
-        values: list[int | float] = seq_dict["values"]
+        values: list[float | int] = seq_dict["values"]
 
-        contexts_and_activations: dict[
-            int, list[tuple[list[str], list[float]]]
-        ] = {dim_idx: [(tokens, values)]}
+        contexts_and_activations[dim_idx].append((tokens, values))
 
-        top_contexts = top_k_contexts(contexts_and_activations, view, top_k)
+    top_contexts = top_k_contexts(contexts_and_activations, view, top_k)
 
-        # len(top_contexts[dim_idx]) == 1
-        # len(context) == len(acts)
-        context, acts = top_contexts[dim_idx][0]
-
+    for context, acts in top_contexts[dim_idx]:
         if not context:
             continue
 
