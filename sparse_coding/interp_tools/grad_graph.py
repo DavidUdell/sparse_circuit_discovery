@@ -543,7 +543,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += down_dim_name
-                label += "</b></font></td></tr></table>>"
+                label += "</b></font></td></tr>"
+                label += neuronpedia_api(
+                    down_layer_idx,
+                    down_dim,
+                    NEURONPEDIA_KEY,
+                    down_layer_module,
+                    TOP_K,
+                    VIEW,
+                )
+                label += "</table>>"
                 graph.add_node(down_dim_name, label=label, shape="box")
 
             # Edge coloration.
