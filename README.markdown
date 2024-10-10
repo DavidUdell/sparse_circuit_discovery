@@ -110,12 +110,16 @@ Save these values in `central_config.yaml`, then run interpretability:
 
 ```python3 fast.py```
 
-Data appears as it does with the naive algorithm.
+Data appears in `sparse_coding/data/`, as it does with the naive algorithm.
 
-However, here you can also choose to render graphs as `.png` files. Change the
-extension of `GRADS_FILE` in `central_config.yaml` from `.svg` to `.png` for
-that. I separately use [PosteRazor](https://posterazor.sourceforge.io/) to tile
-print large `.png` graph files.
+This interpretability pipeline will also pull down more comprehensive
+interpretability data from Neuronpedia and append it to each node, when
+available.
+
+Here you can also choose to render graphs as `.png` files. Change the extension
+of `GRADS_FILE` in `central_config.yaml` from `.svg` to `.png` for that. I
+separately use [PosteRazor](https://posterazor.sourceforge.io/) to tile print
+large `.png` graph files, when a physical copy is desired.
 
 ### Validating Circuits
 There's also an independent circuit validation pipeline, `val.py`. This script
