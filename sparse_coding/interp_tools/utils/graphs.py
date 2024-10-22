@@ -155,7 +155,7 @@ def label_highlighting(
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
 
-        label += "</tr><tr><td></td></tr><tr><td></td></tr>"
+        label += "</tr>"
 
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
@@ -460,7 +460,7 @@ def neuronpedia_api(
     neuronpedia_dict: dict = response.json()
     data: list[dict] = neuronpedia_dict["activations"]
 
-    label: str = "<tr><td></td></tr>"
+    label: str = ""
 
     # defaultdict[int, list[tuple[list[str], list[float]]]]
     contexts_and_activations = defaultdict(list)

@@ -1,20 +1,20 @@
 strict digraph "" {
 	node [label="\N"];
-	7.15755	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>7.15755</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#fefeff"> (</td><td bgcolor="#e4e4ff">C</td></tr><tr><td></td></tr><tr><td></td></tr><tr><td border="1" bgcolor="#6060ff">isco</td><td border="1" bgcolor="#6060ff">FC</td><td border="1" bgcolor="#6060ff">GC</td><td border="1" bgcolor="#6060ff">VC</td><td border="1" bgcolor="#6060ff">airo</td><td border="1" bgcolor="#6060ff">EC</td><td border="1" bgcolor="#6060ff">ancel</td><td border="1" bgcolor="#6060ff">arson</td></tr><tr><td border="1" bgcolor="#ff6060"> arbitration</td><td border="1" bgcolor="#ff6060"> advers</td><td border="1" bgcolor="#ff6060">interstitial</td><td border="1" bgcolor="#ff6060"> orphans</td><td border="1" bgcolor="#ff6060"> Tycoon</td><td border="1" bgcolor="#ff6060"> blinding</td><td border="1" bgcolor="#ff6060"> punitive</td><td border="1" bgcolor="#ff6060"> enforce</td></tr></table>>,
+	7.15755	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>7.15755</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#fefeff"> (</td><td bgcolor="#e4e4ff">C</td></tr><tr><td border="1" bgcolor="#6060ff">isco</td><td border="1" bgcolor="#6060ff">FC</td><td border="1" bgcolor="#6060ff">GC</td><td border="1" bgcolor="#6060ff">VC</td><td border="1" bgcolor="#6060ff">airo</td><td border="1" bgcolor="#6060ff">EC</td><td border="1" bgcolor="#6060ff">ancel</td><td border="1" bgcolor="#6060ff">arson</td></tr><tr><td border="1" bgcolor="#ff6060"> arbitration</td><td border="1" bgcolor="#ff6060"> advers</td><td border="1" bgcolor="#ff6060">interstitial</td><td border="1" bgcolor="#ff6060"> orphans</td><td border="1" bgcolor="#ff6060"> Tycoon</td><td border="1" bgcolor="#ff6060"> blinding</td><td border="1" bgcolor="#ff6060"> punitive</td><td border="1" bgcolor="#ff6060"> enforce</td></tr></table>>,
 		shape=box];
-	8.11089	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.11089</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#ffffff"> (</td><td bgcolor="#ffffff">C</td></tr><tr><td></td></tr><tr><td></td></tr></table>>,
+	8.11089	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.11089</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#ffffff"> (</td><td bgcolor="#ffffff">C</td></tr></table>>,
 		shape=box];
 	7.15755 -> 8.11089	[color="#0000ff81"];
-	8.18486	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.18486</b></font></td></tr><tr><td bgcolor="#ffffff">Copyright</td><td bgcolor="#6060ff"> (</td><td bgcolor="#f7f7ff">C</td></tr><tr><td></td></tr><tr><td></td></tr></table>>,
+	8.18486	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.18486</b></font></td></tr><tr><td bgcolor="#ffffff">Copyright</td><td bgcolor="#6060ff"> (</td><td bgcolor="#f7f7ff">C</td></tr></table>>,
 		shape=box];
 	7.15755 -> 8.18486	[color="#0000ff98"];
-	8.18895	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.18895</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#fefeff"> (</td><td bgcolor="#e0e0ff">C</td></tr><tr><td></td></tr><tr><td></td></tr></table>>,
+	8.18895	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.18895</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#fefeff"> (</td><td bgcolor="#e0e0ff">C</td></tr></table>>,
 		shape=box];
 	7.15755 -> 8.18895	[color="#ff0000ff"];
-	8.22424	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.22424</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#fbfbff"> (</td><td bgcolor="#ffffff">C</td></tr><tr><td></td></tr><tr><td></td></tr></table>>,
+	8.22424	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.22424</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#fbfbff"> (</td><td bgcolor="#ffffff">C</td></tr></table>>,
 		shape=box];
 	7.15755 -> 8.22424	[color="#0000ff91"];
-	8.24089	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.24089</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#ffffff"> (</td><td bgcolor="#ffffff">C</td></tr><tr><td></td></tr><tr><td></td></tr></table>>,
+	8.24089	[label=<<table border="0" cellborder="0" cellspacing="0"><tr><td><font point-size="16"><b>8.24089</b></font></td></tr><tr><td bgcolor="#6060ff">Copyright</td><td bgcolor="#ffffff"> (</td><td bgcolor="#ffffff">C</td></tr></table>>,
 		shape=box];
 	7.15755 -> 8.24089	[color="#0000ff84"];
 	"Effects plotted out of collected: ~0.0%.";
