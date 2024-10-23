@@ -457,7 +457,7 @@ def neuronpedia_api(
             timeout=300,
         )
     except TooManyRedirects:
-        print("Too Many Redirects")
+        print("Handled TooManyRedirects exception")
         return ""
 
     assert (
@@ -467,7 +467,7 @@ def neuronpedia_api(
     try:
         neuronpedia_dict: dict = response.json()
     except JSONDecodeError:
-        print("JSON Decode Error")
+        print("Handled JSONDecodeError")
         return ""
 
     data: list[dict] = neuronpedia_dict["activations"]
