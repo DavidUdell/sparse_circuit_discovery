@@ -86,11 +86,12 @@ test_url: str = (
 test_response = requests.get(
     test_url,
     headers={
-        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Accept": "application/json",
         "Accept-Encoding": "gzip, deflate, br, zstd",
         "Accept-Language": "en-US,en;q=0.9",
         "Cache-Control": "max-age=0",
         "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "sparse_circuit_discovery",
         "X-Api-Key": NEURONPEDIA_KEY,
     },
     timeout=300,
