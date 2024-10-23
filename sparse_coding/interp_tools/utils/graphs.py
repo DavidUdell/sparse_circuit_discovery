@@ -3,12 +3,14 @@
 import html
 from collections import defaultdict
 from copy import copy
+from json.decoder import JSONDecodeError
 from textwrap import dedent
 
 import requests
 from tqdm.auto import tqdm
 import torch as t
 from pygraphviz import AGraph
+from requests.exceptions import TooManyRedirects
 import wandb
 
 from sparse_coding.utils.top_contexts import top_k_contexts
@@ -440,25 +442,34 @@ def neuronpedia_api(
 
     url: str = url_prefix + str(layer_idx) + url_post + str(dim_idx)
 
-    response = requests.get(
-        url,
-        headers={
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "max-age=0",
-            "Upgrade-Insecure-Requests": "1",
-            "User-Agent": "sparse_circuit_discovery",
-            "X-Api-Key": neuronpedia_key,
-        },
-        timeout=300,
-    )
+    try:
+        response = requests.get(
+            url,
+            headers={
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "max-age=0",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": "sparse_circuit_discovery",
+                "X-Api-Key": neuronpedia_key,
+            },
+            timeout=300,
+        )
+    except TooManyRedirects:
+        print("Too Many Redirects")
+        return ""
 
     assert (
         response.status_code != 404
     ), "Neuronpedia API connection failed: 404"
 
-    neuronpedia_dict: dict = response.json()
+    try:
+        neuronpedia_dict: dict = response.json()
+    except JSONDecodeError:
+        print("JSON Decode Error")
+        return ""
+
     data: list[dict] = neuronpedia_dict["activations"]
 
     label: str = ""
