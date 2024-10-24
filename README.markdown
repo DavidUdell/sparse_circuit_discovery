@@ -183,8 +183,3 @@ pale red arrow is a minor downweighting effect.
 
 ## Project Status
 Current version is 1.3.1
-
-The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
-his pretrained sparse autoencoders from HF Hub.
-
-The Neuronpedia wiki is Johnny Lin's.
