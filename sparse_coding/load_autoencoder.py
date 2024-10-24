@@ -12,9 +12,8 @@ from sparse_coding.utils.interface import (
     save_paths,
     sanitize_model_name,
 )
-from sae_training.utils import (  # pylint: disable=unused-import
+from sae_training.config import (
     LanguageModelSAERunnerConfig,
-    LMSparseAutoencoderSessionloader,
 )
 
 # %%
