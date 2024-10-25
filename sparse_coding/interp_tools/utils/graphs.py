@@ -459,8 +459,8 @@ def neuronpedia_api(
     except TooManyRedirects:
         print("TooManyRedirects")
         return ""
-    except ConnectionResetError:
-        print("ConnectionResetError")
+    except requests.exceptions.ConnectionError:
+        print("ConnectionError")
         return ""
 
     # assert (
