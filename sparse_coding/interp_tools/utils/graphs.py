@@ -10,7 +10,6 @@ import requests
 from tqdm.auto import tqdm
 import torch as t
 from pygraphviz import AGraph
-from requests.exceptions import TooManyRedirects
 import wandb
 
 from sparse_coding.utils.top_contexts import top_k_contexts
