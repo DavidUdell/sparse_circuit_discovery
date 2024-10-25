@@ -37,7 +37,7 @@ MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ACTS_LAYERS_RANGE = range(ACTS_LAYERS_SLICE.start, ACTS_LAYERS_SLICE.stop)
 
-RESID_REPO: str = "jbloom/GPT2-Small-SAEs"
+RESID_REPO: str = "jbloom/GPT2-Small-OAI-v5-128k-resid-post-SAEs"
 ATTN_REPO: str = "jbloom/GPT2-Small-OAI-v5-128k-attn-out-SAEs"
 MLP_REPO: str = "jbloom/GPT2-Small-OAI-v5-128k-mlp-out-SAEs"
 
@@ -55,80 +55,79 @@ t.serialization.add_safe_globals([LanguageModelSAERunnerConfig])
 
 # %%
 # Residual autopencoder loading functionality.
-def load_resid_autoencoder(
-    autoencoder_repository: str,
-    encoder_file,
-    enc_biases_file,
-    decoder_file,
-    dec_biases_file,
-    model_dir,
-    acts_layers_range,
-    base_file: str,
-) -> None:
-    """Save a sparse autoencoder directly to disk."""
+# def load_resid_autoencoder(
+#     autoencoder_repository: str,
+#     encoder_file,
+#     enc_biases_file,
+#     decoder_file,
+#     dec_biases_file,
+#     model_dir,
+#     acts_layers_range,
+#     base_file: str,
+# ) -> None:
+#     """Save a sparse autoencoder directly to disk."""
 
-    prefix: str = "final_sparse_autoencoder_gpt2-small_blocks."
-    endfix: str = ".hook_resid_pre_24576.pt"
+#     prefix: str = "final_sparse_autoencoder_gpt2-small_blocks."
+#     endfix: str = ".hook_resid_pre_24576.pt"
 
-    for idx in acts_layers_range:
-        filename: str = f"{prefix}{idx}{endfix}"
-        file_url = hf_hub_download(
-            repo_id=autoencoder_repository,
-            filename=filename,
-        )
+#     for idx in acts_layers_range:
+#         filename: str = f"{prefix}{idx}{endfix}"
+#         file_url = hf_hub_download(
+#             repo_id=autoencoder_repository,
+#             filename=filename,
+#         )
 
-        # Solves a GPU availability issue with CI runners.
-        if not t.cuda.is_available():
-            tensors_dict = t.load(
-                file_url, map_location="cpu", weights_only=True
-            )
-        else:
-            tensors_dict = t.load(file_url, weights_only=True)
+#         # Solves a GPU availability issue with CI runners.
+#         if not t.cuda.is_available():
+#             tensors_dict = t.load(
+#                 file_url, map_location="cpu", weights_only=True
+#             )
+#         else:
+#             tensors_dict = t.load(file_url, weights_only=True)
 
-        encoder = tensors_dict["state_dict"]["W_enc"]
-        enc_biases = tensors_dict["state_dict"]["b_enc"]
-        decoder = tensors_dict["state_dict"]["W_dec"]
-        dec_biases = tensors_dict["state_dict"]["b_dec"]
+#         encoder = tensors_dict["state_dict"]["W_enc"]
+#         enc_biases = tensors_dict["state_dict"]["b_enc"]
+#         decoder = tensors_dict["state_dict"]["W_dec"]
+#         dec_biases = tensors_dict["state_dict"]["b_dec"]
 
-        safe_model_name = sanitize_model_name(model_dir)
-        t.save(
-            encoder,
-            save_paths(base_file, f"{safe_model_name}/{idx}/{encoder_file}"),
-        )
-        t.save(
-            enc_biases,
-            save_paths(
-                base_file, f"{safe_model_name}/{idx}/{enc_biases_file}"
-            ),
-        )
-        t.save(
-            decoder,
-            save_paths(base_file, f"{safe_model_name}/{idx}/{decoder_file}"),
-        )
-        t.save(
-            dec_biases,
-            save_paths(
-                base_file, f"{safe_model_name}/{idx}/{dec_biases_file}"
-            ),
-        )
+#         safe_model_name = sanitize_model_name(model_dir)
+#         t.save(
+#             encoder,
+#             save_paths(base_file, f"{safe_model_name}/{idx}/{encoder_file}"),
+#         )
+#         t.save(
+#             enc_biases,
+#             save_paths(
+#                 base_file, f"{safe_model_name}/{idx}/{enc_biases_file}"
+#             ),
+#         )
+#         t.save(
+#             decoder,
+#             save_paths(base_file, f"{safe_model_name}/{idx}/{decoder_file}"),
+#         )
+#         t.save(
+#             dec_biases,
+#             save_paths(
+#                 base_file, f"{safe_model_name}/{idx}/{dec_biases_file}"
+#             ),
+#         )
 
 
-# %%
 # Call residual loading.
-load_resid_autoencoder(
-    RESID_REPO,
-    ENCODER_FILE,
-    ENC_BIASES_FILE,
-    DECODER_FILE,
-    DEC_BIASES_FILE,
-    MODEL_DIR,
-    ACTS_LAYERS_RANGE,
-    __file__,
-)
+# load_resid_autoencoder(
+#     RESID_REPO,
+#     ENCODER_FILE,
+#     ENC_BIASES_FILE,
+#     DECODER_FILE,
+#     DEC_BIASES_FILE,
+#     MODEL_DIR,
+#     ACTS_LAYERS_RANGE,
+#     __file__,
+# )
 
 
 # %%
-# Attn and MLP autoencoder loading functionality.
+# Sublayer autoencoder loading functionality.
 def load_sublayer_autoencoder(
     autoencoder_repo: str,
     encoder_file: str,
@@ -192,6 +191,17 @@ def load_sublayer_autoencoder(
 
 # %%
 # Call attn and mlp loading.
+load_sublayer_autoencoder(
+    RESID_REPO,
+    ENCODER_FILE,
+    ENC_BIASES_FILE,
+    DECODER_FILE,
+    DEC_BIASES_FILE,
+    MODEL_DIR,
+    ACTS_LAYERS_RANGE,
+    __file__,
+)
+
 load_sublayer_autoencoder(
     ATTN_REPO,
     ATTN_ENCODER_FILE,
