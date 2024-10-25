@@ -469,6 +469,9 @@ def neuronpedia_api(
         print(e)
         return ""
 
+    if neuronpedia_dict is None:
+        return ""
+
     data: list[dict] = neuronpedia_dict["activations"]
 
     label: str = ""
