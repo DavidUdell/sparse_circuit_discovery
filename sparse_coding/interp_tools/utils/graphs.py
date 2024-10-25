@@ -466,8 +466,8 @@ def neuronpedia_api(
 
     try:
         neuronpedia_dict: dict = response.json()
-    except JSONDecodeError:
-        print("JSONDecodeError:", response.status_code)
+    except JSONDecodeError as e:
+        print(e)
         return ""
 
     data: list[dict] = neuronpedia_dict["activations"]
