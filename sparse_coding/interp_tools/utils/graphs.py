@@ -457,17 +457,20 @@ def neuronpedia_api(
             timeout=300,
         )
     except TooManyRedirects:
-        print("Handled TooManyRedirects exception")
+        print("TooManyRedirects")
+        return ""
+    except ConnectionResetError:
+        print("ConnectionResetError")
         return ""
 
-    assert (
-        response.status_code != 404
-    ), "Neuronpedia API connection failed: 404"
+    # assert (
+    #     response.status_code != 404
+    # ), "Neuronpedia API connection failed: 404"
 
     try:
         neuronpedia_dict: dict = response.json()
     except JSONDecodeError:
-        print("Handled JSONDecodeError")
+        print("JSONDecodeError:", response.status_code)
         return ""
 
     data: list[dict] = neuronpedia_dict["activations"]
