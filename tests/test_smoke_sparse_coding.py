@@ -6,7 +6,6 @@ Note that this integration test will necessarily be somewhat slow.
 
 import os
 from runpy import run_module
-import subprocess
 
 import pytest
 import yaml
