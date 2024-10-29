@@ -445,11 +445,18 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
         # Sublayer absolute effect explained.
         sublayer_explained += abs(up_values).sum().item()
+        if "error" in up_layer_module:
+            up_values = up_values.sum().unsqueeze(0)
+            top_values = up_values
+            bottom_values = up_values
+        else:
+            top_values, top_indices = t.topk(
+                up_values, NUM_UP_NODES, largest=True
+            )
+            bottom_values, bottom_indices = t.topk(
+                up_values, NUM_UP_NODES, largest=False
+            )
 
-        top_values, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
-        bottom_values, bottom_indices = t.topk(
-            up_values, NUM_UP_NODES, largest=False
-        )
         color_max_scalar: float = top_values[0].item()
         color_min_scalar: float = bottom_values[0].item()
 
