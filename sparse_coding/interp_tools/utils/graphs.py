@@ -436,6 +436,8 @@ def neuronpedia_api(
         url_post: str = url_post_attn
     elif sublayer_type == "mlp":
         url_post: str = url_post_mlp
+    elif "error" in sublayer_type:
+        return ""
     else:
         raise ValueError("Sublayer type not recognized:", sublayer_type)
 

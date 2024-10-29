@@ -410,31 +410,31 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     down_layer_module: str = "".join(down_layer_split[:-1])
 
     # Graph error statistics.
-    if "error" in up_layer_module and "error" not in down_layer_module:
-        sublayer_unexplained: float = 0.0
-        for down_dim, up_values in down_nodes.items():
-            up_values = up_values.squeeze()
-            if up_values.dim() == 2:
-                up_values = up_values[-1, :]
-            assert up_values.dim() == 1
+    # if "error" in up_layer_module and "error" not in down_layer_module:
+    #     sublayer_unexplained: float = 0.0
+    #     for down_dim, up_values in down_nodes.items():
+    #         up_values = up_values.squeeze()
+    #         if up_values.dim() == 2:
+    #             up_values = up_values[-1, :]
+    #         assert up_values.dim() == 1
 
-            # Sublayer absolute effect unexplained.
-            sublayer_unexplained += abs(up_values).sum().item()
+    #         # Sublayer absolute effect unexplained.
+    #         sublayer_unexplained += abs(up_values).sum().item()
 
-        # Store sublayer unexplained effect.
-        if down_layer_str not in unexplained_dict:
-            unexplained_dict[down_layer_str] = sublayer_unexplained
-        else:
-            unexplained_dict[down_layer_str] += sublayer_unexplained
+    #     # Store sublayer unexplained effect.
+    #     if down_layer_str not in unexplained_dict:
+    #         unexplained_dict[down_layer_str] = sublayer_unexplained
+    #     else:
+    #         unexplained_dict[down_layer_str] += sublayer_unexplained
 
-        # Log overall unexplained effect.
-        effect_unexplained += sublayer_unexplained
+    #     # Log overall unexplained effect.
+    #     effect_unexplained += sublayer_unexplained
 
-        continue
+    #     continue
 
     # All errors are skipped during graphing.
-    if "error" in up_layer_module or "error" in down_layer_module:
-        continue
+    # if "error" in up_layer_module or "error" in down_layer_module:
+    #     continue
 
     sublayer_explained: float = 0.0
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
@@ -606,21 +606,21 @@ total_frac_explained = round(
     effect_explained / (effect_explained + effect_unexplained), 2
 )
 
-for i in explained_dict:
-    assert i in unexplained_dict
-for i in unexplained_dict:
-    assert i in explained_dict
+# for i in explained_dict:
+#     assert i in unexplained_dict
+# for i in unexplained_dict:
+#     assert i in explained_dict
 
 label: str = ""
-for i, explained in explained_dict.items():
-    if explained + unexplained_dict[i] == 0.0:
-        sublayer_frac_explained: float = 0.0
-        print(f"Sublayer {i} logged 0.0 effects in neurons and autoencoder.")
-    else:
-        sublayer_frac_explained = round(
-            explained / (explained + unexplained_dict[i]), 2
-        )
-    label += f"\n{i}: ~{sublayer_frac_explained*100}%"
+# for i, explained in explained_dict.items():
+#     if explained + unexplained_dict[i] == 0.0:
+#         sublayer_frac_explained: float = 0.0
+#         print(f"Sublayer {i} logged 0.0 effects in neurons and autoencoder.")
+#     else:
+#         sublayer_frac_explained = round(
+#             explained / (explained + unexplained_dict[i]), 2
+#         )
+#     label += f"\n{i}: ~{sublayer_frac_explained*100}%"
 
 # Nuke singleton nodes.
 for node in graph.nodes():
