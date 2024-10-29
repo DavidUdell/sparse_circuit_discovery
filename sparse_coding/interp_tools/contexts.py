@@ -27,12 +27,12 @@ import wandb
 from sparse_coding.interp_tools.utils.computations import Encoder
 from sparse_coding.utils import top_contexts
 from sparse_coding.utils.interface import (
-    parse_slice,
-    slice_to_range,
     load_input_token_ids,
-    sanitize_model_name,
     load_yaml_constants,
+    parse_slice,
+    sanitize_model_name,
     save_paths,
+    slice_to_range,
 )
 
 
