@@ -465,7 +465,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             if effect == 0.0:
                 continue
 
-            if "res" in up_layer_module:
+            if "error" in up_layer_module:
+                info: str | None = None
+            elif "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
             elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
@@ -475,46 +477,60 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
 
-            try:
-                graph.add_node(
-                    up_dim_name,
-                    label=label_highlighting(
+            if info is not None:
+                # Autoencoder up nodes
+                try:
+                    graph.add_node(
+                        up_dim_name,
+                        label=label_highlighting(
+                            up_layer_idx,
+                            up_dim,
+                            MODEL_DIR,
+                            info,
+                            0,
+                            tokenizer,
+                            up_dim_name,
+                            {},
+                            __file__,
+                            neuronpedia=True,
+                            sublayer_type=up_layer_module,
+                            top_k=TOP_K,
+                            view=VIEW,
+                            neuronpedia_key=NEURONPEDIA_KEY,
+                        ),
+                        shape="box",
+                    )
+                except ValueError:
+                    label: str = (
+                        '<<table border="0" cellborder="0" cellspacing="0">'
+                    )
+                    label += '<tr><td><font point-size="16"><b>'
+                    label += up_dim_name
+                    label += "</b></font></td></tr>"
+                    label += neuronpedia_api(
                         up_layer_idx,
                         up_dim,
-                        MODEL_DIR,
-                        info,
-                        0,
-                        tokenizer,
-                        up_dim_name,
-                        {},
-                        __file__,
-                        neuronpedia=True,
-                        sublayer_type=up_layer_module,
-                        top_k=TOP_K,
-                        view=VIEW,
-                        neuronpedia_key=NEURONPEDIA_KEY,
-                    ),
-                    shape="box",
-                )
-            except ValueError:
+                        NEURONPEDIA_KEY,
+                        up_layer_module,
+                        TOP_K,
+                        VIEW,
+                    )
+                    label += "</table>>"
+                    graph.add_node(up_dim_name, label=label, shape="box")
+            else:
+                # Error up nodes
                 label: str = (
                     '<<table border="0" cellborder="0" cellspacing="0">'
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += up_dim_name
                 label += "</b></font></td></tr>"
-                label += neuronpedia_api(
-                    up_layer_idx,
-                    up_dim,
-                    NEURONPEDIA_KEY,
-                    up_layer_module,
-                    TOP_K,
-                    VIEW,
-                )
                 label += "</table>>"
                 graph.add_node(up_dim_name, label=label, shape="box")
 
-            if "res" in down_layer_module:
+            if "error" in down_layer_module:
+                info: str | None = None
+            elif "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
@@ -524,42 +540,54 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
 
-            try:
-                graph.add_node(
-                    down_dim_name,
-                    label=label_highlighting(
+            if info is not None:
+                # Autoencoder down nodes
+                try:
+                    graph.add_node(
+                        down_dim_name,
+                        label=label_highlighting(
+                            down_layer_idx,
+                            down_dim,
+                            MODEL_DIR,
+                            info,
+                            0,
+                            tokenizer,
+                            down_dim_name,
+                            {},
+                            __file__,
+                            neuronpedia=True,
+                            sublayer_type=down_layer_module,
+                            top_k=TOP_K,
+                            view=VIEW,
+                            neuronpedia_key=NEURONPEDIA_KEY,
+                        ),
+                        shape="box",
+                    )
+                except ValueError:
+                    label: str = (
+                        '<<table border="0" cellborder="0" cellspacing="0">'
+                    )
+                    label += '<tr><td><font point-size="16"><b>'
+                    label += down_dim_name
+                    label += "</b></font></td></tr>"
+                    label += neuronpedia_api(
                         down_layer_idx,
                         down_dim,
-                        MODEL_DIR,
-                        info,
-                        0,
-                        tokenizer,
-                        down_dim_name,
-                        {},
-                        __file__,
-                        neuronpedia=True,
-                        sublayer_type=down_layer_module,
-                        top_k=TOP_K,
-                        view=VIEW,
-                        neuronpedia_key=NEURONPEDIA_KEY,
-                    ),
-                    shape="box",
-                )
-            except ValueError:
+                        NEURONPEDIA_KEY,
+                        down_layer_module,
+                        TOP_K,
+                        VIEW,
+                    )
+                    label += "</table>>"
+                    graph.add_node(down_dim_name, label=label, shape="box")
+            else:
+                # Error down nodes
                 label: str = (
                     '<<table border="0" cellborder="0" cellspacing="0">'
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += down_dim_name
                 label += "</b></font></td></tr>"
-                label += neuronpedia_api(
-                    down_layer_idx,
-                    down_dim,
-                    NEURONPEDIA_KEY,
-                    down_layer_module,
-                    TOP_K,
-                    VIEW,
-                )
                 label += "</table>>"
                 graph.add_node(down_dim_name, label=label, shape="box")
 
