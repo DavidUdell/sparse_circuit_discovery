@@ -21,6 +21,7 @@ setup(
         "matplotlib",
         "nnsight",
         "numpy",
+        "plotly",
         "pygraphviz",
         "pytest",
         "PyYAML",

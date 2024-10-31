@@ -7,6 +7,7 @@ Histograms from autoencoder activations, to set distribution-aware thresholds.
 import warnings
 
 import numpy as np
+import plotly
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
@@ -128,6 +129,11 @@ for layer_idx in seq_layer_indices:
             )
         )
 
+        projected_acts = model(layer_acts_data)
+        hist = t.histc(projected_acts)
+
+        plot = plotly.plot(hist.cpu(), "hist")
+        plot.show()
 
 # %%
 # Wrap up logging
