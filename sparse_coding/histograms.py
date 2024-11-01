@@ -141,7 +141,7 @@ for layer_idx in seq_layer_indices:
 
         plot = px.histogram(
             projected_acts.cpu().detach().numpy(),
-            title=f"Layer {layer_idx} {acts_file}",
+            title=f"Layer {layer_idx} {acts_file.split('_')[0]} Activations",
         )
         plot.show()
         print("\n")
