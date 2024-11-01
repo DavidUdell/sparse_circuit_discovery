@@ -134,10 +134,10 @@ for layer_idx in seq_layer_indices:
         print("shape: ", projected_acts.shape)
         print("max: ", projected_acts.max().item())
         print("min: ", projected_acts.min().item())
+        print("zeroes: ", (projected_acts == 0).sum().item())
+        print("non-trivials: ", (projected_acts > 1e-6).sum().item())
         print("mean: ", projected_acts.mean().item())
         print("sd: ", projected_acts.std().item())
-        print("zeroes: ", (projected_acts == 0).sum().item())
-        print(projected_acts.detach())
 
         hist = (
             t.histc(projected_acts, min=1e-6, max=projected_acts.max().item())
@@ -151,6 +151,7 @@ for layer_idx in seq_layer_indices:
             text_auto=True,
         )
         plot.show()
+        print("\n")
 
 # %%
 # Wrap up logging
