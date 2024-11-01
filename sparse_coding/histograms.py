@@ -148,7 +148,7 @@ for layer_idx in seq_layer_indices:
         plot = px.histogram(
             hist,
             labels={"value": "activation"},
-            text_auto=True,
+            title=f"Layer {layer_idx} {acts_file}",
         )
         plot.show()
         print("\n")
