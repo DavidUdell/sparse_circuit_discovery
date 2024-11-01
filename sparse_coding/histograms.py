@@ -136,6 +136,7 @@ for layer_idx in seq_layer_indices:
         print("min: ", projected_acts.min().item())
         print("mean: ", projected_acts.mean().item())
         print("sd: ", projected_acts.std().item())
+        print("zeroes: ", (projected_acts == 0).sum().item())
         print(projected_acts.detach())
 
         hist = (
