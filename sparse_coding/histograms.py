@@ -139,15 +139,8 @@ for layer_idx in seq_layer_indices:
         print("mean: ", projected_acts.mean().item())
         print("sd: ", projected_acts.std().item())
 
-        hist = (
-            t.histc(projected_acts, min=1e-6, max=projected_acts.max().item())
-            .cpu()
-            .detach()
-            .numpy()
-        )
         plot = px.histogram(
-            hist,
-            labels={"value": "activation"},
+            projected_acts.cpu().detach().numpy(),
             title=f"Layer {layer_idx} {acts_file}",
         )
         plot.show()
