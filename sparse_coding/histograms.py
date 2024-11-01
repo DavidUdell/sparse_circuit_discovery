@@ -129,9 +129,26 @@ for layer_idx in seq_layer_indices:
             )
         )
 
-        projected_acts = model(layer_acts_data)[:, -1, :]
-        hist = t.histc(projected_acts).cpu().detach().numpy()
-        plot = px.histogram(hist)
+        projected_acts = model(layer_acts_data)[:, -1, :].squeeze()
+
+        print("shape: ", projected_acts.shape)
+        print("max: ", projected_acts.max().item())
+        print("min: ", projected_acts.min().item())
+        print("mean: ", projected_acts.mean().item())
+        print("sd: ", projected_acts.std().item())
+        print(projected_acts.detach())
+
+        hist = (
+            t.histc(projected_acts, min=1e-6, max=projected_acts.max().item())
+            .cpu()
+            .detach()
+            .numpy()
+        )
+        plot = px.histogram(
+            hist,
+            labels={"value": "activation"},
+            text_auto=True,
+        )
         plot.show()
 
 # %%
