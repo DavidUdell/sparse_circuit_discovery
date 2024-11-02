@@ -60,13 +60,6 @@ wandb.init(
     config=config,
 )
 
-
-# %%
-# Compute histograms functionality
-def histograms():
-    """Compute histograms with `t.histc`."""
-
-
 # %%
 # Loop over all the model layers in the slice.
 accelerator: Accelerator = Accelerator()
@@ -131,17 +124,12 @@ for layer_idx in seq_layer_indices:
 
         projected_acts = model(layer_acts_data)[:, -1, :].squeeze()
 
-        print("shape: ", projected_acts.shape)
-        print("max: ", projected_acts.max().item())
-        print("min: ", projected_acts.min().item())
-        print("zeroes: ", (projected_acts == 0).sum().item())
-        print("non-trivials: ", (projected_acts > 1e-6).sum().item())
-        print("mean: ", projected_acts.mean().item())
-        print("sd: ", projected_acts.std().item())
-
         plot = px.histogram(
             projected_acts.cpu().detach().numpy(),
-            title=f"Layer {layer_idx} {acts_file.split('_')[0]} Activations",
+            labels={"value": "magnitude"},
+            marginal="box",
+            range_x=[1e-10, projected_acts.max().item()],
+            title=f"Layer {layer_idx} {acts_file.split('_')[0]}",
         )
         plot.show()
         print("\n")
