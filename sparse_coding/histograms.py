@@ -111,6 +111,7 @@ for layer_idx in seq_layer_indices:
             t.load(acts_path, weights_only=True)
         )
 
+        title: str = f"Layer {layer_idx} {acts_file.split('_')[0]}"
         # Reassigning model variable to tell the garbage collector we're done
         # with it now.
         model: Encoder = accelerator.prepare(
@@ -122,14 +123,21 @@ for layer_idx in seq_layer_indices:
             )
         )
 
-        projected_acts = model(layer_acts_data)[:, -1, :].squeeze()
+        projected_acts: np.ndarray = (
+            model(layer_acts_data)[:, -1, :].squeeze().cpu().detach().numpy()
+        )
+        percentile = np.percentile(projected_acts, 99.99)
+        percentile = round(percentile, 2)
+
+        print(title, "99.99th percentile:")
+        print(percentile)
 
         plot = px.histogram(
-            projected_acts.cpu().detach().numpy(),
+            projected_acts,
             labels={"value": "magnitude"},
             marginal="box",
             range_x=[1e-10, projected_acts.max().item()],
-            title=f"Layer {layer_idx} {acts_file.split('_')[0]}",
+            title=title,
         )
         plot.show()
         print("\n")
