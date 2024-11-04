@@ -87,6 +87,8 @@ mlp = {
     "biases": MLP_BIASES_FILE,
 }
 
+percentiles_dict: dict[str, float] = {}
+
 for layer_idx in seq_layer_indices:
     for sublayer in [resid, attn, mlp]:
         acts_file: str = sublayer["acts"]
@@ -111,7 +113,14 @@ for layer_idx in seq_layer_indices:
             t.load(acts_path, weights_only=True)
         )
 
-        title: str = f"Layer {layer_idx} {acts_file.split('_')[0]}"
+        module_type: str = acts_file.split("_")[0]
+        append: str = f"{module_type}_percentile.csv"
+        percentile_path: str = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{append}",
+        )
+
+        graph_title: str = f"Layer {layer_idx} {module_type}"
         # Reassigning model variable to tell the garbage collector we're done
         # with it now.
         model: Encoder = accelerator.prepare(
@@ -129,12 +138,14 @@ for layer_idx in seq_layer_indices:
         percentile = np.percentile(projected_acts, 99.99)
         percentile = round(percentile, 2)
 
+        percentiles_dict[percentile_path] = percentile
+
         plot = px.histogram(
             projected_acts,
             labels={"value": "magnitude"},
             marginal="box",
             range_x=[1e-10, projected_acts.max().item()],
-            title=title,
+            title=graph_title,
         )
         # Add 99.99th percentile line to plot
         plot.add_vline(
@@ -147,6 +158,14 @@ for layer_idx in seq_layer_indices:
         )
         plot.show()
         print("\n")
+
+# %%
+# Save percentiles to csv
+for path, threshold in percentiles_dict.items():
+    np.savetxt(
+        path,
+        [threshold],
+    )
 
 # %%
 # Wrap up logging
