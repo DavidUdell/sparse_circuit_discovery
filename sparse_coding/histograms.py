@@ -129,15 +129,21 @@ for layer_idx in seq_layer_indices:
         percentile = np.percentile(projected_acts, 99.99)
         percentile = round(percentile, 2)
 
-        print(title, "99.99th percentile:")
-        print(percentile)
-
         plot = px.histogram(
             projected_acts,
             labels={"value": "magnitude"},
             marginal="box",
             range_x=[1e-10, projected_acts.max().item()],
             title=title,
+        )
+        # Add 99.99th percentile line to plot
+        plot.add_vline(
+            annotation_position="top right",
+            annotation_text=f"99.99th percentile: {percentile}",
+            line_color="red",
+            line_dash="dash",
+            line_width=1.5,
+            x=percentile,
         )
         plot.show()
         print("\n")
