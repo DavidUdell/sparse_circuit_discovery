@@ -98,6 +98,7 @@ LOGIT_TOKENS: 10
 # `wandb` logging
 WANDB_PROJECT: "sparse_circuit_discovery"
 WANDB_ENTITY: "davidudell"
+# WANDB_MODE: "disabled"
 
 # Reproducibility
 SEED: 0

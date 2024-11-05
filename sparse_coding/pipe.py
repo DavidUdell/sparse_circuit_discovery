@@ -1,8 +1,11 @@
 """Run the main sparse coding pipeline in one command."""
 
+import os
 from textwrap import dedent
 
 from runpy import run_module
+
+from sparse_coding.utils.interface import load_yaml_constants
 
 
 print(
@@ -15,6 +18,12 @@ print(
         """
     )
 )
+
+# export WANDB_MODE, if set in config
+_, config = load_yaml_constants(__file__)
+WANDB_MODE = config.get("WANDB_MODE")
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 for script in [
     "collect_acts",

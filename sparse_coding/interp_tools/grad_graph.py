@@ -6,6 +6,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 """
 
 
+import os
 import re
 
 import requests
@@ -49,6 +50,7 @@ access, config = load_yaml_constants(__file__)
 NEURONPEDIA_KEY = access.get("NEURONPEDIA_KEY")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -77,6 +79,9 @@ VIEW = config.get("VIEW")
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
 
+# export WANDB_MODE, if set in config
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Neuronpedia API test call.
