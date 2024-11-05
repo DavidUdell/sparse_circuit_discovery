@@ -6,6 +6,7 @@ Requires a HF access token to get `Llama-2`'s tokenizer.
 """
 
 
+import os
 import warnings
 import csv
 from collections import defaultdict
@@ -47,6 +48,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -76,6 +78,9 @@ if config.get("N_DIMS_PRINTED_OVERRIDE") is not None:
     N_DIMS_PRINTED = config.get("N_DIMS_PRINTED_OVERRIDE")
 else:
     N_DIMS_PRINTED = PROJECTION_DIM
+
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Reproducibility.
