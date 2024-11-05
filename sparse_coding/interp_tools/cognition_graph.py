@@ -324,6 +324,7 @@ for ablate_layer_idx in ablate_layer_range:
             )
 
             color_min, color_max = color_range_from_scalars(activation_diff)
+            red, blue = None, None
             if effect > 0.0:
                 red: int = 0
                 blue: int = 255
