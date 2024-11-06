@@ -14,11 +14,16 @@ WANDB_MODE = config.get("WANDB_MODE")
 if WANDB_MODE:
     os.environ["WANDB_MODE"] = WANDB_MODE
 
-for script in [
+# Run from any pwd
+prepend: list[str] = __file__.split("/")[:-1]
+prepend: str = "/".join(prepend)
+
+for append in [
     "collect_acts.py",
     "precluster.py",
     "load_autoencoder.py",
     "interp_tools/contexts.py",
     "interp_tools/grad_graph.py",
 ]:
-    run(["python3", script], check=True)
+    path = f"{prepend}/{append}"
+    run(["python3", path], check=True)
