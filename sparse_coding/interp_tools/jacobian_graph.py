@@ -2,6 +2,8 @@
 """A constant-time causal graphing algorithm."""
 
 
+import os
+
 import torch as t
 from accelerate import Accelerator
 from pygraphviz import AGraph
@@ -35,6 +37,7 @@ _, config = load_yaml_constants(__file__)
 
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -49,6 +52,9 @@ LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 
 NUM_TOP_EFFECTS: int = 10
+
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Reproducibility.

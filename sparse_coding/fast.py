@@ -4,15 +4,8 @@ import os
 
 from subprocess import run
 
-from sparse_coding.utils.interface import load_yaml_constants
 
 os.environ["WANDB_SILENT"] = "true"
-
-# export WANDB_MODE, if set in config
-_, config = load_yaml_constants(__file__)
-WANDB_MODE = config.get("WANDB_MODE")
-if WANDB_MODE:
-    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # Run from any pwd
 prepend: list[str] = __file__.split("/")[:-1]

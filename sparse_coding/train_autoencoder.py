@@ -7,6 +7,7 @@ is your learned dictionary.
 """
 
 
+import os
 import warnings
 
 import numpy as np
@@ -38,6 +39,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 SEED = config.get("SEED")
 ACTS_DATA_FILE = config.get("ACTS_DATA_FILE")
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -59,6 +61,9 @@ SYNC_DIST_LOGGING = config.get("SYNC_DIST_LOGGING", True)
 # For smaller autoencoders, larger batch sizes are possible.
 TRAINING_BATCH_SIZE = config.get("TRAINING_BATCH_SIZE", 16)
 ACCUMULATE_GRAD_BATCHES = config.get("ACCUMULATE_GRAD_BATCHES", 1)
+
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Use available tensor cores.
@@ -222,17 +227,13 @@ for layer_idx in seq_layer_indices:
             encoded_state, output_state = self.forward(masked_data)
 
             pass_activity: t.Tensor = encoded_state.sum((0, 1))
-            self.total_activity += pass_activity.to(
-                self.total_activity.device
-            )
+            self.total_activity += pass_activity.to(self.total_activity.device)
             total_inactive = (self.total_activity == 0.0).sum().item()
 
             pass_frac_inactive = (
-                (pass_activity == 0.0).sum().item() / PROJECTION_DIM
-            )
-            total_frac_inactive: float = (
-                total_inactive / PROJECTION_DIM
-            )
+                pass_activity == 0.0
+            ).sum().item() / PROJECTION_DIM
+            total_frac_inactive: float = total_inactive / PROJECTION_DIM
 
             print(f"pass_frac_inactive: {round(pass_frac_inactive, 2)}\n")
             print(f"total_frac_inactive: {round(total_frac_inactive, 2)}\n")
