@@ -2,8 +2,8 @@
 """
 Mess with autoencoder activation dims during `truthful_qa` and graph effects.
 
-`cognition_graph_mc` in particular tries a model agains the multiple-choice task
-on `truthful_qa`, where the model is teed up to answer a m/c question with
+`cognition_graph_mc` in particular tries a model agains the multiple-choice
+task on `truthful_qa`, where the model is teed up to answer a m/c question with
 widely believed but false choices. The base task is compared to the task in
 which autoencoder activations dimensions are surgically scaled during
 inference, at the crucial last sequence position, where the model is answering.
