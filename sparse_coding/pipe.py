@@ -1,9 +1,18 @@
 """Run the main sparse coding pipeline in one command."""
 
+import os
+import sys
 from textwrap import dedent
 
 from runpy import run_module
 
+
+os.environ["WANDB_SILENT"] = "true"
+
+# Run from any pwd
+path_to_dir: str = os.path.dirname(__file__)
+if path_to_dir not in sys.path:
+    sys.path.insert(0, path_to_dir)
 
 print(
     dedent(
@@ -16,13 +25,10 @@ print(
     )
 )
 
-for script in [
+for submodule in [
     "collect_acts",
     "load_autoencoder",
     "interp_tools.contexts",
     "interp_tools.cognition_graph",
 ]:
-    try:
-        run_module(f"sparse_coding.{script}")
-    except Exception as e:  # pylint: disable=broad-except
-        print(f"Error at script {script}: {e}")
+    run_module(f"sparse_coding.{submodule}")

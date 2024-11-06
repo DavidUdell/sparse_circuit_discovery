@@ -4,17 +4,17 @@ import os
 
 from subprocess import run
 
-from sparse_coding.utils.interface import load_yaml_constants
 
-# export WANDB_MODE, if set in config
-_, config = load_yaml_constants(__file__)
-WANDB_MODE = config.get("WANDB_MODE")
-if WANDB_MODE:
-    os.environ["WANDB_MODE"] = WANDB_MODE
+os.environ["WANDB_SILENT"] = "true"
 
-for script in [
-    "collect_acts",
-    "load_autoencoder",
-    "histograms",
+# Run from any pwd
+dirname: list[str] = __file__.split("/")[:-1]
+dirname: str = "/".join(dirname)
+
+for basename in [
+    "collect_acts.py",
+    "load_autoencoder.py",
+    "histograms.py",
 ]:
-    run(["python3", script], check=True)
+    path: str = f"{dirname}/{basename}"
+    run(["python3", path], check=True)

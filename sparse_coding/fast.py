@@ -8,15 +8,15 @@ from subprocess import run
 os.environ["WANDB_SILENT"] = "true"
 
 # Run from any pwd
-prepend: list[str] = __file__.split("/")[:-1]
-prepend: str = "/".join(prepend)
+dirname: list[str] = __file__.split("/")[:-1]
+dirname: str = "/".join(dirname)
 
-for append in [
+for basename in [
     "collect_acts.py",
     "precluster.py",
     "load_autoencoder.py",
     "interp_tools/contexts.py",
     "interp_tools/grad_graph.py",
 ]:
-    path = f"{prepend}/{append}"
+    path = f"{dirname}/{basename}"
     run(["python3", path], check=True)
