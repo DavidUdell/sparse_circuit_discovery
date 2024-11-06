@@ -609,6 +609,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             elif effect < 0.0:
                 red, green = 255, 0
             else:
+                # Satisfies linter
                 raise ValueError("Should be unreachable.")
 
             alpha: int = int(

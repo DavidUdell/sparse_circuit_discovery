@@ -239,6 +239,9 @@ for i, effect in zip(pos_indices.tolist(), pos_values.tolist()):
         red, green = 0, 255
     elif effect < 0.0:
         red, green = 255, 0
+    else:
+        # Satisfies linter
+        raise ValueError("Should be unreachable.")
 
     alpha: int = int(
         255 * magnitude / max(abs(color_max_scalar), abs(color_min_scalar))
