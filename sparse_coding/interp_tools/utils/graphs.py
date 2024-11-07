@@ -429,8 +429,8 @@ def neuronpedia_api(
     url_post_attn: str = "-att_128k-oai/"
     url_post_mlp: str = "-mlp_128k-oai/"
 
-    # sublayer_type: str = "res" | "attn" | "mlp"
-    if sublayer_type == "res":
+    # sublayer_type: str = "resid" | "attn" | "mlp"
+    if sublayer_type == "resid":
         url_post: str = url_post_res
     elif sublayer_type == "attn":
         url_post: str = url_post_attn
