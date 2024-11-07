@@ -222,11 +222,11 @@ for layer_idx in layer_range:
                 reader = csv.reader(f)
                 for row in reader:
                     percentile: float = float(row[0])
-                    percentiles[f"{layer_idx}_{sublayer}"] = percentile
+                    percentiles[f"{sublayer}_{layer_idx}"] = percentile
                     print(f"{printable} found:", round(percentile, 2))
 
         except FileNotFoundError:
-            percentiles[f"{layer_idx}_{sublayer}"] = None
+            percentiles[f"{sublayer}_{layer_idx}"] = None
             print(f"{printable} not found; using top-k")
 
 # %%
@@ -289,7 +289,7 @@ with grads_manager(
 
     # Add model_dim activations to acts_dict, if needed.
     for grad in grads_dict:
-        if "res_error" in grad:
+        if "resid_error" in grad:
             idx: int = int(grad.split("_")[-1])
             act: t.Tensor = output.hidden_states[idx]
             acts_dict[grad] = act
@@ -304,10 +304,10 @@ with grads_manager(
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        if re.match("res_", loc) is not None:
-            mlp_confound: str = re.sub("(res_error_|res_)", "mlp_", loc)
+        if re.match("resid_", loc) is not None:
+            mlp_confound: str = re.sub("(resid_error_|resid_)", "mlp_", loc)
             mlp_error_confound: str = re.sub(
-                "(res_error_|res_)", "mlp_error_", loc
+                "(resid_error_|resid_)", "mlp_error_", loc
             )
             # The jvp at an activation is a scalar with gradient tracking that
             # represents how well the model would do on the loss metric in that
@@ -333,6 +333,7 @@ with grads_manager(
 
             _, jvp_grads = acts_and_grads
 
+        # Thresholding down nodes -> list of indices, weighted_prod
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
         if weighted_prod.dim() == 2:
             # Single-token prompt edge case.
@@ -340,7 +341,9 @@ with grads_manager(
         else:
             weighted_prod = weighted_prod[:, -1, :].squeeze()
 
-        # Thresholding autoencoders.
+        percentile: float | None = percentiles.get(loc, None)
+        print(f"{loc}: ", percentile)
+
         if "error_" not in loc:
             _, top_indices = t.topk(
                 weighted_prod, NUM_DOWN_NODES, largest=True
@@ -358,6 +361,7 @@ with grads_manager(
             indices: list = [0]
         else:
             raise ValueError("Module location not recognized.")
+        # End thresholding down nodes
 
         for dim_idx in tqdm(indices, desc=loc):
             weighted_prod[dim_idx].backward(retain_graph=True)
@@ -368,20 +372,20 @@ with grads_manager(
             if up_layer_idx not in layer_range:
                 continue
 
-            # res_x
+            # resid_x
             # mlp_x
             # attn_x
-            # res_error_x
+            # resid_error_x
             # mlp_error_x
             # attn_error_x
             if "attn_" in loc:
-                # Upstream res_
-                marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
+                # Upstream resid_
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"res_{up_layer_idx}"].cpu()
-                marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
+                ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"res_error_{up_layer_idx}"].cpu()
+                ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
                 # Same-layer attn_
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
@@ -390,21 +394,21 @@ with grads_manager(
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
-            elif "res_" in loc:
-                # Upstream res_; double-counting corrections.
-                marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
+            elif "resid_" in loc:
+                # Upstream resid_; double-counting corrections.
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
-                    marginal_grads[f"res_{up_layer_idx}"]
+                    marginal_grads[f"resid_{up_layer_idx}"]
                     - jvp_grads[  # pylint: disable=possibly-used-before-assignment
-                        f"res_{up_layer_idx}"
+                        f"resid_{up_layer_idx}"
                     ]
                 ).cpu()
-                marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
-                    marginal_grads[f"res_error_{up_layer_idx}"]
-                    - jvp_grads[f"res_error_{up_layer_idx}"]
+                    marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - jvp_grads[f"resid_error_{up_layer_idx}"]
                 ).cpu()
 
                 # Same-layer mlp_
@@ -485,6 +489,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             top_values = up_values
             bottom_values = up_values
         else:
+            # Up node thresholding
             top_values, top_indices = t.topk(
                 up_values, NUM_UP_NODES, largest=True
             )
