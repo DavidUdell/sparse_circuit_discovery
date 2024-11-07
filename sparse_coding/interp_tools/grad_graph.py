@@ -6,6 +6,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 """
 
 
+import csv
 import os
 import re
 
@@ -198,6 +199,35 @@ mlp_dec_and_biases, _ = prepare_autoencoder_and_indices(
     accelerator,
     __file__,
 )
+
+# %%
+# Load percentile thresholds, if available.
+percentiles: dict = {}
+
+for layer_idx in layer_range:
+    for basename in [
+        "resid_percentile.csv",
+        "attn_percentile.csv",
+        "mlp_percentile.csv",
+    ]:
+        percentile_path: str = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{basename}",
+        )
+        sublayer: str = basename.split("_", maxsplit=1)[0]
+        printable: str = f"Layer {layer_idx} {sublayer} percentile threshold"
+
+        try:
+            with open(percentile_path, encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    percentile: float = float(row[0])
+                    percentiles[f"{layer_idx}_{sublayer}"] = percentile
+                    print(f"{printable} found:", round(percentile, 2))
+
+        except FileNotFoundError:
+            percentiles[f"{layer_idx}_{sublayer}"] = None
+            print(f"{printable} not found; using top-k")
 
 # %%
 # Load preexisting graph, if available.
