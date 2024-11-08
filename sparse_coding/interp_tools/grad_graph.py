@@ -333,35 +333,47 @@ with grads_manager(
 
             _, jvp_grads = acts_and_grads
 
-        # Thresholding down nodes -> list of indices, weighted_prod
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
+        # Standardize weighted_prod shape
         if weighted_prod.dim() == 2:
             # Single-token prompt edge case.
             weighted_prod = weighted_prod[-1, :].squeeze()
         else:
             weighted_prod = weighted_prod[:, -1, :].squeeze()
 
-        percentile: float | None = percentiles.get(loc, None)
-        print(f"{loc}: ", percentile)
-
-        if "error_" not in loc:
-            _, top_indices = t.topk(
-                weighted_prod, NUM_DOWN_NODES, largest=True
-            )
-            _, bottom_indices = t.topk(
-                weighted_prod, NUM_DOWN_NODES, largest=False
-            )
-            indices: list = list(
-                set(top_indices.tolist() + bottom_indices.tolist())
-            )
-        elif "error_" in loc:
-            # Sum across the error tensors, since we don't care about the edges
-            # into the neuron basis.
-            weighted_prod = weighted_prod.sum().unsqueeze(0)
-            indices: list = [0]
+        ### Thresholding down nodes -> indices
+        percentile: None | float = percentiles.get(loc, None)
+        if percentile is None:
+            if "error_" not in loc:
+                _, top_indices = t.topk(
+                    weighted_prod, NUM_DOWN_NODES, largest=True
+                )
+                _, bottom_indices = t.topk(
+                    weighted_prod, NUM_DOWN_NODES, largest=False
+                )
+                indices: list = list(
+                    set(top_indices.tolist() + bottom_indices.tolist())
+                )
+            elif "error_" in loc:
+                # Sum across the error tensors, since we don't care about the
+                # edges into the neuron basis.
+                weighted_prod = weighted_prod.sum().unsqueeze(0)
+                indices: list = [0]
+            else:
+                raise ValueError("Module location not recognized.")
         else:
-            raise ValueError("Module location not recognized.")
-        # End thresholding down nodes
+            # elif percentile is float
+            if acts_dict[loc].dim() == 2:
+                acts_tensor = acts_dict[loc][-1, :].squeeze()
+            else:
+                acts_tensor = acts_dict[loc][:, -1, :].squeeze()
+            thresh_tensor = t.full_like(acts_tensor, percentile)
+            gt_tensor = t.nn.functional.relu(acts_tensor - thresh_tensor)
+            indices: list | int = t.nonzero(gt_tensor).squeeze().tolist()
+            if isinstance(indices, int):
+                indices: list = [indices]
+            assert len(indices) > 0
+        ### End thresholding down nodes
 
         for dim_idx in tqdm(indices, desc=loc):
             weighted_prod[dim_idx].backward(retain_graph=True)
