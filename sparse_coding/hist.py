@@ -13,6 +13,7 @@ dirname: str = "/".join(dirname)
 
 for basename in [
     "collect_acts.py",
+    "precluster.py",
     "load_autoencoder.py",
     "histograms.py",
 ]:
