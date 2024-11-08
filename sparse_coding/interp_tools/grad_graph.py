@@ -341,7 +341,7 @@ with grads_manager(
         else:
             weighted_prod = weighted_prod[:, -1, :].squeeze()
 
-        ### Thresholding down-nodes -> indices
+        ####  Thresholding down-nodes -> indices  ####
         percentile: None | float = percentiles.get(loc, None)
         if percentile is None:
             if "error_" not in loc:
@@ -373,7 +373,7 @@ with grads_manager(
             if isinstance(indices, int):
                 indices: list = [indices]
             assert len(indices) > 0
-        ### End thresholding down-nodes
+        ####  End thresholding down-nodes  ####
 
         for dim_idx in tqdm(indices, desc=loc):
             weighted_prod[dim_idx].backward(retain_graph=True)
@@ -470,14 +470,13 @@ for edges_str, down_nodes in marginal_grads_dict.items():
         # Sublayer absolute effect explained.
         sublayer_explained += abs(up_values).sum().item()
 
-        ### Thresholding up-nodes -> top_values, bottom_values, indices
+        ###  Thresholding up-nodes  ###
         if "error" in up_layer_module:
             up_values = up_values.sum().unsqueeze(0)
             top_values = up_values
             bottom_values = up_values
             indices: list[int] = [0]
         else:
-            # Up node thresholding
             top_values, top_indices = t.topk(
                 up_values, NUM_UP_NODES, largest=True
             )
