@@ -484,13 +484,12 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             bottom_values, bottom_indices = t.topk(
                 up_values, NUM_UP_NODES, largest=False
             )
+            indices: list = list(
+                set(top_indices.tolist() + bottom_indices.tolist())
+            )
 
         color_max_scalar: float = top_values[0].item()
         color_min_scalar: float = bottom_values[0].item()
-
-        indices: list = list(
-            set(top_indices.tolist() + bottom_indices.tolist())
-        )
 
         for up_dim, effect in enumerate(up_values):
             if up_dim not in indices:
