@@ -6,7 +6,6 @@ Histograms from autoencoder activations, to set distribution-aware thresholds.
 
 import warnings
 
-# import plotly.express as px
 import numpy as np
 import torch as t
 from accelerate import Accelerator
@@ -139,25 +138,6 @@ for layer_idx in seq_layer_indices:
         percentile = round(percentile, 2)
 
         percentiles_dict[percentile_path] = percentile
-
-        # plot = px.histogram(
-        #     projected_acts,
-        #     labels={"value": "magnitude"},
-        #     marginal="box",
-        #     range_x=[1e-10, projected_acts.max().item()],
-        #     title=graph_title,
-        # )
-        # # Add 99.99th percentile line to plot
-        # plot.add_vline(
-        #     annotation_position="top right",
-        #     annotation_text=f"99.99th percentile: {percentile}",
-        #     line_color="red",
-        #     line_dash="dash",
-        #     line_width=1.5,
-        #     x=percentile,
-        # )
-        # plot.show()
-        # print("\n")
 
 # %%
 # Save percentiles to csv
