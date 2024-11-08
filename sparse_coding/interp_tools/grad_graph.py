@@ -469,10 +469,13 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
         # Sublayer absolute effect explained.
         sublayer_explained += abs(up_values).sum().item()
+
+        ### Thresholding up-nodes -> top_values, bottom_values, indices
         if "error" in up_layer_module:
             up_values = up_values.sum().unsqueeze(0)
             top_values = up_values
             bottom_values = up_values
+            indices: list[int] = [0]
         else:
             # Up node thresholding
             top_values, top_indices = t.topk(
