@@ -33,8 +33,6 @@ from sparse_coding.utils.top_contexts import unpad_activations
 access, config = load_yaml_constants(__file__)
 
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
-WANDB_PROJECT = config.get("WANDB_PROJECT")
-WANDB_ENTITY = config.get("WANDB_ENTITY")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -143,20 +141,19 @@ for layer_idx in acts_layers_range:
             if not any(c == KEEPER_CLUSTER_INDEX for c in seq_clusters):
                 continue
 
-            filtered_seq_acts = t.Tensor([])
+            filtered_seq_acts: list = []
             for c, act in zip(seq_clusters, seq_acts):
                 # Restore seq dimension
                 act = act.unsqueeze(0)
-                filtered_seq_acts = t.cat(
-                    [filtered_seq_acts.to(act.device), act]
-                )
+                filtered_seq_acts.append(act)
                 if c == KEEPER_CLUSTER_INDEX:
                     break
 
+            filtered_seq_acts: t.Tensor = t.cat(filtered_seq_acts, dim=0)
             # Restore batch dimension
             filtered_acts_list.append(filtered_seq_acts.unsqueeze(0))
 
-        max_seq_len: int = max(seq.shape[-1] for seq in filtered_acts_list)
+        max_seq_len: int = max(seq.shape[1] for seq in filtered_acts_list)
         padded_acts_list: list[t.Tensor] = [
             pad_activations(act, max_seq_len, accelerator)
             for act in filtered_acts_list

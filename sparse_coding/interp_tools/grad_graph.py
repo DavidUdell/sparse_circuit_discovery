@@ -6,6 +6,8 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 """
 
 
+import csv
+import os
 import re
 
 import requests
@@ -49,6 +51,7 @@ access, config = load_yaml_constants(__file__)
 NEURONPEDIA_KEY = access.get("NEURONPEDIA_KEY")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -77,6 +80,9 @@ VIEW = config.get("VIEW")
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
 
+# export WANDB_MODE, if set in config
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Neuronpedia API test call.
@@ -86,11 +92,12 @@ test_url: str = (
 test_response = requests.get(
     test_url,
     headers={
-        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Accept": "application/json",
         "Accept-Encoding": "gzip, deflate, br, zstd",
         "Accept-Language": "en-US,en;q=0.9",
         "Cache-Control": "max-age=0",
         "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "sparse_circuit_discovery",
         "X-Api-Key": NEURONPEDIA_KEY,
     },
     timeout=300,
@@ -194,6 +201,35 @@ mlp_dec_and_biases, _ = prepare_autoencoder_and_indices(
 )
 
 # %%
+# Load percentile thresholds, if available.
+percentiles: dict = {}
+
+for layer_idx in layer_range:
+    for basename in [
+        "resid_percentile.csv",
+        "attn_percentile.csv",
+        "mlp_percentile.csv",
+    ]:
+        percentile_path: str = save_paths(
+            __file__,
+            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{basename}",
+        )
+        sublayer: str = basename.split("_", maxsplit=1)[0]
+        printable: str = f"Layer {layer_idx} {sublayer} percentile threshold"
+
+        try:
+            with open(percentile_path, encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    percentile: float = float(row[0])
+                    percentiles[f"{sublayer}_{layer_idx}"] = percentile
+                    print(f"{printable} found:", round(percentile, 2))
+
+        except FileNotFoundError:
+            percentiles[f"{sublayer}_{layer_idx}"] = None
+            print(f"{printable} not found; using top-k")
+
+# %%
 # Load preexisting graph, if available.
 graph = load_preexisting_graph(MODEL_DIR, GRADS_DOT_FILE, __file__)
 
@@ -253,7 +289,7 @@ with grads_manager(
 
     # Add model_dim activations to acts_dict, if needed.
     for grad in grads_dict:
-        if "res_error" in grad:
+        if "resid_error" in grad:
             idx: int = int(grad.split("_")[-1])
             act: t.Tensor = output.hidden_states[idx]
             acts_dict[grad] = act
@@ -268,10 +304,10 @@ with grads_manager(
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        if re.match("res_", loc) is not None:
-            mlp_confound: str = re.sub("(res_error_|res_)", "mlp_", loc)
+        if re.match("resid_", loc) is not None:
+            mlp_confound: str = re.sub("(resid_error_|resid_)", "mlp_", loc)
             mlp_error_confound: str = re.sub(
-                "(res_error_|res_)", "mlp_error_", loc
+                "(resid_error_|resid_)", "mlp_error_", loc
             )
             # The jvp at an activation is a scalar with gradient tracking that
             # represents how well the model would do on the loss metric in that
@@ -298,30 +334,46 @@ with grads_manager(
             _, jvp_grads = acts_and_grads
 
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
+        # Standardize weighted_prod shape
         if weighted_prod.dim() == 2:
             # Single-token prompt edge case.
             weighted_prod = weighted_prod[-1, :].squeeze()
         else:
             weighted_prod = weighted_prod[:, -1, :].squeeze()
 
-        # Thresholding autoencoders.
-        if "error_" not in loc:
-            _, top_indices = t.topk(
-                weighted_prod, NUM_DOWN_NODES, largest=True
-            )
-            _, bottom_indices = t.topk(
-                weighted_prod, NUM_DOWN_NODES, largest=False
-            )
-            indices: list = list(
-                set(top_indices.tolist() + bottom_indices.tolist())
-            )
-        elif "error_" in loc:
-            # Sum across the error tensors, since we don't care about the edges
-            # into the neuron basis.
-            weighted_prod = weighted_prod.sum().unsqueeze(0)
-            indices: list = [0]
+        ####  Thresholding down-nodes -> indices  ####
+        percentile: None | float = percentiles.get(loc, None)
+        if percentile is None:
+            if "error_" not in loc:
+                _, top_indices = t.topk(
+                    weighted_prod, NUM_DOWN_NODES, largest=True
+                )
+                _, bottom_indices = t.topk(
+                    weighted_prod, NUM_DOWN_NODES, largest=False
+                )
+                indices: list = list(
+                    set(top_indices.tolist() + bottom_indices.tolist())
+                )
+            elif "error_" in loc:
+                # Sum across the error tensors, since we don't care about the
+                # edges into the neuron basis.
+                weighted_prod = weighted_prod.sum().unsqueeze(0)
+                indices: list = [0]
+            else:
+                raise ValueError("Module location not recognized.")
         else:
-            raise ValueError("Module location not recognized.")
+            # elif percentile is float
+            if acts_dict[loc].dim() == 2:
+                acts_tensor = acts_dict[loc][-1, :].squeeze()
+            else:
+                acts_tensor = acts_dict[loc][:, -1, :].squeeze()
+            thresh_tensor = t.full_like(acts_tensor, percentile)
+            gt_tensor = t.nn.functional.relu(acts_tensor - thresh_tensor)
+            indices: list | int = t.nonzero(gt_tensor).squeeze().tolist()
+            if isinstance(indices, int):
+                indices: list = [indices]
+            assert len(indices) > 0
+        ####  End thresholding down-nodes  ####
 
         for dim_idx in tqdm(indices, desc=loc):
             weighted_prod[dim_idx].backward(retain_graph=True)
@@ -332,20 +384,20 @@ with grads_manager(
             if up_layer_idx not in layer_range:
                 continue
 
-            # res_x
+            # resid_x
             # mlp_x
             # attn_x
-            # res_error_x
+            # resid_error_x
             # mlp_error_x
             # attn_error_x
             if "attn_" in loc:
-                # Upstream res_
-                marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
+                # Upstream resid_
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"res_{up_layer_idx}"].cpu()
-                marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
+                ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"res_error_{up_layer_idx}"].cpu()
+                ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
                 # Same-layer attn_
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
@@ -354,21 +406,21 @@ with grads_manager(
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
-            elif "res_" in loc:
-                # Upstream res_; double-counting corrections.
-                marginal_grads_dict[f"res_{up_layer_idx}_to_" + loc][
+            elif "resid_" in loc:
+                # Upstream resid_; double-counting corrections.
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
-                    marginal_grads[f"res_{up_layer_idx}"]
+                    marginal_grads[f"resid_{up_layer_idx}"]
                     - jvp_grads[  # pylint: disable=possibly-used-before-assignment
-                        f"res_{up_layer_idx}"
+                        f"resid_{up_layer_idx}"
                     ]
                 ).cpu()
-                marginal_grads_dict[f"res_error_{up_layer_idx}_to_" + loc][
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
-                    marginal_grads[f"res_error_{up_layer_idx}"]
-                    - jvp_grads[f"res_error_{up_layer_idx}"]
+                    marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - jvp_grads[f"resid_error_{up_layer_idx}"]
                 ).cpu()
 
                 # Same-layer mlp_
@@ -408,33 +460,6 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     up_layer_module: str = "".join(up_layer_split[:-1])
     down_layer_module: str = "".join(down_layer_split[:-1])
 
-    # Graph error statistics.
-    if "error" in up_layer_module and "error" not in down_layer_module:
-        sublayer_unexplained: float = 0.0
-        for down_dim, up_values in down_nodes.items():
-            up_values = up_values.squeeze()
-            if up_values.dim() == 2:
-                up_values = up_values[-1, :]
-            assert up_values.dim() == 1
-
-            # Sublayer absolute effect unexplained.
-            sublayer_unexplained += abs(up_values).sum().item()
-
-        # Store sublayer unexplained effect.
-        if down_layer_str not in unexplained_dict:
-            unexplained_dict[down_layer_str] = sublayer_unexplained
-        else:
-            unexplained_dict[down_layer_str] += sublayer_unexplained
-
-        # Log overall unexplained effect.
-        effect_unexplained += sublayer_unexplained
-
-        continue
-
-    # All errors are skipped during graphing.
-    if "error" in up_layer_module or "error" in down_layer_module:
-        continue
-
     sublayer_explained: float = 0.0
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         up_values = up_values.squeeze()
@@ -445,16 +470,25 @@ for edges_str, down_nodes in marginal_grads_dict.items():
         # Sublayer absolute effect explained.
         sublayer_explained += abs(up_values).sum().item()
 
-        top_values, top_indices = t.topk(up_values, NUM_UP_NODES, largest=True)
-        bottom_values, bottom_indices = t.topk(
-            up_values, NUM_UP_NODES, largest=False
-        )
+        ###  Thresholding up-nodes  ###
+        if "error" in up_layer_module:
+            up_values = up_values.sum().unsqueeze(0)
+            top_values = up_values
+            bottom_values = up_values
+            indices: list[int] = [0]
+        else:
+            top_values, top_indices = t.topk(
+                up_values, NUM_UP_NODES, largest=True
+            )
+            bottom_values, bottom_indices = t.topk(
+                up_values, NUM_UP_NODES, largest=False
+            )
+            indices: list = list(
+                set(top_indices.tolist() + bottom_indices.tolist())
+            )
+
         color_max_scalar: float = top_values[0].item()
         color_min_scalar: float = bottom_values[0].item()
-
-        indices: list = list(
-            set(top_indices.tolist() + bottom_indices.tolist())
-        )
 
         for up_dim, effect in enumerate(up_values):
             if up_dim not in indices:
@@ -464,7 +498,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             if effect == 0.0:
                 continue
 
-            if "res" in up_layer_module:
+            if "error" in up_layer_module:
+                info: str | None = None
+            elif "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
             elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
@@ -474,46 +510,60 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
 
-            try:
-                graph.add_node(
-                    up_dim_name,
-                    label=label_highlighting(
+            if info is not None:
+                # Autoencoder up nodes
+                try:
+                    graph.add_node(
+                        up_dim_name,
+                        label=label_highlighting(
+                            up_layer_idx,
+                            up_dim,
+                            MODEL_DIR,
+                            info,
+                            0,
+                            tokenizer,
+                            up_dim_name,
+                            {},
+                            __file__,
+                            neuronpedia=True,
+                            sublayer_type=up_layer_module,
+                            top_k=TOP_K,
+                            view=VIEW,
+                            neuronpedia_key=NEURONPEDIA_KEY,
+                        ),
+                        shape="box",
+                    )
+                except ValueError:
+                    label: str = (
+                        '<<table border="0" cellborder="0" cellspacing="0">'
+                    )
+                    label += '<tr><td><font point-size="16"><b>'
+                    label += up_dim_name
+                    label += "</b></font></td></tr>"
+                    label += neuronpedia_api(
                         up_layer_idx,
                         up_dim,
-                        MODEL_DIR,
-                        info,
-                        0,
-                        tokenizer,
-                        up_dim_name,
-                        {},
-                        __file__,
-                        neuronpedia=True,
-                        sublayer_type=up_layer_module,
-                        top_k=TOP_K,
-                        view=VIEW,
-                        neuronpedia_key=NEURONPEDIA_KEY,
-                    ),
-                    shape="box",
-                )
-            except ValueError:
+                        NEURONPEDIA_KEY,
+                        up_layer_module,
+                        TOP_K,
+                        VIEW,
+                    )
+                    label += "</table>>"
+                    graph.add_node(up_dim_name, label=label, shape="box")
+            else:
+                # Error up nodes
                 label: str = (
                     '<<table border="0" cellborder="0" cellspacing="0">'
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += up_dim_name
                 label += "</b></font></td></tr>"
-                label += neuronpedia_api(
-                    up_layer_idx,
-                    up_dim,
-                    NEURONPEDIA_KEY,
-                    up_layer_module,
-                    TOP_K,
-                    VIEW,
-                )
                 label += "</table>>"
                 graph.add_node(up_dim_name, label=label, shape="box")
 
-            if "res" in down_layer_module:
+            if "error" in down_layer_module:
+                info: str | None = None
+            elif "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
@@ -523,42 +573,54 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
 
-            try:
-                graph.add_node(
-                    down_dim_name,
-                    label=label_highlighting(
+            if info is not None:
+                # Autoencoder down nodes
+                try:
+                    graph.add_node(
+                        down_dim_name,
+                        label=label_highlighting(
+                            down_layer_idx,
+                            down_dim,
+                            MODEL_DIR,
+                            info,
+                            0,
+                            tokenizer,
+                            down_dim_name,
+                            {},
+                            __file__,
+                            neuronpedia=True,
+                            sublayer_type=down_layer_module,
+                            top_k=TOP_K,
+                            view=VIEW,
+                            neuronpedia_key=NEURONPEDIA_KEY,
+                        ),
+                        shape="box",
+                    )
+                except ValueError:
+                    label: str = (
+                        '<<table border="0" cellborder="0" cellspacing="0">'
+                    )
+                    label += '<tr><td><font point-size="16"><b>'
+                    label += down_dim_name
+                    label += "</b></font></td></tr>"
+                    label += neuronpedia_api(
                         down_layer_idx,
                         down_dim,
-                        MODEL_DIR,
-                        info,
-                        0,
-                        tokenizer,
-                        down_dim_name,
-                        {},
-                        __file__,
-                        neuronpedia=True,
-                        sublayer_type=down_layer_module,
-                        top_k=TOP_K,
-                        view=VIEW,
-                        neuronpedia_key=NEURONPEDIA_KEY,
-                    ),
-                    shape="box",
-                )
-            except ValueError:
+                        NEURONPEDIA_KEY,
+                        down_layer_module,
+                        TOP_K,
+                        VIEW,
+                    )
+                    label += "</table>>"
+                    graph.add_node(down_dim_name, label=label, shape="box")
+            else:
+                # Error down nodes
                 label: str = (
                     '<<table border="0" cellborder="0" cellspacing="0">'
                 )
                 label += '<tr><td><font point-size="16"><b>'
                 label += down_dim_name
                 label += "</b></font></td></tr>"
-                label += neuronpedia_api(
-                    down_layer_idx,
-                    down_dim,
-                    NEURONPEDIA_KEY,
-                    down_layer_module,
-                    TOP_K,
-                    VIEW,
-                )
                 label += "</table>>"
                 graph.add_node(down_dim_name, label=label, shape="box")
 
@@ -568,6 +630,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             elif effect < 0.0:
                 red, green = 255, 0
             else:
+                # Satisfies linter
                 raise ValueError("Should be unreachable.")
 
             alpha: int = int(
@@ -605,22 +668,6 @@ total_frac_explained = round(
     effect_explained / (effect_explained + effect_unexplained), 2
 )
 
-for i in explained_dict:
-    assert i in unexplained_dict
-for i in unexplained_dict:
-    assert i in explained_dict
-
-label: str = ""
-for i, explained in explained_dict.items():
-    if explained + unexplained_dict[i] == 0.0:
-        sublayer_frac_explained: float = 0.0
-        print(f"Sublayer {i} logged 0.0 effects in neurons and autoencoder.")
-    else:
-        sublayer_frac_explained = round(
-            explained / (explained + unexplained_dict[i]), 2
-        )
-    label += f"\n{i}: ~{sublayer_frac_explained*100}%"
-
 # Nuke singleton nodes.
 for node in graph.nodes():
     if len(graph.edges(node)) == 0:
@@ -630,7 +677,6 @@ graph = prune_graph(graph)
 
 graph.add_node(
     f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"
-    + label
 )
 
 # %%

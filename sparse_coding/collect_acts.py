@@ -7,6 +7,7 @@ Otherwise, activations are collected for the prompt specified.
 """
 
 
+import os
 import warnings
 
 import numpy as np
@@ -46,6 +47,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 DATASET = config.get("DATASET")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
@@ -57,6 +59,9 @@ ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 NUM_SEQUENCES_EVALED = config.get("NUM_SEQUENCES_EVALED", 1000)
 MAX_SEQ_LEN = config.get("MAX_SEQ_LEN", 1000)
 SEED = config.get("SEED")
+
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Reproducibility.

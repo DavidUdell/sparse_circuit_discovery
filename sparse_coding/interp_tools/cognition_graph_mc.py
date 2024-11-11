@@ -2,8 +2,8 @@
 """
 Mess with autoencoder activation dims during `truthful_qa` and graph effects.
 
-`cognition_graph_mc` in particular tries a model agains the multiple-choice task
-on `truthful_qa`, where the model is teed up to answer a m/c question with
+`cognition_graph_mc` in particular tries a model agains the multiple-choice
+task on `truthful_qa`, where the model is teed up to answer a m/c question with
 widely believed but false choices. The base task is compared to the task in
 which autoencoder activations dimensions are surgically scaled during
 inference, at the crucial last sequence position, where the model is answering.
@@ -15,6 +15,7 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
+import os
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -52,6 +53,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ENCODER_FILE = config.get("ENCODER_FILE")
@@ -80,6 +82,8 @@ if DIMS_PINNED is not None:
             """
         )
 
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Reproducibility.

@@ -47,7 +47,7 @@ PROMPT: "Copyright (C"
 
 # Dataset
 # A specified dataset will override the prompt.
-# DATASET: Elriggs/openwebtext-100k
+# DATASET: "Elriggs/openwebtext-100k"
 
 # Autoencoder Size
 PROJECTION_FACTOR: 32
@@ -98,6 +98,7 @@ LOGIT_TOKENS: 10
 # `wandb` logging
 WANDB_PROJECT: "sparse_circuit_discovery"
 WANDB_ENTITY: "davidudell"
+# WANDB_MODE: "disabled"
 
 # Reproducibility
 SEED: 0
@@ -107,7 +108,7 @@ NUM_SEQUENCES_EVALED: 50
 MAX_SEQ_LEN: 50
 
 # `precluster.py`
-NUM_CLUSTERS: 10
+NUM_CLUSTERS: 1000
 KEEPER_CLUSTER_INDEX: 0
 
 # `train_autoencoder.py`

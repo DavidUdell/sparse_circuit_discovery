@@ -9,7 +9,7 @@ MODEL_DIR: "openai-community/gpt2"
 PROMPT: "Copyright (C"
 
 # Layers Slice to Cache Activations From
-ACTS_LAYERS_SLICE: "7:9"
+ACTS_LAYERS_SLICE: "10:12"
 
 # Topk thresholds for gradient-based method.
 NUM_DOWN_NODES: 10
@@ -58,9 +58,9 @@ COEFFICIENT: 0.0
 BRANCHING_FACTOR: 5
 INIT_THINNING_FACTOR: 0.2
 LOGIT_TOKENS: 8
-THRESHOLD_EXP: 5.01
+THRESHOLD_EXP: 5.5
 DIMS_PINNED:
-  7: [15755]
+  10: [4105]
 
 ## ------------------------------------------------------------------------- ##
 ## ------------------------- Stable Test Constants ------------------------- ##

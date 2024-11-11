@@ -69,3 +69,34 @@ def deduplicate_sequences(
                 deduplicated_contexts_and_acts[dim_idx].append((context, acts))
 
     return deduplicated_contexts_and_acts
+
+
+class Encoder(t.nn.Module):
+    """
+    Reconstruct an encoder as a callable linear layer.
+
+    Takes imported_weights and biases as initialization args.
+    """
+
+    def __init__(
+        self,
+        layer_weights: t.Tensor,
+        layer_biases: t.Tensor,
+        hidden_dim: int,
+        projection_dim: int,
+    ):
+        """Initialize the encoder."""
+
+        super().__init__()
+        self.encoder_layer = t.nn.Linear(hidden_dim, projection_dim)
+        self.encoder_layer.weight.data = layer_weights
+        self.encoder_layer.bias.data = layer_biases
+
+        self.encoder = t.nn.Sequential(self.encoder_layer, t.nn.ReLU())
+
+    def forward(self, inputs):
+        """Project to the sparse latent space."""
+
+        # Apparently unneeded patch for `accelerate` with small models: inputs
+        # = inputs.to(self.encoder_layer.weight.device)
+        return self.encoder(inputs)

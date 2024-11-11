@@ -1,4 +1,4 @@
-"""Run the constant-time graph pipeline in one command."""
+"""Run the histograms pipeline in one command."""
 
 import os
 
@@ -15,8 +15,7 @@ for basename in [
     "collect_acts.py",
     "precluster.py",
     "load_autoencoder.py",
-    "interp_tools/contexts.py",
-    "interp_tools/grad_graph.py",
+    "histograms.py",
 ]:
-    path = f"{dirname}/{basename}"
+    path: str = f"{dirname}/{basename}"
     run(["python3", path], check=True)

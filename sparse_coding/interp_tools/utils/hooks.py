@@ -545,8 +545,9 @@ def grads_manager(
                 error_name: str = f"mlp_error_{layer_idx}"
             elif "gpt2block" in module.__class__.__name__.lower():
                 # "gpt2block"
-                current_name: str = f"res_{layer_idx}"
-                error_name: str = f"res_error_{layer_idx}"
+                # Standardizing to "resid_"
+                current_name: str = f"resid_{layer_idx}"
+                error_name: str = f"resid_error_{layer_idx}"
             else:
                 raise ValueError("Unexpected module name.")
 

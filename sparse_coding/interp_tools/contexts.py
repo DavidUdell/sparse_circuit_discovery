@@ -6,6 +6,7 @@ Requires a HF access token to get `Llama-2`'s tokenizer.
 """
 
 
+import os
 import warnings
 import csv
 from collections import defaultdict
@@ -24,14 +25,15 @@ from transformers import (
 from tqdm.auto import tqdm
 import wandb
 
+from sparse_coding.interp_tools.utils.computations import Encoder
 from sparse_coding.utils import top_contexts
 from sparse_coding.utils.interface import (
-    parse_slice,
-    slice_to_range,
     load_input_token_ids,
-    sanitize_model_name,
     load_yaml_constants,
+    parse_slice,
+    sanitize_model_name,
     save_paths,
+    slice_to_range,
 )
 
 
@@ -46,6 +48,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 PROMPT_IDS_PATH = save_paths(__file__, config.get("PROMPT_IDS_FILE"))
@@ -76,6 +79,9 @@ if config.get("N_DIMS_PRINTED_OVERRIDE") is not None:
 else:
     N_DIMS_PRINTED = PROJECTION_DIM
 
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
+
 # %%
 # Reproducibility.
 _ = t.manual_seed(SEED)
@@ -103,30 +109,6 @@ accelerator: Accelerator = Accelerator()
 unpacked_prompts_ids: list[list[int]] = load_input_token_ids(PROMPT_IDS_PATH)
 
 assert isinstance(unpacked_prompts_ids[0], list)
-
-
-# %%
-# Define the encoder class, taking imported_weights and biases as
-# initialization args.
-class Encoder(t.nn.Module):
-    """Reconstruct an encoder as a callable linear layer."""
-
-    def __init__(self, layer_weights: t.Tensor, layer_biases: t.Tensor):
-        """Initialize the encoder."""
-
-        super().__init__()
-        self.encoder_layer = t.nn.Linear(HIDDEN_DIM, PROJECTION_DIM)
-        self.encoder_layer.weight.data = layer_weights
-        self.encoder_layer.bias.data = layer_biases
-
-        self.encoder = t.nn.Sequential(self.encoder_layer, t.nn.ReLU())
-
-    def forward(self, inputs):
-        """Project to the sparse latent space."""
-
-        # Apparently unneeded patch for `accelerate` with small models: inputs
-        # = inputs.to(self.encoder_layer.weight.device)
-        return self.encoder(inputs)
 
 
 # %%
@@ -227,7 +209,9 @@ for layer_idx in seq_layer_indices:
         imported_biases: t.Tensor = t.load(BIASES_PATH, weights_only=True)
 
         # Initialize a concrete encoder for this layer.
-        model: Encoder = Encoder(imported_weights, imported_biases)
+        model: Encoder = Encoder(
+            imported_weights, imported_biases, HIDDEN_DIM, PROJECTION_DIM
+        )
         model = accelerator.prepare(model)
 
         # Load and parallelize activations.

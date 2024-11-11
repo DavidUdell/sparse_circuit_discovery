@@ -10,6 +10,7 @@ You may need to have logged a HF access token, if applicable.
 """
 
 
+import os
 import warnings
 from collections import defaultdict
 from textwrap import dedent
@@ -53,6 +54,7 @@ access, config = load_yaml_constants(__file__)
 HF_ACCESS_TOKEN = access.get("HF_ACCESS_TOKEN", "")
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
@@ -86,6 +88,9 @@ if DIMS_PINNED is not None:
             singleton index lists.
             """
         )
+
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Reproducibility.
@@ -325,6 +330,9 @@ for ablate_layer_idx in ablate_layer_range:
             elif effect < 0.0:
                 red: int = 255
                 blue: int = 0
+            else:
+                # Satisfies linter
+                raise ValueError("Should be unreachable.")
             alpha = int(255 * magnitude / max(abs(color_max), abs(color_min)))
             rgba_str: str = f"#{red:02x}00{blue:02x}{alpha:02x}"
 

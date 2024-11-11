@@ -5,6 +5,8 @@ rasp model itself is initialized here.
 """
 
 
+import os
+
 import numpy as np
 import torch as t
 import wandb
@@ -22,7 +24,11 @@ _, config = load_yaml_constants(__file__)
 
 WANDB_PROJECT = config.get("WANDB_PROJECT")
 WANDB_ENTITY = config.get("WANDB_ENTITY")
+WANDB_MODE = config.get("WANDB_MODE")
 SEED = config.get("SEED")
+
+if WANDB_MODE:
+    os.environ["WANDB_MODE"] = WANDB_MODE
 
 # %%
 # Reproducibility.

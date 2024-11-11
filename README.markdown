@@ -29,7 +29,7 @@ Registry](https://github.com/DavidUdell/sparse_circuit_discovery/pkgs/container/
 The Docker image is especially good for pulling to a remote server.
 
 ## User's Guide
-### Naive Algorithm
+### Naive Algorithm Pipeline
 Your base of operations is `sparse_coding/config/central_config.yaml`.
 The most important hyperparameters are clustered up top:
 
@@ -82,7 +82,7 @@ a `.dot` for the computer. If you run the interpretability pipeline again, the
 new data will expand upon that old `.dot` file. This way, you can progressively
 trace out circuits as you go.
 
-### Gradient-Based Algorithm
+### Gradient-Based Algorithm Pipeline
 There is also a gradient-based algorithm, an implementation of [Marks et al.
 (2024).](https://arxiv.org/abs/2403.19647) This algorithm has the advantage of
 plotting contributions to the cross-entropy loss _directly_, rather than
@@ -121,7 +121,7 @@ of `GRADS_FILE` in `central_config.yaml` from `.svg` to `.png` for that. I
 separately use [PosteRazor](https://posterazor.sourceforge.io/) to tile print
 large `.png` graph files, when a physical copy is desired.
 
-### Validating Circuits
+### Circuit Validation Pipeline
 There's also an independent circuit validation pipeline, `val.py`. This script
 simultaneously ablates all the features that comprise a circuit, to see how the
 _overall_ circuit behaves under ablation (rather than just looking at separate
@@ -143,6 +143,15 @@ VALIDATION_DIMS_PINNED:
 Now run validation with:
 
 `python3 val.py`
+
+### Preclustering Pipeline
+Setting a dataset in `central_config.yaml` and then running:
+
+`python3 hist.py`
+
+will precluster that dataset by neuron-basis activations and then cache 99.99th
+percentile autoencoder-basis activation magnitudes. Now, running `fast.py` will
+use those cached thresholds.
 
 ## How to Read the Graphs
 Consider the cognition graph at the top of this page. Each _box_ with a label
@@ -182,9 +191,4 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.3.0
-
-The `sae_training` sub-directory is Joseph Bloom's, a dependency for importing
-his pretrained sparse autoencoders from HF Hub.
-
-The Neuronpedia wiki is Johnny Lin's.
+Current version is 1.3.1

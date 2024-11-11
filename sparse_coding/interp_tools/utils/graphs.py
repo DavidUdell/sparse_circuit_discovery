@@ -3,6 +3,7 @@
 import html
 from collections import defaultdict
 from copy import copy
+from json.decoder import JSONDecodeError
 from textwrap import dedent
 
 import requests
@@ -155,7 +156,7 @@ def label_highlighting(
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
 
-        label += "</tr><tr><td></td></tr><tr><td></td></tr>"
+        label += "</tr>"
 
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
@@ -428,39 +429,54 @@ def neuronpedia_api(
     url_post_attn: str = "-att_128k-oai/"
     url_post_mlp: str = "-mlp_128k-oai/"
 
-    # sublayer_type: str = "res" | "attn" | "mlp"
-    if sublayer_type == "res":
+    # sublayer_type: str = "resid" | "attn" | "mlp"
+    if sublayer_type == "resid":
         url_post: str = url_post_res
     elif sublayer_type == "attn":
         url_post: str = url_post_attn
     elif sublayer_type == "mlp":
         url_post: str = url_post_mlp
+    elif "error" in sublayer_type:
+        return ""
     else:
         raise ValueError("Sublayer type not recognized:", sublayer_type)
 
     url: str = url_prefix + str(layer_idx) + url_post + str(dim_idx)
 
-    response = requests.get(
-        url,
-        headers={
-            "Accept": "text/html,application/xhtml+xml,application/xml",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "max-age=0",
-            "Upgrade-Insecure-Requests": "1",
-            "X-Api-Key": neuronpedia_key,
-        },
-        timeout=300,
-    )
+    try:
+        response = requests.get(
+            url,
+            headers={
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "max-age=0",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": "sparse_circuit_discovery",
+                "X-Api-Key": neuronpedia_key,
+            },
+            timeout=300,
+        )
+    except requests.exceptions.RequestException as e:
+        print(e)
+        return ""
 
-    assert (
-        response.status_code != 404
-    ), "Neuronpedia API connection failed: 404"
+    # assert (
+    #     response.status_code != 404
+    # ), "Neuronpedia API connection failed: 404"
 
-    neuronpedia_dict: dict = response.json()
+    try:
+        neuronpedia_dict: dict = response.json()
+    except JSONDecodeError as e:
+        print(e)
+        return ""
+
+    if neuronpedia_dict is None:
+        return ""
+
     data: list[dict] = neuronpedia_dict["activations"]
 
-    label: str = "<tr><td></td></tr>"
+    label: str = ""
 
     # defaultdict[int, list[tuple[list[str], list[float]]]]
     contexts_and_activations = defaultdict(list)
