@@ -8,7 +8,6 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 
 import csv
 import os
-import re
 
 import requests
 import torch as t
@@ -298,40 +297,16 @@ with grads_manager(
     for act in acts_dict:
         assert act in grads_dict
 
+    # Order s/t attn precedes mlp precedes resid.
+    grads_list: list = []
     for loc, grad in grads_dict.items():
         assert loc in acts_dict
+        grads_list.append((loc, grad))
+    grads_list.sort(key=lambda x: x[0])
 
+    for loc, grad in grads_list:
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
-
-        if re.match("resid_", loc) is not None:
-            mlp_confound: str = re.sub("(resid_error_|resid_)", "mlp_", loc)
-            mlp_error_confound: str = re.sub(
-                "(resid_error_|resid_)", "mlp_error_", loc
-            )
-            # The jvp at an activation is a scalar with gradient tracking that
-            # represents how well the model would do on the loss metric in that
-            # forward pass, if all later modules were replaced with a best-fit
-            # first-order Taylor approximation.
-            jvp = (
-                t.einsum(
-                    "...sd,...sd->...s",
-                    grads_dict[mlp_confound].detach(),
-                    acts_dict[mlp_confound],
-                ).squeeze()
-                + t.einsum(
-                    "...sd,...sd->...s",
-                    grads_dict[mlp_error_confound].detach(),
-                    acts_dict[mlp_error_confound],
-                ).squeeze()
-            )
-            if jvp.dim() == 0:
-                # Single-token prompt edge case.
-                jvp.backward(retain_graph=True)
-            else:
-                jvp[-1].backward(retain_graph=True)
-
-            _, jvp_grads = acts_and_grads
 
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
         # Standardize weighted_prod shape
@@ -376,6 +351,7 @@ with grads_manager(
         ####  End thresholding down-nodes  ####
 
         for dim_idx in tqdm(indices, desc=loc):
+            # Edge-level backward passes
             weighted_prod[dim_idx].backward(retain_graph=True)
             _, marginal_grads = acts_and_grads
 
@@ -384,14 +360,12 @@ with grads_manager(
             if up_layer_idx not in layer_range:
                 continue
 
-            # resid_x
-            # mlp_x
-            # attn_x
-            # resid_error_x
-            # mlp_error_x
-            # attn_error_x
+            # Down-node keys are:
+            # resid_x, mlp_x, attn_x, resid_error_x, mlp_error_x, attn_error_x
+
+            # Deduplicate and store edges
             if "attn_" in loc:
-                # Upstream resid_
+                # resid-to-attn
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
@@ -399,53 +373,67 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
-                # Upstream resid_
-                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
-                    dim_idx
-                ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
-                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
-                    dim_idx
-                ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
-
-                # Same-layer attn_
+                # attn-to-mlp
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
-            elif "resid_" in loc:
-                # Upstream resid_; double-counting corrections.
+
+                # resid-to-mlp
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"resid_{up_layer_idx}"]
-                    - jvp_grads[  # pylint: disable=possibly-used-before-assignment
-                        f"resid_{up_layer_idx}"
-                    ]
+                    - marginal_grads[f"attn_{down_layer_idx}"]
                 ).cpu()
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"resid_error_{up_layer_idx}"]
-                    - jvp_grads[f"resid_error_{up_layer_idx}"]
+                    - marginal_grads[f"attn_error_{down_layer_idx}"]
                 ).cpu()
 
-                # Same-layer attn_
+            elif "resid_" in loc:
+                # attn-to-resid
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
+                ] = (
+                    marginal_grads[f"attn_{down_layer_idx}"]
+                    - marginal_grads[f"mlp_{down_layer_idx}"]
+                ).cpu()
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
+                ] = (
+                    marginal_grads[f"attn_error_{down_layer_idx}"]
+                    - marginal_grads[f"mlp_error_{down_layer_idx}"]
+                ).cpu()
 
-                # Same-layer mlp_
+                # mlp-to-resid
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"mlp_{down_layer_idx}"].cpu()
                 marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"mlp_error_{down_layer_idx}"].cpu()
+
+                # resid-to-resid
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = (
+                    marginal_grads[f"resid_{up_layer_idx}"]
+                    - marginal_grads[f"mlp_{down_layer_idx}"]
+                    - marginal_grads[f"attn_{down_layer_idx}"]
+                ).cpu()
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = (
+                    marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - marginal_grads[f"mlp_error_{down_layer_idx}"]
+                    - marginal_grads[f"attn_error_{down_layer_idx}"]
+                ).cpu()
+
             else:
                 raise ValueError("Module location not recognized.")
 
