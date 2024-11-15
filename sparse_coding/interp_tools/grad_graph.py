@@ -399,6 +399,14 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
+                # Upstream resid_
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
+
                 # Same-layer attn_
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
@@ -422,6 +430,14 @@ with grads_manager(
                     marginal_grads[f"resid_error_{up_layer_idx}"]
                     - jvp_grads[f"resid_error_{up_layer_idx}"]
                 ).cpu()
+
+                # Same-layer attn_
+                marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
+                marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
 
                 # Same-layer mlp_
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
