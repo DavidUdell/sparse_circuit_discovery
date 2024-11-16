@@ -8,6 +8,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 
 import csv
 import os
+import re
 
 import requests
 import torch as t
@@ -121,6 +122,86 @@ wandb.init(
     entity=WANDB_ENTITY,
     config=config,
 )
+
+
+# %%
+# Fix double-counting on edges functionality
+def quantify_double_counting_for_down_node(
+    down_node_location: str,
+    gradients: dict,
+    activations: dict,
+) -> dict | None:
+    """
+    Provide confound effect grads for each down-node.
+
+    This function runs inside a backward-pass context manager which has a
+    global `acts_and_grads`. The edges resid-to-attn, attn-to-mlp, mlp-to-resid
+    have no confounds.
+    """
+    resid_pattern: str = "(resid_error_|resid_)"
+    mlp_pattern: str = "(mlp_error_|mlp_)"
+
+    # RESID: resid-to-resid-(resid-to-attn-to-resid)-(resid-to-mlp-to-resid)
+    # RESID: attn-to-resid - (attn-to-mlp-to-resid)
+    if re.match("resid_", down_node_location) is not None:
+        # sub in mlp
+        mlp_handle: str = re.sub(resid_pattern, "mlp_", down_node_location)
+        mlp_err_handle: str = re.sub(
+            resid_pattern, "mlp_error_", down_node_location
+        )
+        # Weight mlp acts by effect on resid; detach grads
+        mlp_affecting_resid = (
+            t.einsum(
+                "...sd,...sd->...s",
+                gradients[mlp_handle].detach(),
+                activations[mlp_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                gradients[mlp_err_handle].detach(),
+                activations[mlp_err_handle],
+            ).squeeze()
+        )
+        # Differentiate effects w/r/t attn
+        if mlp_affecting_resid.dim() == 0:
+            # Single-token prompt edge case.
+            mlp_affecting_resid.backward(retain_graph=True)
+        else:
+            mlp_affecting_resid[-1].backward(retain_graph=True)
+        _, attn_to_mlp_to_resid_grads = acts_and_grads
+        return attn_to_mlp_to_resid_grads
+
+    # MLP: resid-to-mlp - (resid-to-attn-to-mlp)
+    if re.match("mlp_", down_node_location) is not None:
+        # sub in attn
+        attn_handle: str = re.sub(mlp_pattern, "attn_", down_node_location)
+        attn_err_handle: str = re.sub(
+            mlp_pattern, "attn_error_", down_node_location
+        )
+        attn_affecting_mlp = (
+            t.einsum(
+                "...sd,...sd->...s",
+                gradients[attn_handle].detach(),
+                activations[attn_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                gradients[attn_err_handle].detach(),
+                activations[attn_err_handle],
+            ).squeeze()
+        )
+        # Differentiate effects w/r/t resid
+        if attn_affecting_mlp.dim() == 0:
+            # Single-token prompt edge case.
+            attn_affecting_mlp.backward(retain_graph=True)
+        else:
+            attn_affecting_mlp[-1].backward(retain_graph=True)
+        _, resid_to_attn_to_mlp_grads = acts_and_grads
+        return resid_to_attn_to_mlp_grads
+
+    assert re.match("attn_", down_node_location)
+    return None
+
 
 # %%
 # Load and prepare the model.
@@ -307,6 +388,8 @@ with grads_manager(
     for loc, grad in grads_list:
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
+
+        # Get ready to subtract confound effects for down-node
 
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
         # Standardize weighted_prod shape
