@@ -168,7 +168,7 @@ def quantify_double_counting_for_down_node(
             mlp_affecting_resid.backward(retain_graph=True)
         else:
             mlp_affecting_resid[-1].backward(retain_graph=True)
-        _, attn_to_mlp_to_resid_grads = acts_and_grads
+        _, x_to_mlp_to_resid_grads = acts_and_grads
 
         # RESID:
         # resid-to-resid - (resid-to-attn-to-resid) - (resid-to-mlp-to-resid)
@@ -197,7 +197,7 @@ def quantify_double_counting_for_down_node(
             attn_affecting_resid[-1].backward(retain_graph=True)
         _, resid_to_attn_to_resid_grads = acts_and_grads
 
-        return attn_to_mlp_to_resid_grads, resid_to_attn_to_resid_grads
+        return x_to_mlp_to_resid_grads, resid_to_attn_to_resid_grads
 
     # MLP: resid-to-mlp - (resid-to-attn-to-mlp)
     if re.match("mlp_", down_node_location) is not None:
@@ -424,7 +424,7 @@ with grads_manager(
             acts_dict,
         )
         if isinstance(confounds_grads, tuple):
-            attn_mlp_resid_grads, resid_attn_resid_grads = confounds_grads
+            x_mlp_resid_grads, resid_attn_resid_grads = confounds_grads
         if confounds_grads is not None:
             resid_attn_mlp_grads: dict = confounds_grads
 
@@ -485,7 +485,7 @@ with grads_manager(
 
             # Deduplicate and store edges
             if "attn_" in loc:
-                # resid-to-attn (pure)
+                # resid-to-attn
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
@@ -493,7 +493,7 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
-                # attn-to-mlp (pure)
+                # attn-to-mlp
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
@@ -501,36 +501,40 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
 
-                # resid-to-mlp
+                # resid-to-mlp - (resid-attn-mlp)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"resid_{up_layer_idx}"]
-                    - marginal_grads[f"attn_{down_layer_idx}"]
+                    - resid_attn_mlp_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"attn_{down_layer_idx}"
+                    ]
                 ).cpu()
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"resid_error_{up_layer_idx}"]
-                    - marginal_grads[f"attn_error_{down_layer_idx}"]
+                    - resid_attn_mlp_grads[f"attn_error_{down_layer_idx}"]
                 ).cpu()
 
             elif "resid_" in loc:
-                # attn-to-resid
+                # attn-to-resid - (attn-mlp-resid)
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"attn_{down_layer_idx}"]
-                    - marginal_grads[f"mlp_{down_layer_idx}"]
+                    - x_mlp_resid_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"mlp_{down_layer_idx}"
+                    ]
                 ).cpu()
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"attn_error_{down_layer_idx}"]
-                    - marginal_grads[f"mlp_error_{down_layer_idx}"]
+                    - x_mlp_resid_grads[f"mlp_error_{down_layer_idx}"]
                 ).cpu()
 
-                # mlp-to-resid (pure)
+                # mlp-to-resid
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"mlp_{down_layer_idx}"].cpu()
@@ -538,20 +542,22 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"mlp_error_{down_layer_idx}"].cpu()
 
-                # resid-to-resid
+                # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"resid_{up_layer_idx}"]
-                    - marginal_grads[f"mlp_{down_layer_idx}"]
-                    - marginal_grads[f"attn_{down_layer_idx}"]
+                    - resid_attn_resid_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"attn_{down_layer_idx}"
+                    ]
+                    - x_mlp_resid_grads[f"mlp_{down_layer_idx}"]
                 ).cpu()
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = (
                     marginal_grads[f"resid_error_{up_layer_idx}"]
-                    - marginal_grads[f"mlp_error_{down_layer_idx}"]
-                    - marginal_grads[f"attn_error_{down_layer_idx}"]
+                    - resid_attn_resid_grads[f"attn_error_{down_layer_idx}"]
+                    - x_mlp_resid_grads[f"mlp_error_{down_layer_idx}"]
                 ).cpu()
 
             else:
