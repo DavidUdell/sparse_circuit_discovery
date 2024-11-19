@@ -417,7 +417,16 @@ with grads_manager(
         grad = grad.squeeze().unsqueeze(0).detach()
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        # Get ready to subtract confound effects for down-node
+        # Perpare confound effects for subtraction, per down-node
+        confounds_grads = quantify_double_counting_for_down_node(
+            loc,
+            grads_dict,
+            acts_dict,
+        )
+        if isinstance(confounds_grads, tuple):
+            attn_mlp_resid_grads, resid_attn_resid_grads = confounds_grads
+        if confounds_grads is not None:
+            resid_attn_mlp_grads: dict = confounds_grads
 
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
         # Standardize weighted_prod shape
@@ -476,7 +485,7 @@ with grads_manager(
 
             # Deduplicate and store edges
             if "attn_" in loc:
-                # resid-to-attn
+                # resid-to-attn (pure)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
@@ -484,7 +493,7 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
             elif "mlp_" in loc:
-                # attn-to-mlp
+                # attn-to-mlp (pure)
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
@@ -521,7 +530,7 @@ with grads_manager(
                     - marginal_grads[f"mlp_error_{down_layer_idx}"]
                 ).cpu()
 
-                # mlp-to-resid
+                # mlp-to-resid (pure)
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"mlp_{down_layer_idx}"].cpu()
