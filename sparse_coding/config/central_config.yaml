@@ -7,7 +7,7 @@
 
 # ACTS_LAYERS_SLICE should be a Python slice, in str format. Set it to ":" to
 # plot data from all model layers.
-ACTS_LAYERS_SLICE: "9:12"
+ACTS_LAYERS_SLICE: "0:12"
 INIT_THINNING_FACTOR: 1.0
 NUM_SEQUENCES_INTERPED: 1
 THRESHOLD_EXP: 5.0
@@ -43,7 +43,7 @@ VALIDATION_DIMS_PINNED:
 MODEL_DIR: "openai-community/gpt2"
 
 # Prompt
-PROMPT: "Copyright (C"
+PROMPT: "The capital of France is Paris"
 
 # Dataset
 # A specified dataset will override the prompt.
