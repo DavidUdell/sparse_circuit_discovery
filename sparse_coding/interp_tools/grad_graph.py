@@ -810,6 +810,16 @@ graph.add_node(
 )
 
 # %%
+# Reproducibility test printouts.
+print("Activations:")
+for k, v in acts_dict.values():
+    print(k, v)
+
+print("Gradients:")
+for k, v in grads_dict.values():
+    print(k, v)
+
+# %%
 # Render graph
 graph.write(save_dot_path)
 # Format (.svg, .png) is inferred from file extension.
