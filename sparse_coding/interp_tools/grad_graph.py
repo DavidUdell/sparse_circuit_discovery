@@ -9,6 +9,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 import csv
 import os
 import re
+from math import isnan
 
 import requests
 import torch as t
@@ -761,6 +762,10 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 red, green = 0, 255
             elif effect < 0.0:
                 red, green = 255, 0
+            elif isnan(effect):
+                raise ValueError(
+                    f"Exploding/vanishing gradients?: {edges_str, effect}"
+                )
             else:
                 # Satisfies linter
                 raise ValueError("Should be unreachable.")
