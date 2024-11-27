@@ -577,6 +577,8 @@ unexplained_dict: dict = {}
 effect_explained: float = 0.0
 effect_unexplained: float = 0.0
 
+# Noting that 0:12 runs sometimes have exploding early gradients and so
+# numerical instability.
 for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
@@ -812,11 +814,11 @@ graph.add_node(
 # %%
 # Reproducibility test printouts.
 print("Activations:")
-for k, v in acts_dict.values():
+for k, v in acts_dict.items():
     print(k, v)
 
 print("Gradients:")
-for k, v in grads_dict.values():
+for k, v in grads_dict.items():
     print(k, v)
 
 # %%
