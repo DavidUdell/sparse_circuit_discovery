@@ -389,10 +389,11 @@ with grads_manager(
     output = model(**inputs)
 
     # Metric backward pass.
-    metric(
+    loss = metric(
         output.logits.squeeze(),
         inputs["input_ids"].squeeze(),
-    ).backward(retain_graph=True)
+    )
+    loss.backward(retain_graph=True)
 
     acts_dict, grads_dict = acts_and_grads
 
