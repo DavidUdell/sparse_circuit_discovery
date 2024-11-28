@@ -43,7 +43,7 @@ VALIDATION_DIMS_PINNED:
 MODEL_DIR: "openai-community/gpt2"
 
 # Prompt
-PROMPT: "The capital of France is Paris"
+PROMPT: "The capital of France is"
 
 # Dataset
 # A specified dataset will override the prompt.
