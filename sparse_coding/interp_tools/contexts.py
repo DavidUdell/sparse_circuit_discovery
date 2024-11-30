@@ -112,7 +112,7 @@ listed_prompts_ids = []
 if not isinstance(unpacked_prompts_ids[0], list):
     for i in unpacked_prompts_ids:
         listed_prompts_ids.append([i])
-unpacked_prompts_ids = listed_prompts_ids
+    unpacked_prompts_ids = listed_prompts_ids
 assert isinstance(unpacked_prompts_ids[0], list)
 
 
