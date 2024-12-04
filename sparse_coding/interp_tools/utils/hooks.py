@@ -555,9 +555,8 @@ def grads_manager(
             handles.append(
                 projected_acts.register_hook(backward_hooks_fac(current_name))
             )
-            # Cache activations.
+            # Cache autoencoder activations.
             acts_dict[current_name] = projected_acts
-            acts_dict[error_name] = output[0]
 
             # Decode projected acts.
             projected_acts = (
@@ -569,20 +568,23 @@ def grads_manager(
             )
 
             # Algebra for the error residual.
-            error = projected_acts - output[0]
+            error = -(projected_acts - output[0])
             # Then break gradient for the new error tensor.
             error = error.detach()
+
+            # Cache error activations.
+            acts_dict[error_name] = error
+
             error.requires_grad = True
 
             handles.append(error.register_hook(backward_hooks_fac(error_name)))
 
-            # output[0] = projected_acts - error
+            # output[0] = projected_acts + error
             if isinstance(output, tuple):
-                return projected_acts - error, output[1]
-            elif isinstance(output, t.Tensor):
-                return projected_acts - error
-            else:
-                raise ValueError("Unexpected output type.")
+                return projected_acts + error, output[1]
+            if isinstance(output, t.Tensor):
+                return projected_acts + error
+            raise ValueError("Unexpected output type.")
 
         return forward_hook
 
