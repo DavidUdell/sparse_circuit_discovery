@@ -559,7 +559,7 @@ def grads_manager(
             acts_dict[current_name] = projected_acts
 
             # Decode projected acts.
-            projected_acts = (
+            decoded_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
                     decoder.T.to(model.device),
@@ -568,22 +568,21 @@ def grads_manager(
             )
 
             # Algebra for the error residual.
-            error = -(projected_acts - output[0])
+            error = -(decoded_acts - output[0])
             # Then break gradient for the new error tensor.
-            error = error.detach()
+            error = error.detach().requires_grad_(True)
 
             # Cache error activations.
             acts_dict[error_name] = error
 
-            error.requires_grad = True
-
             handles.append(error.register_hook(backward_hooks_fac(error_name)))
 
-            # output[0] = projected_acts + error
+            # output[0] = decoded_acts + error
+            reconstructed: t.Tensor = decoded_acts + error
             if isinstance(output, tuple):
-                return projected_acts + error, output[1]
+                return reconstructed, output[1]
             if isinstance(output, t.Tensor):
-                return projected_acts + error
+                return reconstructed
             raise ValueError("Unexpected output type.")
 
         return forward_hook
