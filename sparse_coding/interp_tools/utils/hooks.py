@@ -491,14 +491,23 @@ def grads_manager(
     grads_dict: dict = {}
     handles = []
 
-    def backward_hooks_fac(location: str):
+    def backwards_replace_fac(replace):
+        """Replace a gradient with the gradient of an argument."""
+
+        def backward_replace_hook(grad):
+            """Replace a gradient with a closure object's gradient."""
+            return replace.grad
+
+        return backward_replace_hook
+
+    def backwards_cache_fac(location: str):
         """Allow backward hooks to label their dictionary entries."""
 
-        def backward_hook(grad):
+        def backward_cache_hook(grad):
             """Label the gradient tensor with its location."""
             grads_dict[location] = grad
 
-        return backward_hook
+        return backward_cache_hook
 
     def forward_hooks_fac(
         layer_idx: int,
@@ -519,12 +528,16 @@ def grads_manager(
             Pass activations through autoencoder and register a backward hook
             at the autoencoder tensor and error residual.
             """
-
+            if isinstance(output, tuple):
+                hidden = output[0]
+            else:
+                assert isinstance(output, t.Tensor)
+                hidden = output
             # Project activations through the encoder. Bias usage corresponds
             # to JBloom's.
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
-                    output[0] - dec_biases.to(model.device),
+                    hidden - dec_biases.to(model.device),
                     encoder.T.to(model.device),
                     bias=enc_biases.to(model.device),
                 ).to(model.device)
@@ -553,7 +566,7 @@ def grads_manager(
 
             # Register backward hooks on the projected activations.
             handles.append(
-                projected_acts.register_hook(backward_hooks_fac(current_name))
+                projected_acts.register_hook(backwards_cache_fac(current_name))
             )
             # Cache autoencoder activations.
             acts_dict[current_name] = projected_acts
@@ -568,17 +581,27 @@ def grads_manager(
             )
 
             # Algebra for the error residual.
-            error = -(decoded_acts - output[0])
+            error = hidden - decoded_acts
             # Then break gradient for the new error tensor.
             error = error.detach().requires_grad_(True)
 
             # Cache error activations.
             acts_dict[error_name] = error
 
-            handles.append(error.register_hook(backward_hooks_fac(error_name)))
+            handles.append(
+                error.register_hook(backwards_cache_fac(error_name))
+            )
 
-            # output[0] = decoded_acts + error
+            # hidden = decoded_acts + error
             reconstructed: t.Tensor = decoded_acts + error
+
+            # This block brings this repo's grads into alignment with the Bau
+            # Lab implementation.
+            reconstructed.retain_grad()
+            handles.append(
+                hidden.register_hook(backwards_replace_fac(reconstructed))
+            )
+
             if isinstance(output, tuple):
                 return reconstructed, output[1]
             if isinstance(output, t.Tensor):
