@@ -387,11 +387,12 @@ with grads_manager(
 
     # Forward pass installs all backward hooks.
     output = model(**inputs)
+    logits = output.logits[:, -1, :].squeeze()
 
-    # Metric backward pass.
+    target = inputs["input_ids"][:, -1].squeeze()
     loss = metric(
-        output.logits.squeeze(),
-        inputs["input_ids"].squeeze(),
+        logits,
+        target,
     )
     loss.backward(retain_graph=True)
 
