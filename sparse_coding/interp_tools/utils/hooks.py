@@ -528,24 +528,6 @@ def grads_manager(
             Pass activations through autoencoder and register a backward hook
             at the autoencoder tensor and error residual.
             """
-            if isinstance(output, tuple):
-                hidden = output[0]
-            else:
-                assert isinstance(output, t.Tensor)
-                hidden = output
-            # Project activations through the encoder. Bias usage corresponds
-            # to JBloom's.
-            projected_acts = (
-                t.nn.functional.linear(  # pylint: disable=not-callable
-                    hidden - dec_biases.to(model.device),
-                    encoder.T.to(model.device),
-                    bias=enc_biases.to(model.device),
-                ).to(model.device)
-            )
-            t.nn.functional.relu(
-                projected_acts,
-                inplace=True,
-            )
 
             # Module detection
             if "attention" in module.__class__.__name__.lower():
@@ -564,11 +546,27 @@ def grads_manager(
             else:
                 raise ValueError("Unexpected module name.")
 
-            # Register backward hooks on the projected activations.
+            # Handle tuple cases
+            if isinstance(output, tuple):
+                hidden = output[0]
+            else:
+                assert isinstance(output, t.Tensor)
+                hidden = output
+
+            # Project activations through the encoder. Bias usage corresponds
+            # to JBloom's.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    hidden - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
+            )
+            projected_acts = t.nn.functional.relu(projected_acts)
+
             handles.append(
                 projected_acts.register_hook(backwards_cache_fac(current_name))
             )
-            # Cache autoencoder activations.
             acts_dict[current_name] = projected_acts
 
             # Decode projected acts.

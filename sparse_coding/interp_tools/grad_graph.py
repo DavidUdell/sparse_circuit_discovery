@@ -369,7 +369,13 @@ print(PROMPT)
 print()
 print("Backward passes:")
 
-inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+tokens = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+inputs = tokens.copy()
+
+inputs["input_ids"] = inputs["input_ids"][:, :-1]
+inputs["attention_mask"] = inputs["attention_mask"][:, :-1]
+target = tokens["input_ids"][:, -1].squeeze()
+
 acts_dict: dict = None
 grads_dict: dict = None
 marginal_grads_dict: dict = recursive_defaultdict()
@@ -389,7 +395,6 @@ with grads_manager(
     output = model(**inputs)
     logits = output.logits[:, -1, :].squeeze()
 
-    target = inputs["input_ids"][:, -1].squeeze()
     loss = metric(
         logits,
         target,
@@ -398,16 +403,12 @@ with grads_manager(
 
     acts_dict, grads_dict = acts_and_grads
 
-    # Add model_dim activations to acts_dict, if needed.
-    for grad in grads_dict:
-        if "resid_error" in grad:
-            idx: int = int(grad.split("_")[-1])
-            act: t.Tensor = output.hidden_states[idx]
-            acts_dict[grad] = act
-
-    # Compute Jacobian-vector products.
-    for act in acts_dict:
-        assert act in grads_dict
+    for act, grad in zip(acts_dict, grads_dict):
+        assert act in grads_dict, act
+        assert grad in acts_dict, grad
+    # Acts and grads are in correspondence across implementations at this
+    # point. Later backward passes may mess with things, though; the backward
+    # hooks are all still in place.
 
     # Order s/t attn precedes mlp precedes resid.
     grads_list: list = []
