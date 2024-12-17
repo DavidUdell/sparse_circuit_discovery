@@ -406,19 +406,23 @@ with grads_manager(
     for act, grad in zip(acts_dict, grads_dict):
         assert act in grads_dict, act
         assert grad in acts_dict, grad
-    # Acts and grads are in correspondence across implementations at this
-    # point. Later backward passes may mess with things, though; the backward
-    # hooks are all still in place.
 
-    # Order s/t attn precedes mlp precedes resid.
+    # Note that, because the closure remains in place for the backwards hooks,
+    # grads_dict going forward will be messed up by later backward passes. I
+    # don't want to actually close the closure because I want to leave the
+    # hooks in place. For accurate grads from the last backward pass, the
+    # grads_list object constructed next retains those. This is a cleaner
+    # solution to preserving that data than getting all of what I want with
+    # .clone() and .detach() trickery later on, actually.
     grads_list: list = []
     for loc, grad in grads_dict.items():
         assert loc in acts_dict
         grads_list.append((loc, grad))
+    # Ordered s.t. attn precedes mlp precedes resid.
     grads_list.sort(key=lambda x: x[0])
 
     for loc, grad in grads_list:
-        grad = grad.squeeze().unsqueeze(0).detach()
+        grad = grad.squeeze().unsqueeze(0)
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
         # Perpare confound effects for subtraction, per down-node

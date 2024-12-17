@@ -494,7 +494,7 @@ def grads_manager(
     def backwards_replace_fac(replace):
         """Replace a gradient with the gradient of an argument."""
 
-        def backward_replace_hook(grad):
+        def backward_replace_hook(grad):  # pylint: disable=unused-argument
             """Replace a gradient with a closure object's gradient."""
             return replace.grad
 
@@ -567,6 +567,8 @@ def grads_manager(
             handles.append(
                 projected_acts.register_hook(backwards_cache_fac(current_name))
             )
+            # Note that the cached projected acts are neither cloned nor
+            # detached yet.
             acts_dict[current_name] = projected_acts
 
             # Decode projected acts.
@@ -583,7 +585,8 @@ def grads_manager(
             # Then break gradient for the new error tensor.
             error = error.detach().requires_grad_(True)
 
-            # Cache error activations.
+            # Note that the cached error acts are neither cloned nor detached
+            # yet.
             acts_dict[error_name] = error
 
             handles.append(
