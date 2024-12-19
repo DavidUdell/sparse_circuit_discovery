@@ -448,15 +448,8 @@ with grads_manager(
         percentile: None | float = percentiles.get(loc, None)
         if percentile is None:
             if "error_" not in loc:
-                _, top_indices = t.topk(
-                    weighted_prod, NUM_DOWN_NODES, largest=True
-                )
-                _, bottom_indices = t.topk(
-                    weighted_prod, NUM_DOWN_NODES, largest=False
-                )
-                indices: list = list(
-                    set(top_indices.tolist() + bottom_indices.tolist())
-                )
+                _, ab_top_indices = t.topk(weighted_prod.abs(), NUM_DOWN_NODES)
+                indices: list = list(set(ab_top_indices.tolist()))
             elif "error_" in loc:
                 # Sum across the error tensors, since we don't care about the
                 # edges into the neuron basis.
@@ -617,18 +610,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             bottom_values = up_values
             indices: list[int] = [0]
         else:
-            top_values, top_indices = t.topk(
-                up_values, NUM_UP_NODES, largest=True
-            )
-            bottom_values, bottom_indices = t.topk(
-                up_values, NUM_UP_NODES, largest=False
-            )
-            indices: list = list(
-                set(top_indices.tolist() + bottom_indices.tolist())
-            )
+            _, ab_top_indices = t.topk(up_values.abs(), NUM_UP_NODES)
+            indices: list = ab_top_indices.tolist()
 
-        color_max_scalar: float = top_values[0].item()
-        color_min_scalar: float = bottom_values[0].item()
+        color_max_scalar: float = t.max(up_values)
+        color_min_scalar: float = t.min(up_values)
 
         for up_dim, effect in enumerate(up_values):
             if up_dim not in indices:
