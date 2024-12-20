@@ -448,8 +448,10 @@ with grads_manager(
         percentile: None | float = percentiles.get(loc, None)
         if percentile is None:
             if "error_" not in loc:
-                _, ab_top_indices = t.topk(weighted_prod.abs(), NUM_DOWN_NODES)
-                indices: list = list(set(ab_top_indices.tolist()))
+                ab_top_values, ab_top_indices = t.topk(
+                    weighted_prod.abs(), NUM_DOWN_NODES
+                )
+                indices: list = ab_top_indices[ab_top_values > 0.0].tolist()
             elif "error_" in loc:
                 # Sum across the error tensors, since we don't care about the
                 # edges into the neuron basis.
