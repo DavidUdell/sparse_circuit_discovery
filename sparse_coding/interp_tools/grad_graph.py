@@ -423,7 +423,7 @@ with grads_manager(
 
     for loc, grad in grads_list:
         grad = grad.squeeze().unsqueeze(0)
-        act = acts_dict[loc].squeeze().unsqueeze(0)
+        act = -acts_dict[loc].squeeze().unsqueeze(0)
 
         # Perpare confound effects for subtraction, per down-node
         confounds_grads = quantify_double_counting_for_down_node(
@@ -470,6 +470,14 @@ with grads_manager(
                 indices: list = [indices]
             assert len(indices) > 0
         ####  End thresholding down-nodes  ####
+
+        print(loc, "effects:")
+        print(weighted_prod.to("cpu").detach())
+        print()
+
+        print(loc, "select nodes:")
+        print(indices)
+        print()
 
         for dim_idx in tqdm(indices, desc=loc):
             # Edge-level backward passes
