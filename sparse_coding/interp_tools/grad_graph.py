@@ -819,17 +819,17 @@ graph.add_node(
     f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"
 )
 
-# %%
-# Reproducibility test printouts.
-print("Activations:")
-for k, v in acts_dict.items():
-    print(k, v)
+# # %%
+# # Reproducibility test printouts.
+# print("Activations:")
+# for k, v in acts_dict.items():
+#     print(k, v)
 
-# Note that grads_list is used here; grads_dict is not accurate anymore by this
-# point.
-print("Gradients:")
-for k, v in grads_list:
-    print(k, v)
+# # Note that grads_list is used here; grads_dict is not accurate anymore by this
+# # point.
+# print("Gradients:")
+# for k, v in grads_list:
+#     print(k, v)
 
 # %%
 # Render graph
