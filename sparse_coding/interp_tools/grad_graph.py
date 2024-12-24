@@ -423,7 +423,7 @@ with grads_manager(
 
     for loc, grad in grads_list:
         grad = grad.squeeze().unsqueeze(0)
-        act = -acts_dict[loc].squeeze().unsqueeze(0)
+        act = acts_dict[loc].squeeze().unsqueeze(0)
 
         # Perpare confound effects for subtraction, per down-node
         confounds_grads = quantify_double_counting_for_down_node(
@@ -825,8 +825,8 @@ graph.add_node(
 # for k, v in acts_dict.items():
 #     print(k, v)
 
-# # Note that grads_list is used here; grads_dict is not accurate anymore by this
-# # point.
+# # Note that grads_list is used here; grads_dict is not accurate anymore by
+# # this point.
 # print("Gradients:")
 # for k, v in grads_list:
 #     print(k, v)
