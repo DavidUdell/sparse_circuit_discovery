@@ -378,6 +378,7 @@ target = tokens["input_ids"][:, -1].squeeze()
 
 acts_dict: dict = None
 grads_dict: dict = None
+marginal_grads_list: list = []
 marginal_grads_dict: dict = recursive_defaultdict()
 
 with grads_manager(
@@ -486,6 +487,9 @@ with grads_manager(
             weighted_prod[dim_idx].backward(retain_graph=True)
             _, marginal_grads = acts_and_grads
 
+            for k, v in marginal_grads.items():
+                marginal_grads_list.append((loc, dim_idx, k, v.to("cpu")))
+
             down_layer_idx = int(loc.split("_")[-1])
             up_layer_idx = down_layer_idx - 1
             if up_layer_idx not in layer_range:
@@ -503,6 +507,20 @@ with grads_manager(
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
+
+                printable = t.topk(
+                    t.einsum(
+                        "sd,sd->sd",
+                        marginal_grads[f"resid_{up_layer_idx}"][:, -1, :],
+                        acts_dict[f"resid_{up_layer_idx}"][:, -1, :],
+                    ).abs(),
+                    NUM_UP_NODES,
+                )
+                print("Down dim", dim_idx, "top up resid nodes:")
+                print(printable.indices.to("cpu"))
+                print(printable.values.to("cpu").detach())
+                print()
+
             elif "mlp_" in loc:
                 # attn-to-mlp
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
