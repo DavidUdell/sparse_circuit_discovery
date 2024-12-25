@@ -837,8 +837,7 @@ graph.add_node(
     f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"
 )
 
-# # %%
-# # Reproducibility test printouts.
+# # Act/grad regression test printouts.
 # print("Activations:")
 # for k, v in acts_dict.items():
 #     print(k, v)
