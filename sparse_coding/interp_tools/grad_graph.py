@@ -474,13 +474,14 @@ with grads_manager(
             assert len(indices) > 0
         ####  End thresholding down-nodes  ####
 
-        print(loc, "effects:")
-        print(weighted_prod.to("cpu").detach())
-        print()
+        # # Effect/down node regression test printouts
+        # print(loc, "effects:")
+        # print(weighted_prod.to("cpu").detach())
+        # print()
 
-        print(loc, "select nodes:")
-        print(indices)
-        print()
+        # print(loc, "select nodes:")
+        # print(indices)
+        # print()
 
         for dim_idx in tqdm(indices, desc=loc):
             # Edge-level backward passes
@@ -595,6 +596,17 @@ with grads_manager(
 # Here to have the newlines look nice in both the interactive notebooks and the
 # shell.
 print()
+
+# # Act/grad regression test printouts.
+# print("Activations:")
+# for k, v in acts_dict.items():
+#     print(k, v)
+
+# # Note that grads_list is used here; grads_dict is not accurate anymore by
+# # this point.
+# print("Gradients:")
+# for k, v in grads_list:
+#     print(k, v)
 
 # %%
 # Populate graph.
@@ -836,17 +848,6 @@ graph = prune_graph(graph)
 graph.add_node(
     f"Overall effect explained by autoencoders: ~{total_frac_explained*100}%"
 )
-
-# # Act/grad regression test printouts.
-# print("Activations:")
-# for k, v in acts_dict.items():
-#     print(k, v)
-
-# # Note that grads_list is used here; grads_dict is not accurate anymore by
-# # this point.
-# print("Gradients:")
-# for k, v in grads_list:
-#     print(k, v)
 
 # %%
 # Render graph
