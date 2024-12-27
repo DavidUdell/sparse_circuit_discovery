@@ -378,7 +378,6 @@ target = tokens["input_ids"][:, -1].squeeze()
 
 acts_dict: dict = None
 grads_dict: dict = None
-marginal_grads_list: list = []
 marginal_grads_dict: dict = recursive_defaultdict()
 
 with grads_manager(
@@ -478,7 +477,6 @@ with grads_manager(
         # print(loc, "effects:")
         # print(weighted_prod.to("cpu").detach())
         # print()
-
         # print(loc, "select nodes:")
         # print(indices)
         # print()
@@ -488,8 +486,12 @@ with grads_manager(
             weighted_prod[dim_idx].backward(retain_graph=True)
             _, marginal_grads = acts_and_grads
 
+            print("Down node", loc, dim_idx, "upstream grad:")
             for k, v in marginal_grads.items():
-                marginal_grads_list.append((loc, dim_idx, k, v.to("cpu")))
+                print(k)
+                print(v.to("cpu"))
+                print()
+            print()
 
             down_layer_idx = int(loc.split("_")[-1])
             up_layer_idx = down_layer_idx - 1
@@ -498,7 +500,6 @@ with grads_manager(
 
             # Down-node keys are:
             # resid_x, mlp_x, attn_x, resid_error_x, mlp_error_x, attn_error_x
-
             # Deduplicate and store edges
             if "attn_" in loc:
                 # resid-to-attn
@@ -509,18 +510,18 @@ with grads_manager(
                     dim_idx
                 ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
 
-                printable = t.topk(
-                    t.einsum(
-                        "sd,sd->sd",
-                        marginal_grads[f"resid_{up_layer_idx}"][:, -1, :],
-                        acts_dict[f"resid_{up_layer_idx}"][:, -1, :],
-                    ).abs(),
-                    NUM_UP_NODES,
-                )
-                print("Down dim", dim_idx, "top up resid nodes:")
-                print(printable.indices.to("cpu"))
-                print(printable.values.to("cpu").detach())
-                print()
+                # printable = t.topk(
+                #     t.einsum(
+                #         "sd,sd->sd",
+                #         marginal_grads[f"resid_{up_layer_idx}"][:, -1, :],
+                #         acts_dict[f"resid_{up_layer_idx}"][:, -1, :],
+                #     ).abs(),
+                #     NUM_UP_NODES,
+                # )
+                # print("Down dim", dim_idx, "top up resid nodes:")
+                # print(printable.indices.to("cpu"))
+                # print(printable.values.to("cpu").detach())
+                # print()
 
             elif "mlp_" in loc:
                 # attn-to-mlp
@@ -601,7 +602,6 @@ print()
 # print("Activations:")
 # for k, v in acts_dict.items():
 #     print(k, v)
-
 # # Note that grads_list is used here; grads_dict is not accurate anymore by
 # # this point.
 # print("Gradients:")
