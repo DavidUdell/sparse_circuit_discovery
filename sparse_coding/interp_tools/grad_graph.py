@@ -488,8 +488,8 @@ with grads_manager(
 
             print("Down node", loc, dim_idx, "upstream grad:")
             for k, v in marginal_grads.items():
-                print(k)
-                print(v.to("cpu"))
+                print("   ", k, str(list(v.shape)) + ":")
+                print("   ", v.to("cpu"))
                 print()
             print()
 
