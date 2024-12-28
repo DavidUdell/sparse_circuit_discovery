@@ -418,7 +418,7 @@ with grads_manager(
         # Perpare confound effects for subtraction, per down-node
         confounds_grads = quantify_double_counting_for_down_node(
             loc,
-            grads_dict,
+            old_grads_dict,
             acts_dict,
         )
         if isinstance(confounds_grads, tuple):
@@ -479,7 +479,7 @@ with grads_manager(
             print("Down node", loc, dim_idx, "upstream grad:")
             for k, v in marginal_grads.items():
                 print("   ", k, str(list(v.shape)) + ":")
-                print("   ", v.to("cpu"))
+                print("   ", v[:, -1, :].to("cpu"))
                 print()
             print()
 
