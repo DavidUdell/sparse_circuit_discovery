@@ -9,6 +9,7 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 import csv
 import os
 import re
+from copy import deepcopy
 from math import isnan
 
 import requests
@@ -378,6 +379,7 @@ target = tokens["input_ids"][:, -1].squeeze()
 
 acts_dict: dict = None
 grads_dict: dict = None
+old_grads_dict: dict = None
 marginal_grads_dict: dict = recursive_defaultdict()
 
 with grads_manager(
@@ -407,21 +409,9 @@ with grads_manager(
         assert act in grads_dict, act
         assert grad in acts_dict, grad
 
-    # Note that, because the closure remains in place for the backwards hooks,
-    # grads_dict going forward will be messed up by later backward passes. I
-    # don't want to actually close the closure because I want to leave the
-    # hooks in place. For accurate grads from the last backward pass, the
-    # grads_list object constructed next retains those. This is a cleaner
-    # solution to preserving that data than getting all of what I want with
-    # .clone() and .detach() trickery later on, actually.
-    grads_list: list = []
-    for loc, grad in grads_dict.items():
-        assert loc in acts_dict
-        grads_list.append((loc, grad))
-    # Ordered s.t. attn precedes mlp precedes resid.
-    grads_list.sort(key=lambda x: x[0])
+    old_grads_dict = deepcopy(grads_dict)
 
-    for loc, grad in grads_list:
+    for loc, grad in old_grads_dict.items():
         grad = grad.squeeze().unsqueeze(0)
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
@@ -605,7 +595,7 @@ print()
 # # Note that grads_list is used here; grads_dict is not accurate anymore by
 # # this point.
 # print("Gradients:")
-# for k, v in grads_list:
+# for k, v in old_grads_dict.items():
 #     print(k, v)
 
 # %%
