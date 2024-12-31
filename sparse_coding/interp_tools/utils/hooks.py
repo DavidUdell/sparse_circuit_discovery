@@ -490,6 +490,7 @@ def grads_manager(
     acts_dict: dict = {}
     grads_dict: dict = {}
     handles = []
+    ripcord = []
 
     def backwards_replace_fac(replace):
         """Replace a gradient with the gradient of an argument."""
@@ -599,7 +600,7 @@ def grads_manager(
             # This block brings this repo's grads into alignment with the Bau
             # Lab implementation.
             reconstructed.retain_grad()
-            handles.append(
+            ripcord.append(
                 hidden.register_hook(backwards_replace_fac(reconstructed))
             )
 
@@ -647,7 +648,7 @@ def grads_manager(
         )
 
     try:
-        yield (acts_dict, grads_dict)
+        yield (acts_dict, grads_dict, ripcord)
     finally:
         for handle in handles:
             handle.remove()

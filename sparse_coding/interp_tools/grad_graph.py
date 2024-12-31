@@ -170,7 +170,7 @@ def quantify_double_counting_for_down_node(
             mlp_affecting_resid.backward(retain_graph=True)
         else:
             mlp_affecting_resid[-1].backward(retain_graph=True)
-        _, x_to_mlp_to_resid_grads = acts_and_grads
+        _, x_to_mlp_to_resid_grads, _ = acts_and_grads
 
         # RESID:
         # resid-to-resid - (resid-to-attn-to-resid) - (resid-to-mlp-to-resid)
@@ -197,7 +197,7 @@ def quantify_double_counting_for_down_node(
             attn_affecting_resid.backward(retain_graph=True)
         else:
             attn_affecting_resid[-1].backward(retain_graph=True)
-        _, resid_to_attn_to_resid_grads = acts_and_grads
+        _, resid_to_attn_to_resid_grads, _ = acts_and_grads
 
         return x_to_mlp_to_resid_grads, resid_to_attn_to_resid_grads
 
@@ -226,7 +226,7 @@ def quantify_double_counting_for_down_node(
             attn_affecting_mlp.backward(retain_graph=True)
         else:
             attn_affecting_mlp[-1].backward(retain_graph=True)
-        _, resid_to_attn_to_mlp_grads = acts_and_grads
+        _, resid_to_attn_to_mlp_grads, _ = acts_and_grads
         return resid_to_attn_to_mlp_grads
 
     assert re.match("attn_", down_node_location)
@@ -403,11 +403,14 @@ with grads_manager(
     )
     loss.backward(retain_graph=True)
 
-    acts_dict, grads_dict = acts_and_grads
+    acts_dict, grads_dict, ripcord = acts_and_grads
 
-    for act, grad in zip(acts_dict, grads_dict):
-        assert act in grads_dict, act
-        assert grad in acts_dict, grad
+    # This block brings edge grads later on into correspondence with the Bau
+    # Lab implementation. The backward hooks need to change for succeeding
+    # backward passes; this removes the gradient replacement hooks used above
+    # that are now unwanted.
+    for h in ripcord:
+        h.remove()
 
     old_grads_dict = deepcopy(grads_dict)
 
@@ -474,7 +477,7 @@ with grads_manager(
         for dim_idx in tqdm(indices, desc=loc):
             # Edge-level backward passes
             weighted_prod[dim_idx].backward(retain_graph=True)
-            _, marginal_grads = acts_and_grads
+            _, marginal_grads, _ = acts_and_grads
 
             print("Down node", loc, dim_idx, "upstream grad:")
             for k, v in marginal_grads.items():
