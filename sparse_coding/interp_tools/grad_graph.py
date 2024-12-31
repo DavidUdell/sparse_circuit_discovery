@@ -623,6 +623,14 @@ print()
 # for k, v in old_grads_dict.items():
 #     print(k, v)
 
+# Marginal-effects regression test printouts.
+print("Marginal effects:")
+for k, v in marginal_grads_dict.items():
+    print(k)
+    for i, j in v.items():
+        print(i, j.detach())
+    print()
+
 # %%
 # Populate graph.
 print("Computing top-k/bottom-k graph edges:")
