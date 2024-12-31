@@ -479,13 +479,6 @@ with grads_manager(
             weighted_prod[dim_idx].backward(retain_graph=True)
             _, marginal_grads, _ = acts_and_grads
 
-            print("Down node", loc, dim_idx, "upstream grad:")
-            for k, v in marginal_grads.items():
-                print("   ", k, str(list(v.shape)) + ":")
-                print("   ", v[:, -1, :].to("cpu"))
-                print()
-            print()
-
             down_layer_idx = int(loc.split("_")[-1])
             up_layer_idx = down_layer_idx - 1
             if up_layer_idx not in layer_range:
@@ -498,32 +491,37 @@ with grads_manager(
                 # resid-to-attn
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    marginal_grads[f"resid_{up_layer_idx}"],
+                    acts_dict[f"resid_{up_layer_idx}"],
+                ).cpu()
+
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
-
-                # printable = t.topk(
-                #     t.einsum(
-                #         "sd,sd->sd",
-                #         marginal_grads[f"resid_{up_layer_idx}"][:, -1, :],
-                #         acts_dict[f"resid_{up_layer_idx}"][:, -1, :],
-                #     ).abs(),
-                #     NUM_UP_NODES,
-                # )
-                # print("Down dim", dim_idx, "top up resid nodes:")
-                # print(printable.indices.to("cpu"))
-                # print(printable.values.to("cpu").detach())
-                # print()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    marginal_grads[f"resid_error_{up_layer_idx}"],
+                    acts_dict[f"resid_error_{up_layer_idx}"],
+                ).cpu()
 
             elif "mlp_" in loc:
                 # attn-to-mlp
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    marginal_grads[f"attn_{down_layer_idx}"],
+                    acts_dict[f"attn_{down_layer_idx}"],
+                ).cpu()
+
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    marginal_grads[f"attn_error_{down_layer_idx}"],
+                    acts_dict[f"attn_error_{down_layer_idx}"],
+                ).cpu()
 
                 # resid-to-mlp - (resid-attn-mlp)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
@@ -561,10 +559,19 @@ with grads_manager(
                 # mlp-to-resid
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"mlp_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    marginal_grads[f"mlp_{down_layer_idx}"],
+                    acts_dict[f"mlp_{down_layer_idx}"],
+                ).cpu()
+
                 marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"mlp_error_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    marginal_grads[f"mlp_error_{down_layer_idx}"],
+                    acts_dict[f"mlp_error_{down_layer_idx}"],
+                ).cpu()
 
                 # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
