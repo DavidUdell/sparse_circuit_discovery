@@ -6,15 +6,18 @@ import torch as t
 
 
 class SimpleModel(t.nn.Module):
-    """Toy single layer model."""
+    """Toy two-layer model."""
 
     def __init__(self):
         super(SimpleModel, self).__init__()
-        self.linear = t.nn.Linear(3, 3)
+        self.linear_1 = t.nn.Linear(3, 3)
+        self.linear_2 = t.nn.Linear(3, 3)
 
     def forward(self, x):
         """Linear-only forward pass."""
-        return self.linear(x)
+        x = self.linear_1(x)
+        x = self.linear_2(x)
+        return x
 
 
 model = SimpleModel()
@@ -35,19 +38,30 @@ def hooks_manager(model_in, projection_in, reconstruction_in):
     gradients = {}
     handles = []
 
-    def backward_hook(grad):
-        gradients["grads"] = grad
+    def backward_hook_fac(name: str):
+        def backward_hook(grad):
+            gradients[name] = grad
 
-    def forward_hook(
-        module, inputs, output  # pylint: disable=unused-argument
-    ):
-        output = projection_in(output)
-        output = t.relu(output)
-        handles.append(output.register_hook(backward_hook))
-        output = reconstruction_in(output)
-        return output
+        return backward_hook
 
-    handles.append(model_in.register_forward_hook(forward_hook))
+    def forward_hook_fac(name: str):
+        def forward_hook(
+            module, inputs, output  # pylint: disable=unused-argument
+        ):
+            output = projection_in(output)
+            output = t.relu(output)
+            handles.append(output.register_hook(backward_hook_fac(name)))
+            output = reconstruction_in(output)
+            return output
+
+        return forward_hook
+
+    handles.append(
+        model_in.linear_1.register_forward_hook(forward_hook_fac("Linear_1"))
+    )
+    handles.append(
+        model_in.linear_2.register_forward_hook(forward_hook_fac("Linear_2"))
+    )
 
     try:
         yield gradients
@@ -61,14 +75,17 @@ with hooks_manager(model, projection, reconstruction) as grads:
     loss = loss_fn(activation, target)
     loss.backward(retain_graph=True)
     grads_dict = grads
-    print(grads_dict["grads"], end="\n\n")
+    print(grads_dict["Linear_1"])
+    print(grads_dict["Linear_2"], end="\n\n")
 
     intermediate_scalar = activation[:, 1]
     intermediate_scalar.backward(retain_graph=True)
     grads_dict = grads
-    print(grads_dict["grads"], end="\n\n")
+    print(grads_dict["Linear_1"])
+    print(grads_dict["Linear_2"], end="\n\n")
 
     intermediate_scalar = activation[:, -1]
     intermediate_scalar.backward(retain_graph=True)
     grads_dict = grads
-    print(grads_dict["grads"], end="\n\n")
+    print(grads_dict["Linear_1"])
+    print(grads_dict["Linear_2"], end="\n\n")
