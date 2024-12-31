@@ -38,6 +38,12 @@ def hooks_manager(model_in, projection_in, reconstruction_in):
     gradients = {}
     handles = []
 
+    def backward_replace_fac(replace: t.Tensor):
+        def replace_hook(grad):  # pylint: disable=unused-argument
+            return replace.grad
+
+        return replace_hook
+
     def backward_hook_fac(name: str):
         def backward_hook(grad):
             gradients[name] = grad
@@ -48,11 +54,20 @@ def hooks_manager(model_in, projection_in, reconstruction_in):
         def forward_hook(
             module, inputs, output  # pylint: disable=unused-argument
         ):
-            output = projection_in(output)
-            output = t.relu(output)
-            handles.append(output.register_hook(backward_hook_fac(name)))
-            output = reconstruction_in(output)
-            return output
+            projected_acts = projection_in(output)
+            projected_acts = t.relu(projected_acts)
+            handles.append(
+                projected_acts.register_hook(backward_hook_fac(name))
+            )
+            decoded_acts = reconstruction_in(projected_acts)
+            error = output - decoded_acts
+            error = error.detach().requires_grad_(True)
+            reconstructed = decoded_acts + error
+            reconstructed.retain_grad()
+            handles.append(
+                output.register_hook(backward_replace_fac(reconstructed))
+            )
+            return reconstructed
 
         return forward_hook
 
