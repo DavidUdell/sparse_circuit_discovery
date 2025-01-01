@@ -494,16 +494,20 @@ with grads_manager(
                 ] = t.einsum(
                     "...sd,...sd->...sd",
                     marginal_grads[f"resid_{up_layer_idx}"],
-                    acts_dict[f"resid_{up_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"resid_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
                     marginal_grads[f"resid_error_{up_layer_idx}"],
-                    acts_dict[f"resid_error_{up_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"resid_error_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
             elif "mlp_" in loc:
                 # attn-to-mlp
@@ -512,16 +516,20 @@ with grads_manager(
                 ] = t.einsum(
                     "...sd,...sd->...sd",
                     marginal_grads[f"attn_{down_layer_idx}"],
-                    acts_dict[f"attn_{down_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"attn_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
                     marginal_grads[f"attn_error_{down_layer_idx}"],
-                    acts_dict[f"attn_error_{down_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"attn_error_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 # resid-to-mlp - (resid-attn-mlp)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
@@ -532,8 +540,10 @@ with grads_manager(
                     - resid_attn_mlp_grads[  # pylint: disable=possibly-used-before-assignment
                         f"attn_{down_layer_idx}"
                     ],
-                    acts_dict[f"resid_{up_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"resid_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
@@ -541,8 +551,10 @@ with grads_manager(
                     "...sd,...sd->...sd",
                     marginal_grads[f"resid_error_{up_layer_idx}"]
                     - resid_attn_mlp_grads[f"attn_error_{down_layer_idx}"],
-                    acts_dict[f"resid_error_{up_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"resid_error_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
             elif "resid_" in loc:
                 # attn-to-resid - (attn-mlp-resid)
@@ -554,8 +566,10 @@ with grads_manager(
                     - x_mlp_resid_grads[  # pylint: disable=possibly-used-before-assignment
                         f"mlp_{down_layer_idx}"
                     ],
-                    acts_dict[f"attn_{down_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"attn_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
@@ -563,8 +577,10 @@ with grads_manager(
                     "...sd,...sd->...sd",
                     marginal_grads[f"attn_error_{down_layer_idx}"]
                     - x_mlp_resid_grads[f"mlp_error_{down_layer_idx}"],
-                    acts_dict[f"attn_error_{down_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"attn_error_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 # mlp-to-resid
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
@@ -572,16 +588,20 @@ with grads_manager(
                 ] = t.einsum(
                     "...sd,...sd->...sd",
                     marginal_grads[f"mlp_{down_layer_idx}"],
-                    acts_dict[f"mlp_{down_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"mlp_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
                     marginal_grads[f"mlp_error_{down_layer_idx}"],
-                    acts_dict[f"mlp_error_{down_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"mlp_error_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
@@ -593,8 +613,10 @@ with grads_manager(
                         f"attn_{down_layer_idx}"
                     ]
                     - x_mlp_resid_grads[f"mlp_{down_layer_idx}"],
-                    acts_dict[f"resid_{up_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"resid_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
@@ -603,8 +625,10 @@ with grads_manager(
                     marginal_grads[f"resid_error_{up_layer_idx}"]
                     - resid_attn_resid_grads[f"attn_error_{down_layer_idx}"]
                     - x_mlp_resid_grads[f"mlp_error_{down_layer_idx}"],
-                    acts_dict[f"resid_error_{up_layer_idx}"],
-                ).cpu()
+                    -acts_dict[f"resid_error_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
 
             else:
                 raise ValueError("Module location not recognized.")
