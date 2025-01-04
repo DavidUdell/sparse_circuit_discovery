@@ -499,7 +499,7 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"resid_{up_layer_idx}"],
+                    old_marginal_grads[f"resid_{up_layer_idx}"],
                     -acts_dict[f"resid_{up_layer_idx}"],
                 )[
                     :, -1, :
@@ -509,7 +509,7 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"resid_error_{up_layer_idx}"],
+                    old_marginal_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
                     :, -1, :
@@ -521,7 +521,7 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"attn_{down_layer_idx}"],
+                    old_marginal_grads[f"attn_{down_layer_idx}"],
                     -acts_dict[f"attn_{down_layer_idx}"],
                 )[
                     :, -1, :
@@ -531,7 +531,7 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"attn_error_{down_layer_idx}"],
+                    old_marginal_grads[f"attn_error_{down_layer_idx}"],
                     -acts_dict[f"attn_error_{down_layer_idx}"],
                 )[
                     :, -1, :
@@ -555,8 +555,8 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"resid_error_{up_layer_idx}"]
-                    - resid_attn_mlp_grads[f"attn_error_{down_layer_idx}"],
+                    old_marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - resid_attn_mlp_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
                     :, -1, :
@@ -568,9 +568,9 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"attn_{down_layer_idx}"]
+                    old_marginal_grads[f"attn_{down_layer_idx}"]
                     - x_mlp_resid_grads[  # pylint: disable=possibly-used-before-assignment
-                        f"mlp_{down_layer_idx}"
+                        f"attn_{down_layer_idx}"
                     ],
                     -acts_dict[f"attn_{down_layer_idx}"],
                 )[
@@ -581,8 +581,8 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"attn_error_{down_layer_idx}"]
-                    - x_mlp_resid_grads[f"mlp_error_{down_layer_idx}"],
+                    old_marginal_grads[f"attn_error_{down_layer_idx}"]
+                    - x_mlp_resid_grads[f"attn_error_{down_layer_idx}"],
                     -acts_dict[f"attn_error_{down_layer_idx}"],
                 )[
                     :, -1, :
@@ -593,7 +593,7 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"mlp_{down_layer_idx}"],
+                    old_marginal_grads[f"mlp_{down_layer_idx}"],
                     -acts_dict[f"mlp_{down_layer_idx}"],
                 )[
                     :, -1, :
@@ -603,7 +603,7 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"mlp_error_{down_layer_idx}"],
+                    old_marginal_grads[f"mlp_error_{down_layer_idx}"],
                     -acts_dict[f"mlp_error_{down_layer_idx}"],
                 )[
                     :, -1, :
@@ -614,11 +614,11 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"resid_{up_layer_idx}"]
+                    old_marginal_grads[f"resid_{up_layer_idx}"]
                     - resid_attn_resid_grads[  # pylint: disable=possibly-used-before-assignment
-                        f"attn_{down_layer_idx}"
+                        f"resid_{up_layer_idx}"
                     ]
-                    - x_mlp_resid_grads[f"mlp_{down_layer_idx}"],
+                    - x_mlp_resid_grads[f"resid_{up_layer_idx}"],
                     -acts_dict[f"resid_{up_layer_idx}"],
                 )[
                     :, -1, :
@@ -628,9 +628,9 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"resid_error_{up_layer_idx}"]
-                    - resid_attn_resid_grads[f"attn_error_{down_layer_idx}"]
-                    - x_mlp_resid_grads[f"mlp_error_{down_layer_idx}"],
+                    old_marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - resid_attn_resid_grads[f"resid_error_{up_layer_idx}"]
+                    - x_mlp_resid_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
                     :, -1, :
