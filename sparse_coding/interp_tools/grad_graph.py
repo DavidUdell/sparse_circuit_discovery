@@ -155,12 +155,12 @@ def quantify_double_counting_for_down_node(
         mlp_affecting_resid = (
             t.einsum(
                 "...sd,...sd->...s",
-                gradients[mlp_handle].detach(),
+                gradients[mlp_handle],
                 activations[mlp_handle],
             ).squeeze()
             + t.einsum(
                 "...sd,...sd->...s",
-                gradients[mlp_err_handle].detach(),
+                gradients[mlp_err_handle],
                 activations[mlp_err_handle],
             ).squeeze()
         )
@@ -171,6 +171,7 @@ def quantify_double_counting_for_down_node(
         else:
             mlp_affecting_resid[-1].backward(retain_graph=True)
         _, x_to_mlp_to_resid_grads, _ = acts_and_grads
+        x_to_mlp_to_resid_grads = deepcopy(x_to_mlp_to_resid_grads)
 
         # RESID:
         # resid-to-resid - (resid-to-attn-to-resid) - (resid-to-mlp-to-resid)
@@ -182,12 +183,12 @@ def quantify_double_counting_for_down_node(
         attn_affecting_resid = (
             t.einsum(
                 "...sd,...sd->...s",
-                gradients[attn_handle].detach(),
+                gradients[attn_handle],
                 activations[attn_handle],
             ).squeeze()
             + t.einsum(
                 "...sd,...sd->...s",
-                gradients[attn_err_handle].detach(),
+                gradients[attn_err_handle],
                 activations[attn_err_handle],
             ).squeeze()
         )
@@ -211,12 +212,12 @@ def quantify_double_counting_for_down_node(
         attn_affecting_mlp = (
             t.einsum(
                 "...sd,...sd->...s",
-                gradients[attn_handle].detach(),
+                gradients[attn_handle],
                 activations[attn_handle],
             ).squeeze()
             + t.einsum(
                 "...sd,...sd->...s",
-                gradients[attn_err_handle].detach(),
+                gradients[attn_err_handle],
                 activations[attn_err_handle],
             ).squeeze()
         )
@@ -418,17 +419,6 @@ with grads_manager(
         grad = grad.squeeze().unsqueeze(0)
         act = acts_dict[loc].squeeze().unsqueeze(0)
 
-        # Perpare confound effects for subtraction, per down-node
-        confounds_grads = quantify_double_counting_for_down_node(
-            loc,
-            old_grads_dict,
-            acts_dict,
-        )
-        if isinstance(confounds_grads, tuple):
-            x_mlp_resid_grads, resid_attn_resid_grads = confounds_grads
-        if confounds_grads is not None:
-            resid_attn_mlp_grads: dict = confounds_grads
-
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
         # Standardize weighted_prod shape
         if weighted_prod.dim() == 2:
@@ -479,10 +469,26 @@ with grads_manager(
             weighted_prod[dim_idx].backward(retain_graph=True)
             _, marginal_grads, _ = acts_and_grads
 
+            old_marginal_grads = deepcopy(marginal_grads)
+
             down_layer_idx = int(loc.split("_")[-1])
             up_layer_idx = down_layer_idx - 1
             if up_layer_idx not in layer_range:
                 continue
+
+            # Perpare confound effects for subtraction, per down-node
+            confounds_grads = quantify_double_counting_for_down_node(
+                loc,
+                marginal_grads,
+                acts_dict,
+            )
+            if isinstance(confounds_grads, tuple):
+                x_mlp_resid_grads, resid_attn_resid_grads = confounds_grads
+                x_mlp_resid_grads = deepcopy(x_mlp_resid_grads)
+                resid_attn_resid_grads = deepcopy(resid_attn_resid_grads)
+            if confounds_grads is not None:
+                resid_attn_mlp_grads: dict = confounds_grads
+                resid_attn_mlp_grads = deepcopy(resid_attn_mlp_grads)
 
             # Down-node keys are:
             # resid_x, mlp_x, attn_x, resid_error_x, mlp_error_x, attn_error_x
@@ -536,9 +542,9 @@ with grads_manager(
                     dim_idx
                 ] = t.einsum(
                     "...sd,...sd->...sd",
-                    marginal_grads[f"resid_{up_layer_idx}"]
+                    old_marginal_grads[f"resid_{up_layer_idx}"]
                     - resid_attn_mlp_grads[  # pylint: disable=possibly-used-before-assignment
-                        f"attn_{down_layer_idx}"
+                        f"resid_{up_layer_idx}"
                     ],
                     -acts_dict[f"resid_{up_layer_idx}"],
                 )[
