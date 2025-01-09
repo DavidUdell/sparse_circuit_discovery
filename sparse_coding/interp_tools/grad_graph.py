@@ -143,6 +143,10 @@ def quantify_double_counting_for_down_node(
     resid_pattern: str = "(resid_error_|resid_)"
     mlp_pattern: str = "(mlp_error_|mlp_)"
 
+    # We don't want the input gradients to change dynamically if we need to
+    # take several backward pass measurements:
+    gradients = deepcopy(gradients)
+
     # Deal with two possible cases; we only know the down node is resid
     if re.match("resid_", down_node_location) is not None:
         # RESID: attn-to-resid - (attn-to-mlp-to-resid)
@@ -151,7 +155,7 @@ def quantify_double_counting_for_down_node(
         mlp_err_handle: str = re.sub(
             resid_pattern, "mlp_error_", down_node_location
         )
-        # Weight mlp acts by effect on resid; detach grads
+        # Weight mlp acts by effect on resid.
         mlp_affecting_resid = (
             t.einsum(
                 "...sd,...sd->...s",
@@ -175,6 +179,7 @@ def quantify_double_counting_for_down_node(
 
         # RESID:
         # resid-to-resid - (resid-to-attn-to-resid) - (resid-to-mlp-to-resid)
+        # + (resid-to-attn-to-mlp-to-resid)
         # (sub in mlp case was already covered), sub in attn
         attn_handle: str = re.sub(resid_pattern, "attn_", down_node_location)
         attn_err_handle: str = re.sub(
@@ -199,8 +204,32 @@ def quantify_double_counting_for_down_node(
         else:
             attn_affecting_resid[-1].backward(retain_graph=True)
         _, resid_to_attn_to_resid_grads, _ = acts_and_grads
+        resid_to_attn_to_resid_grads = deepcopy(resid_to_attn_to_resid_grads)
 
-        return x_to_mlp_to_resid_grads, resid_to_attn_to_resid_grads
+        attn_affecting_mlp_affecting_resid = (
+            t.einsum(
+                "...sd,...sd->...s",
+                x_to_mlp_to_resid_grads[attn_handle],
+                activations[attn_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                x_to_mlp_to_resid_grads[attn_err_handle],
+                activations[attn_err_handle],
+            ).squeeze()
+        )
+        if attn_affecting_mlp_affecting_resid.dim() == 0:
+            attn_affecting_mlp_affecting_resid.backward(retain_graph=True)
+        else:
+            attn_affecting_mlp_affecting_resid[-1].backward(retain_graph=True)
+        # up_resid affecting attn affecting mlp affecting resid
+        _, full_confound_grads, _ = acts_and_grads
+
+        return (
+            x_to_mlp_to_resid_grads,
+            resid_to_attn_to_resid_grads,
+            full_confound_grads,
+        )
 
     # MLP: resid-to-mlp - (resid-to-attn-to-mlp)
     if re.match("mlp_", down_node_location) is not None:
@@ -483,9 +512,12 @@ with grads_manager(
                 acts_dict,
             )
             if isinstance(confounds_grads, tuple):
-                x_mlp_resid_grads, resid_attn_resid_grads = confounds_grads
+                x_mlp_resid_grads, resid_attn_resid_grads, full_path_grads = (
+                    confounds_grads
+                )
                 x_mlp_resid_grads = deepcopy(x_mlp_resid_grads)
                 resid_attn_resid_grads = deepcopy(resid_attn_resid_grads)
+                full_path_grads = deepcopy(full_path_grads)
             if confounds_grads is not None:
                 resid_attn_mlp_grads: dict = confounds_grads
                 resid_attn_mlp_grads = deepcopy(resid_attn_mlp_grads)
@@ -610,6 +642,7 @@ with grads_manager(
                 ].cpu()
 
                 # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
+                # + (resid-attn-mlp-resid)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
@@ -618,7 +651,8 @@ with grads_manager(
                     - resid_attn_resid_grads[  # pylint: disable=possibly-used-before-assignment
                         f"resid_{up_layer_idx}"
                     ]
-                    - x_mlp_resid_grads[f"resid_{up_layer_idx}"],
+                    - x_mlp_resid_grads[f"resid_{up_layer_idx}"]
+                    + full_path_grads[f"resid_{up_layer_idx}"],
                     -acts_dict[f"resid_{up_layer_idx}"],
                 )[
                     :, -1, :
@@ -630,7 +664,8 @@ with grads_manager(
                     "...sd,...sd->...sd",
                     old_marginal_grads[f"resid_error_{up_layer_idx}"]
                     - resid_attn_resid_grads[f"resid_error_{up_layer_idx}"]
-                    - x_mlp_resid_grads[f"resid_error_{up_layer_idx}"],
+                    - x_mlp_resid_grads[f"resid_error_{up_layer_idx}"]
+                    + full_path_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
                     :, -1, :
