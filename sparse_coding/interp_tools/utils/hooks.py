@@ -1,6 +1,8 @@
 """Ablation and caching hooks."""
 
+import re
 from collections import defaultdict
+from copy import deepcopy
 from contextlib import contextmanager
 from textwrap import dedent
 from typing import Generator
@@ -708,3 +710,139 @@ def attn_mlp_acts_manager(
     finally:
         for handle in handles:
             handle.remove()
+
+
+def measure_confounds(
+    down_node_location: str,
+    gradients: dict,
+    activations: dict,
+    acts_and_grads,
+) -> tuple | dict | None:
+    """
+    Provide confound effect grads for each down-node.
+
+    This function runs inside a backward-pass context manager which has a
+    global `acts_and_grads`. The edges resid-to-attn, attn-to-mlp, mlp-to-resid
+    have no confounds.
+    """
+    resid_pattern: str = "(resid_error_|resid_)"
+    mlp_pattern: str = "(mlp_error_|mlp_)"
+
+    # We don't want the input gradients to change dynamically if we need to
+    # take several backward pass measurements:
+    gradients = deepcopy(gradients)
+
+    # Deal with two possible cases; we only know the down node is resid
+    if re.match("resid_", down_node_location) is not None:
+        # RESID: attn-to-resid - (attn-to-mlp-to-resid)
+        # sub in mlp
+        mlp_handle: str = re.sub(resid_pattern, "mlp_", down_node_location)
+        mlp_err_handle: str = re.sub(
+            resid_pattern, "mlp_error_", down_node_location
+        )
+        # Weight mlp acts by effect on resid.
+        mlp_affecting_resid = (
+            t.einsum(
+                "...sd,...sd->...s",
+                gradients[mlp_handle],
+                activations[mlp_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                gradients[mlp_err_handle],
+                activations[mlp_err_handle],
+            ).squeeze()
+        )
+        # Differentiate effects w/r/t attn
+        if mlp_affecting_resid.dim() == 0:
+            # Single-token prompt edge case.
+            mlp_affecting_resid.backward(retain_graph=True)
+        else:
+            mlp_affecting_resid[-1].backward(retain_graph=True)
+        _, x_to_mlp_to_resid_grads, _ = acts_and_grads
+        x_to_mlp_to_resid_grads = deepcopy(x_to_mlp_to_resid_grads)
+
+        # RESID:
+        # resid-to-resid - (resid-to-attn-to-resid) - (resid-to-mlp-to-resid)
+        # + (resid-to-attn-to-mlp-to-resid)
+        # (sub in mlp case was already covered), sub in attn
+        attn_handle: str = re.sub(resid_pattern, "attn_", down_node_location)
+        attn_err_handle: str = re.sub(
+            resid_pattern, "attn_error_", down_node_location
+        )
+        attn_affecting_resid = (
+            t.einsum(
+                "...sd,...sd->...s",
+                gradients[attn_handle],
+                activations[attn_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                gradients[attn_err_handle],
+                activations[attn_err_handle],
+            ).squeeze()
+        )
+        # Differentiate effects w/r/t resid
+        if attn_affecting_resid.dim() == 0:
+            # Single-token prompt edge case.
+            attn_affecting_resid.backward(retain_graph=True)
+        else:
+            attn_affecting_resid[-1].backward(retain_graph=True)
+        _, resid_to_attn_to_resid_grads, _ = acts_and_grads
+        resid_to_attn_to_resid_grads = deepcopy(resid_to_attn_to_resid_grads)
+
+        attn_affecting_mlp_affecting_resid = (
+            t.einsum(
+                "...sd,...sd->...s",
+                x_to_mlp_to_resid_grads[attn_handle],
+                activations[attn_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                x_to_mlp_to_resid_grads[attn_err_handle],
+                activations[attn_err_handle],
+            ).squeeze()
+        )
+        if attn_affecting_mlp_affecting_resid.dim() == 0:
+            attn_affecting_mlp_affecting_resid.backward(retain_graph=True)
+        else:
+            attn_affecting_mlp_affecting_resid[-1].backward(retain_graph=True)
+        # up_resid affecting attn affecting mlp affecting resid
+        _, full_confound_grads, _ = acts_and_grads
+
+        return (
+            x_to_mlp_to_resid_grads,
+            resid_to_attn_to_resid_grads,
+            full_confound_grads,
+        )
+
+    # MLP: resid-to-mlp - (resid-to-attn-to-mlp)
+    if re.match("mlp_", down_node_location) is not None:
+        # sub in attn
+        attn_handle: str = re.sub(mlp_pattern, "attn_", down_node_location)
+        attn_err_handle: str = re.sub(
+            mlp_pattern, "attn_error_", down_node_location
+        )
+        attn_affecting_mlp = (
+            t.einsum(
+                "...sd,...sd->...s",
+                gradients[attn_handle],
+                activations[attn_handle],
+            ).squeeze()
+            + t.einsum(
+                "...sd,...sd->...s",
+                gradients[attn_err_handle],
+                activations[attn_err_handle],
+            ).squeeze()
+        )
+        # Differentiate effects w/r/t resid
+        if attn_affecting_mlp.dim() == 0:
+            # Single-token prompt edge case.
+            attn_affecting_mlp.backward(retain_graph=True)
+        else:
+            attn_affecting_mlp[-1].backward(retain_graph=True)
+        _, resid_to_attn_to_mlp_grads, _ = acts_and_grads
+        return resid_to_attn_to_mlp_grads
+
+    assert re.match("attn_", down_node_location)
+    return None
