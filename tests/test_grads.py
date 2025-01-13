@@ -1,53 +1,98 @@
 """Test the grads manager."""
 
 from copy import deepcopy
+from runpy import run_module
 
 import torch as t
 from accelerate import Accelerator
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import wandb
 
-from sparse_coding.utils.interface import slice_to_range
+from sparse_coding.utils.interface import (
+    slice_to_range,
+    load_yaml_constants,
+    parse_slice,
+)
 from sparse_coding.utils.tasks import recursive_defaultdict
 from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
     measure_confounds,
     prepare_autoencoder_and_indices,
 )
+from tests.test_smoke_sparse_coding import (  # pylint: disable=unused-import
+    mock_interface,
+)
 
 
-def test_edge_level_effects():
+def test_edge_level_effects(
+    mock_interface,
+):  # pylint: disable=redefined-outer-name, unused-argument
     """Assert correctness of edge-level effects across layers 11-12."""
+
+    # Self-contained preparations.
+    scripts = [
+        "collect_acts",
+        "load_autoencoder",
+        "interp_tools.contexts",
+    ]
+    for script in scripts:
+        with wandb.init(mode="offline"):
+            run_module(f"sparse_coding.{script}")
+
+    # Test constants are patched over
+    _, config = load_yaml_constants(__file__)
+
+    model_dir = config.get("MODEL_DIR")
+    prompt = config.get("PROMPT")
+    acts_layers_slice = parse_slice(config.get("ACTS_LAYERS_SLICE"))
+    encoder_file = config.get("ENCODER_FILE")
+    enc_biases_file = config.get("ENC_BIASES_FILE")
+    decoder_file = config.get("DECODER_FILE")
+    dec_biases_file = config.get("DEC_BIASES_FILE")
+    attn_encoder_file = config.get("ATTN_ENCODER_FILE")
+    attn_enc_biases_file = config.get("ATTN_ENC_BIASES_FILE")
+    attn_decoder_file = config.get("ATTN_DECODER_FILE")
+    attn_dec_biases_file = config.get("ATTN_DEC_BIASES_FILE")
+    mlp_encoder_file = config.get("MLP_ENCODER_FILE")
+    mlp_enc_biases_file = config.get("MLP_ENC_BIASES_FILE")
+    mlp_decoder_file = config.get("MLP_DECODER_FILE")
+    mlp_dec_biases_file = config.get("MLP_DEC_BIASES_FILE")
+    resid_tokens_file = config.get("TOP_K_INFO_FILE")
+    attn_tokens_file = config.get("ATTN_TOKEN_FILE")
+    mlp_tokens_file = config.get("MLP_TOKEN_FILE")
+    num_down_nodes = config.get("NUM_DOWN_NODES")
+
     model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
-        MODEL_DIR,
+        model_dir,
         output_hidden_states=True,
         return_dict_in_generate=True,
     )
     tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(
-        MODEL_DIR, clean_up_tokenization_spaces=True
+        model_dir, clean_up_tokenization_spaces=True
     )
     accelerator: Accelerator = Accelerator()
 
     model = accelerator.prepare(model)
-    layer_range = slice_to_range(model, ACTS_LAYERS_SLICE)
+    layer_range = slice_to_range(model, acts_layers_slice)
 
     # %%
     # Prepare all layer range autoencoders.
     # Residual autoencoders
     res_enc_and_biases, _ = prepare_autoencoder_and_indices(
         layer_range,
-        MODEL_DIR,
-        ENCODER_FILE,
-        ENC_BIASES_FILE,
-        RESID_TOKENS_FILE,
+        model_dir,
+        encoder_file,
+        enc_biases_file,
+        resid_tokens_file,
         accelerator,
         __file__,
     )
     res_dec_and_biases, _ = prepare_autoencoder_and_indices(
         layer_range,
-        MODEL_DIR,
-        DECODER_FILE,
-        DEC_BIASES_FILE,
-        RESID_TOKENS_FILE,
+        model_dir,
+        decoder_file,
+        dec_biases_file,
+        resid_tokens_file,
         accelerator,
         __file__,
     )
@@ -55,19 +100,19 @@ def test_edge_level_effects():
     # Attention autoencoders
     attn_enc_and_biases, _ = prepare_autoencoder_and_indices(
         layer_range,
-        MODEL_DIR,
-        ATTN_ENCODER_FILE,
-        ATTN_ENC_BIASES_FILE,
-        ATTN_TOKENS_FILE,
+        model_dir,
+        attn_encoder_file,
+        attn_enc_biases_file,
+        attn_tokens_file,
         accelerator,
         __file__,
     )
     attn_dec_and_biases, _ = prepare_autoencoder_and_indices(
         layer_range,
-        MODEL_DIR,
-        ATTN_DECODER_FILE,
-        ATTN_DEC_BIASES_FILE,
-        ATTN_TOKENS_FILE,
+        model_dir,
+        attn_decoder_file,
+        attn_dec_biases_file,
+        attn_tokens_file,
         accelerator,
         __file__,
     )
@@ -75,26 +120,26 @@ def test_edge_level_effects():
     # MLP autoencoders
     mlp_enc_and_biases, _ = prepare_autoencoder_and_indices(
         layer_range,
-        MODEL_DIR,
-        MLP_ENCODER_FILE,
-        MLP_ENC_BIASES_FILE,
-        MLP_TOKENS_FILE,
+        model_dir,
+        mlp_encoder_file,
+        mlp_enc_biases_file,
+        mlp_tokens_file,
         accelerator,
         __file__,
     )
     mlp_dec_and_biases, _ = prepare_autoencoder_and_indices(
         layer_range,
-        MODEL_DIR,
-        MLP_DECODER_FILE,
-        MLP_DEC_BIASES_FILE,
-        MLP_TOKENS_FILE,
+        model_dir,
+        mlp_decoder_file,
+        mlp_dec_biases_file,
+        mlp_tokens_file,
         accelerator,
         __file__,
     )
 
     metric = t.nn.CrossEntropyLoss()
 
-    tokens = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+    tokens = tokenizer(prompt, return_tensors="pt").to(model.device)
     inputs = tokens.copy()
 
     inputs["input_ids"] = inputs["input_ids"][:, :-1]
@@ -151,34 +196,18 @@ def test_edge_level_effects():
                 weighted_prod = weighted_prod[:, -1, :].squeeze()
 
             ####  Thresholding down-nodes -> indices  ####
-            percentile: None | float = percentiles.get(loc, None)
-            if percentile is None:
-                if "error_" not in loc:
-                    ab_top_values, ab_top_indices = t.topk(
-                        weighted_prod.abs(), NUM_DOWN_NODES
-                    )
-                    indices: list = ab_top_indices[
-                        ab_top_values > 0.0
-                    ].tolist()
-                elif "error_" in loc:
-                    # Sum across the error tensors, since we don't care about
-                    # the edges into the neuron basis.
-                    weighted_prod = weighted_prod.sum().unsqueeze(0)
-                    indices: list = [0]
-                else:
-                    raise ValueError("Module location not recognized.")
+            if "error_" not in loc:
+                ab_top_values, ab_top_indices = t.topk(
+                    weighted_prod.abs(), num_down_nodes
+                )
+                indices: list = ab_top_indices[ab_top_values > 0.0].tolist()
+            elif "error_" in loc:
+                # Sum across the error tensors, since we don't care about
+                # the edges into the neuron basis.
+                weighted_prod = weighted_prod.sum().unsqueeze(0)
+                indices: list = [0]
             else:
-                # elif percentile is float
-                if acts_dict[loc].dim() == 2:
-                    acts_tensor = acts_dict[loc][-1, :].squeeze()
-                else:
-                    acts_tensor = acts_dict[loc][:, -1, :].squeeze()
-                thresh_tensor = t.full_like(acts_tensor, percentile)
-                gt_tensor = t.nn.functional.relu(acts_tensor - thresh_tensor)
-                indices: list | int = t.nonzero(gt_tensor).squeeze().tolist()
-                if isinstance(indices, int):
-                    indices: list = [indices]
-                assert len(indices) > 0
+                raise ValueError("Module location not recognized.")
             ####  End thresholding down-nodes  ####
 
             for dim_idx in indices:
@@ -370,3 +399,4 @@ def test_edge_level_effects():
         for i, j in v.items():
             print(i, j.detach())
         print()
+    raise ValueError()
