@@ -78,7 +78,6 @@ LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 TOP_K = config.get("TOP_K")
 VIEW = config.get("VIEW")
-# x2 for each: topk and bottomk nodes.
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
 
