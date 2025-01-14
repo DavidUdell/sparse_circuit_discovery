@@ -10,7 +10,6 @@ import wandb
 
 from sparse_coding.utils.interface import (
     slice_to_range,
-    load_yaml_constants,
     parse_slice,
 )
 from sparse_coding.utils.tasks import recursive_defaultdict
@@ -24,12 +23,12 @@ from tests.test_smoke_sparse_coding import (  # pylint: disable=unused-import
 )
 
 
-def test_edge_level_effects(
+def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-argument
     mock_interface,
-):  # pylint: disable=redefined-outer-name, unused-argument
+):
     """Assert correctness of edge-level effects across layers 11-12."""
 
-    # Self-contained preparations.
+    # Run a self-contained preparations pipeline
     scripts = [
         "collect_acts",
         "load_autoencoder",
@@ -39,7 +38,11 @@ def test_edge_level_effects(
         with wandb.init(mode="offline"):
             run_module(f"sparse_coding.{script}")
 
-    # Test constants are patched over
+    # Import patching-over happpens here
+    from sparse_coding.utils.interface import (  # pylint: disable=import-outside-toplevel
+        load_yaml_constants,
+    )
+
     _, config = load_yaml_constants(__file__)
 
     model_dir = config.get("MODEL_DIR")
@@ -62,6 +65,8 @@ def test_edge_level_effects(
     mlp_tokens_file = config.get("MLP_TOKEN_FILE")
     num_down_nodes = config.get("NUM_DOWN_NODES")
 
+    t.set_grad_enabled(True)
+
     model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         model_dir,
         output_hidden_states=True,
@@ -75,7 +80,6 @@ def test_edge_level_effects(
     model = accelerator.prepare(model)
     layer_range = slice_to_range(model, acts_layers_slice)
 
-    # %%
     # Prepare all layer range autoencoders.
     # Residual autoencoders
     res_enc_and_biases, _ = prepare_autoencoder_and_indices(
@@ -174,10 +178,6 @@ def test_edge_level_effects(
 
         acts_dict, grads_dict, ripcord = acts_and_grads
 
-        # This block brings edge grads later on into correspondence with the
-        # Bau Lab implementation. The backward hooks need to change for
-        # succeeding backward passes; this removes the gradient replacement
-        # hooks used above that are now unwanted.
         for h in ripcord:
             h.remove()
 
