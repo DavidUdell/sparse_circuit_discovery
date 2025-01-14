@@ -26,6 +26,7 @@ setup(
         "PyYAML",
         "scikit-learn",
         "torch",
+        "torchvision>=0.7.0",
         "tqdm",
         "tracr @ git+https://github.com/google-deepmind/tracr.git",
         "transformer_lens",
