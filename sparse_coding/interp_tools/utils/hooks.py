@@ -737,22 +737,12 @@ def measure_confounds(
         # RESID: attn-to-resid - (attn-to-mlp-to-resid)
         # sub in mlp
         mlp_handle: str = re.sub(resid_pattern, "mlp_", down_node_location)
-        mlp_err_handle: str = re.sub(
-            resid_pattern, "mlp_error_", down_node_location
-        )
         # Weight mlp acts by effect on resid.
-        mlp_affecting_resid = (
-            t.einsum(
-                "...sd,...sd->...s",
-                gradients[mlp_handle],
-                activations[mlp_handle],
-            ).squeeze()
-            + t.einsum(
-                "...sd,...sd->...s",
-                gradients[mlp_err_handle],
-                activations[mlp_err_handle],
-            ).squeeze()
-        )
+        mlp_affecting_resid = t.einsum(
+            "...sd,...sd->...s",
+            gradients[mlp_handle],
+            activations[mlp_handle],
+        ).squeeze()
         # Differentiate effects w/r/t attn
         if mlp_affecting_resid.dim() == 0:
             # Single-token prompt edge case.
@@ -767,21 +757,11 @@ def measure_confounds(
         # + (resid-to-attn-to-mlp-to-resid)
         # (sub in mlp case was already covered), sub in attn
         attn_handle: str = re.sub(resid_pattern, "attn_", down_node_location)
-        attn_err_handle: str = re.sub(
-            resid_pattern, "attn_error_", down_node_location
-        )
-        attn_affecting_resid = (
-            t.einsum(
-                "...sd,...sd->...s",
-                gradients[attn_handle],
-                activations[attn_handle],
-            ).squeeze()
-            + t.einsum(
-                "...sd,...sd->...s",
-                gradients[attn_err_handle],
-                activations[attn_err_handle],
-            ).squeeze()
-        )
+        attn_affecting_resid = t.einsum(
+            "...sd,...sd->...s",
+            gradients[attn_handle],
+            activations[attn_handle],
+        ).squeeze()
         # Differentiate effects w/r/t resid
         if attn_affecting_resid.dim() == 0:
             # Single-token prompt edge case.
@@ -791,18 +771,11 @@ def measure_confounds(
         _, resid_to_attn_to_resid_grads, _ = acts_and_grads
         resid_to_attn_to_resid_grads = deepcopy(resid_to_attn_to_resid_grads)
 
-        attn_affecting_mlp_affecting_resid = (
-            t.einsum(
-                "...sd,...sd->...s",
-                x_to_mlp_to_resid_grads[attn_handle],
-                activations[attn_handle],
-            ).squeeze()
-            + t.einsum(
-                "...sd,...sd->...s",
-                x_to_mlp_to_resid_grads[attn_err_handle],
-                activations[attn_err_handle],
-            ).squeeze()
-        )
+        attn_affecting_mlp_affecting_resid = t.einsum(
+            "...sd,...sd->...s",
+            x_to_mlp_to_resid_grads[attn_handle],
+            activations[attn_handle],
+        ).squeeze()
         if attn_affecting_mlp_affecting_resid.dim() == 0:
             attn_affecting_mlp_affecting_resid.backward(retain_graph=True)
         else:
@@ -820,21 +793,11 @@ def measure_confounds(
     if re.match("mlp_", down_node_location) is not None:
         # sub in attn
         attn_handle: str = re.sub(mlp_pattern, "attn_", down_node_location)
-        attn_err_handle: str = re.sub(
-            mlp_pattern, "attn_error_", down_node_location
-        )
-        attn_affecting_mlp = (
-            t.einsum(
-                "...sd,...sd->...s",
-                gradients[attn_handle],
-                activations[attn_handle],
-            ).squeeze()
-            + t.einsum(
-                "...sd,...sd->...s",
-                gradients[attn_err_handle],
-                activations[attn_err_handle],
-            ).squeeze()
-        )
+        attn_affecting_mlp = t.einsum(
+            "...sd,...sd->...s",
+            gradients[attn_handle],
+            activations[attn_handle],
+        ).squeeze()
         # Differentiate effects w/r/t resid
         if attn_affecting_mlp.dim() == 0:
             # Single-token prompt edge case.
