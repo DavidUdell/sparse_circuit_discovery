@@ -585,12 +585,12 @@ def grads_manager(
 
             # Algebra for the error residual.
             error = hidden - decoded_acts
-            # Then break gradient for the new error tensor.
-            error = error.detach().requires_grad_(True)
 
             # Note that the cached error acts are neither cloned nor detached
             # yet.
             acts_dict[error_name] = error
+            # Stop grad must go here
+            error = error.detach().requires_grad_(True)
 
             handles.append(
                 error.register_hook(backwards_cache_fac(error_name))
