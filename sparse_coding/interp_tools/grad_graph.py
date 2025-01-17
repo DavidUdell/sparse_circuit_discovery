@@ -403,11 +403,11 @@ with grads_manager(
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
-                    "...sd,...sd->...sd",
+                    "...sd,...sd->...s",
                     old_marginal_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
-                    :, -1, :
+                    :, -1
                 ].cpu()
 
             elif "mlp_" in loc:
@@ -425,11 +425,11 @@ with grads_manager(
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
-                    "...sd,...sd->...sd",
+                    "...sd,...sd->...s",
                     old_marginal_grads[f"attn_error_{down_layer_idx}"],
                     -acts_dict[f"attn_error_{down_layer_idx}"],
                 )[
-                    :, -1, :
+                    :, -1
                 ].cpu()
 
                 # resid-to-mlp - (resid-attn-mlp)
@@ -449,12 +449,12 @@ with grads_manager(
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
-                    "...sd,...sd->...sd",
+                    "...sd,...sd->...s",
                     old_marginal_grads[f"resid_error_{up_layer_idx}"]
                     - resid_attn_mlp_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
-                    :, -1, :
+                    :, -1
                 ].cpu()
 
             elif "resid_" in loc:
@@ -475,12 +475,12 @@ with grads_manager(
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
-                    "...sd,...sd->...sd",
+                    "...sd,...sd->...s",
                     old_marginal_grads[f"attn_error_{down_layer_idx}"]
                     - x_mlp_resid_grads[f"attn_error_{down_layer_idx}"],
                     -acts_dict[f"attn_error_{down_layer_idx}"],
                 )[
-                    :, -1, :
+                    :, -1
                 ].cpu()
 
                 # mlp-to-resid
@@ -497,11 +497,11 @@ with grads_manager(
                 marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
-                    "...sd,...sd->...sd",
+                    "...sd,...sd->...s",
                     old_marginal_grads[f"mlp_error_{down_layer_idx}"],
                     -acts_dict[f"mlp_error_{down_layer_idx}"],
                 )[
-                    :, -1, :
+                    :, -1
                 ].cpu()
 
                 # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
@@ -524,14 +524,14 @@ with grads_manager(
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
                 ] = t.einsum(
-                    "...sd,...sd->...sd",
+                    "...sd,...sd->...s",
                     old_marginal_grads[f"resid_error_{up_layer_idx}"]
                     - resid_attn_resid_grads[f"resid_error_{up_layer_idx}"]
                     - x_mlp_resid_grads[f"resid_error_{up_layer_idx}"]
                     + full_path_grads[f"resid_error_{up_layer_idx}"],
                     -acts_dict[f"resid_error_{up_layer_idx}"],
                 )[
-                    :, -1, :
+                    :, -1
                 ].cpu()
 
             else:
@@ -589,6 +589,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
         up_values = up_values.squeeze()
         if up_values.dim() == 2:
             up_values = up_values[-1, :]
+        elif up_values.dim() == 0:
+            up_values = up_values.unsqueeze(dim=0)
         assert up_values.dim() == 1
 
         # Sublayer absolute effect explained.

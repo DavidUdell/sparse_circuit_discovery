@@ -258,11 +258,11 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
                     marginal_grads_dict[
                         f"resid_error_{up_layer_idx}_to_" + loc
                     ][dim_idx] = t.einsum(
-                        "...sd,...sd->...sd",
+                        "...sd,...sd->...s",
                         old_marginal_grads[f"resid_error_{up_layer_idx}"],
                         -acts_dict[f"resid_error_{up_layer_idx}"],
                     )[
-                        :, -1, :
+                        :, -1
                     ].cpu()
 
                 elif "mlp_" in loc:
@@ -280,11 +280,11 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
                     marginal_grads_dict[
                         f"attn_error_{down_layer_idx}_to_" + loc
                     ][dim_idx] = t.einsum(
-                        "...sd,...sd->...sd",
+                        "...sd,...sd->...s",
                         old_marginal_grads[f"attn_error_{down_layer_idx}"],
                         -acts_dict[f"attn_error_{down_layer_idx}"],
                     )[
-                        :, -1, :
+                        :, -1
                     ].cpu()
 
                     # resid-to-mlp - (resid-attn-mlp)
@@ -304,12 +304,12 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
                     marginal_grads_dict[
                         f"resid_error_{up_layer_idx}_to_" + loc
                     ][dim_idx] = t.einsum(
-                        "...sd,...sd->...sd",
+                        "...sd,...sd->...s",
                         old_marginal_grads[f"resid_error_{up_layer_idx}"]
                         - resid_attn_mlp_grads[f"resid_error_{up_layer_idx}"],
                         -acts_dict[f"resid_error_{up_layer_idx}"],
                     )[
-                        :, -1, :
+                        :, -1
                     ].cpu()
 
                 elif "resid_" in loc:
@@ -330,12 +330,12 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
                     marginal_grads_dict[
                         f"attn_error_{down_layer_idx}_to_" + loc
                     ][dim_idx] = t.einsum(
-                        "...sd,...sd->...sd",
+                        "...sd,...sd->...s",
                         old_marginal_grads[f"attn_error_{down_layer_idx}"]
                         - x_mlp_resid_grads[f"attn_error_{down_layer_idx}"],
                         -acts_dict[f"attn_error_{down_layer_idx}"],
                     )[
-                        :, -1, :
+                        :, -1
                     ].cpu()
 
                     # mlp-to-resid
@@ -352,11 +352,11 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
                     marginal_grads_dict[
                         f"mlp_error_{down_layer_idx}_to_" + loc
                     ][dim_idx] = t.einsum(
-                        "...sd,...sd->...sd",
+                        "...sd,...sd->...s",
                         old_marginal_grads[f"mlp_error_{down_layer_idx}"],
                         -acts_dict[f"mlp_error_{down_layer_idx}"],
                     )[
-                        :, -1, :
+                        :, -1
                     ].cpu()
 
                     # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
@@ -379,14 +379,14 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
                     marginal_grads_dict[
                         f"resid_error_{up_layer_idx}_to_" + loc
                     ][dim_idx] = t.einsum(
-                        "...sd,...sd->...sd",
+                        "...sd,...sd->...s",
                         old_marginal_grads[f"resid_error_{up_layer_idx}"]
                         - resid_attn_resid_grads[f"resid_error_{up_layer_idx}"]
                         - x_mlp_resid_grads[f"resid_error_{up_layer_idx}"]
                         + full_path_grads[f"resid_error_{up_layer_idx}"],
                         -acts_dict[f"resid_error_{up_layer_idx}"],
                     )[
-                        :, -1, :
+                        :, -1
                     ].cpu()
 
                 else:
