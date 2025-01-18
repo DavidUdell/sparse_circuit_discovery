@@ -474,13 +474,20 @@ def neuronpedia_api(
     if neuronpedia_dict is None:
         return ""
 
-    data: list[dict] = neuronpedia_dict["activations"]
+    act_data: list[dict] = neuronpedia_dict["activations"]
+
+    # Logit tokens and diff values
+    pos_tokens: list[str] = neuronpedia_dict["pos_str"]
+    neg_tokens: list[str] = neuronpedia_dict["neg_str"]
+
+    pos_diffs: list[float] = neuronpedia_dict["pos_values"]
+    neg_diffs: list[float] = neuronpedia_dict["neg_values"]
 
     label: str = ""
 
     # defaultdict[int, list[tuple[list[str], list[float]]]]
     contexts_and_activations = defaultdict(list)
-    for seq_dict in data:
+    for seq_dict in act_data:
         tokens: list[str] = seq_dict["tokens"]
         values: list[float | int] = seq_dict["values"]
 
@@ -511,6 +518,42 @@ def neuronpedia_api(
                 shade = f"#{rg_shade}{rg_shade}{b_shade}"
                 cell_tag = f'<td bgcolor="{shade}">'
                 label += f"{cell_tag}{token}</td>"
+        label += "</tr>"
+
+    # Top row of logit diffs
+    if pos_tokens:
+        label += "<tr>"
+        for tok, diff in zip(pos_tokens, pos_diffs):
+            tok = html.escape(tok)
+            tok = tok.encode("unicode_escape").decode("utf-8")
+
+            if diff > 0.0:
+                shade = "#6060ff"
+            elif diff < 0.0:
+                shade = "#ff6060"
+            else:
+                shade = "#cccccc"
+            cell_tag = f'<td border="1" bgcolor="{shade}">'
+
+            label += f"{cell_tag}{tok}</td>"
+        label += "</tr>"
+
+    # Bottom row of logit diffs
+    if neg_tokens:
+        label += "<tr>"
+        for tok, diff in zip(neg_tokens, neg_diffs):
+            tok = html.escape(tok)
+            tok = tok.encode("unicode_escape").decode("utf-8")
+
+            if diff > 0.0:
+                shade = "#6060ff"
+            elif diff < 0.0:
+                shade = "#ff6060"
+            else:
+                shade = "#cccccc"
+            cell_tag = f'<td border="1" bgcolor="{shade}">'
+
+            label += f"{cell_tag}{tok}</td>"
         label += "</tr>"
 
     return label

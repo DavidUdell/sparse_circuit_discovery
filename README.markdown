@@ -99,8 +99,7 @@ NUM_DOWN_NODES: 5
 ```
 
 2. `NUM_UP_NODES` fixes the number of sublayer nodes to plot edges _up to_, for
-   each sublayer down node. Note that the number of edges equals _twice_ this
-   value: you'll get this many top-k edges and this many _bottom-k_ edges.
+   each sublayer down node. You'll get this many absolute top-k edges.
 3. `NUM_DOWN_NODES` fixes the number of sublayer nodes that edges will then be
    plotted _from_.
 
@@ -191,4 +190,4 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.3.1
+Current version is 1.3.2

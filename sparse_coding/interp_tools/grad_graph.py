@@ -8,7 +8,8 @@ Implements the unsupervised circuit discovery algorithm in Baulab 2024.
 
 import csv
 import os
-import re
+from copy import deepcopy
+from math import isnan
 
 import requests
 import torch as t
@@ -40,6 +41,7 @@ from sparse_coding.interp_tools.utils.graphs import (
 )
 from sparse_coding.interp_tools.utils.hooks import (
     grads_manager,
+    measure_confounds,
     prepare_autoencoder_and_indices,
 )
 
@@ -76,7 +78,6 @@ LOGIT_TOKENS = config.get("LOGIT_TOKENS", 10)
 SEED = config.get("SEED")
 TOP_K = config.get("TOP_K")
 VIEW = config.get("VIEW")
-# x2 for each: topk and bottomk nodes.
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
 
@@ -122,6 +123,7 @@ wandb.init(
     entity=WANDB_ENTITY,
     config=config,
 )
+
 
 # %%
 # Load and prepare the model.
@@ -260,9 +262,16 @@ print(PROMPT)
 print()
 print("Backward passes:")
 
-inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+tokens = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+inputs = tokens.copy()
+
+inputs["input_ids"] = inputs["input_ids"][:, :-1]
+inputs["attention_mask"] = inputs["attention_mask"][:, :-1]
+target = tokens["input_ids"][:, -1].squeeze()
+
 acts_dict: dict = None
 grads_dict: dict = None
+old_grads_dict: dict = None
 marginal_grads_dict: dict = recursive_defaultdict()
 
 with grads_manager(
@@ -278,60 +287,28 @@ with grads_manager(
 
     # Forward pass installs all backward hooks.
     output = model(**inputs)
+    logits = output.logits[:, -1, :].squeeze()
 
-    # Metric backward pass.
-    metric(
-        output.logits.squeeze(),
-        inputs["input_ids"].squeeze(),
-    ).backward(retain_graph=True)
+    loss = metric(
+        logits,
+        target,
+    )
+    loss.backward(retain_graph=True)
 
-    acts_dict, grads_dict = acts_and_grads
+    acts_dict, grads_dict, ripcord = acts_and_grads
 
-    # Add model_dim activations to acts_dict, if needed.
-    for grad in grads_dict:
-        if "resid_error" in grad:
-            idx: int = int(grad.split("_")[-1])
-            act: t.Tensor = output.hidden_states[idx]
-            acts_dict[grad] = act
+    # This block brings edge grads later on into correspondence with the Bau
+    # Lab implementation. The backward hooks need to change for succeeding
+    # backward passes; this removes the gradient replacement hooks used above
+    # that are now unwanted.
+    for h in ripcord:
+        h.remove()
 
-    # Compute Jacobian-vector products.
-    for act in acts_dict:
-        assert act in grads_dict
+    old_grads_dict = deepcopy(grads_dict)
 
-    for loc, grad in grads_dict.items():
-        assert loc in acts_dict
-
-        grad = grad.squeeze().unsqueeze(0).detach()
+    for loc, grad in old_grads_dict.items():
+        grad = grad.squeeze().unsqueeze(0)
         act = acts_dict[loc].squeeze().unsqueeze(0)
-
-        if re.match("resid_", loc) is not None:
-            mlp_confound: str = re.sub("(resid_error_|resid_)", "mlp_", loc)
-            mlp_error_confound: str = re.sub(
-                "(resid_error_|resid_)", "mlp_error_", loc
-            )
-            # The jvp at an activation is a scalar with gradient tracking that
-            # represents how well the model would do on the loss metric in that
-            # forward pass, if all later modules were replaced with a best-fit
-            # first-order Taylor approximation.
-            jvp = (
-                t.einsum(
-                    "...sd,...sd->...s",
-                    grads_dict[mlp_confound].detach(),
-                    acts_dict[mlp_confound],
-                ).squeeze()
-                + t.einsum(
-                    "...sd,...sd->...s",
-                    grads_dict[mlp_error_confound].detach(),
-                    acts_dict[mlp_error_confound],
-                ).squeeze()
-            )
-            if jvp.dim() == 0:
-                # Single-token prompt edge case.
-                jvp.backward(retain_graph=True)
-            else:
-                jvp[-1].backward(retain_graph=True)
-
-            _, jvp_grads = acts_and_grads
 
         weighted_prod = t.einsum("...sd,...sd->...sd", grad, act)
         # Standardize weighted_prod shape
@@ -345,15 +322,10 @@ with grads_manager(
         percentile: None | float = percentiles.get(loc, None)
         if percentile is None:
             if "error_" not in loc:
-                _, top_indices = t.topk(
-                    weighted_prod, NUM_DOWN_NODES, largest=True
+                ab_top_values, ab_top_indices = t.topk(
+                    weighted_prod.abs(), NUM_DOWN_NODES
                 )
-                _, bottom_indices = t.topk(
-                    weighted_prod, NUM_DOWN_NODES, largest=False
-                )
-                indices: list = list(
-                    set(top_indices.tolist() + bottom_indices.tolist())
-                )
+                indices: list = ab_top_indices[ab_top_values > 0.0].tolist()
             elif "error_" in loc:
                 # Sum across the error tensors, since we don't care about the
                 # edges into the neuron basis.
@@ -375,67 +347,217 @@ with grads_manager(
             assert len(indices) > 0
         ####  End thresholding down-nodes  ####
 
+        # # Effect/down node regression test printouts
+        # print(loc, "effects:")
+        # print(weighted_prod.to("cpu").detach())
+        # print()
+        # print(loc, "select nodes:")
+        # print(indices)
+        # print()
+
         for dim_idx in tqdm(indices, desc=loc):
+            # Edge-level backward passes
             weighted_prod[dim_idx].backward(retain_graph=True)
-            _, marginal_grads = acts_and_grads
+            _, marginal_grads, _ = acts_and_grads
+
+            old_marginal_grads = deepcopy(marginal_grads)
 
             down_layer_idx = int(loc.split("_")[-1])
             up_layer_idx = down_layer_idx - 1
             if up_layer_idx not in layer_range:
                 continue
 
-            # resid_x
-            # mlp_x
-            # attn_x
-            # resid_error_x
-            # mlp_error_x
-            # attn_error_x
+            # Perpare confound effects for subtraction, per down-node
+            confounds_grads = measure_confounds(
+                loc,
+                marginal_grads,
+                acts_dict,
+                acts_and_grads,
+            )
+            if isinstance(confounds_grads, tuple):
+                x_mlp_resid_grads, resid_attn_resid_grads, full_path_grads = (
+                    confounds_grads
+                )
+                x_mlp_resid_grads = deepcopy(x_mlp_resid_grads)
+                resid_attn_resid_grads = deepcopy(resid_attn_resid_grads)
+                full_path_grads = deepcopy(full_path_grads)
+            if confounds_grads is not None:
+                resid_attn_mlp_grads: dict = confounds_grads
+                resid_attn_mlp_grads = deepcopy(resid_attn_mlp_grads)
+
+            # Down-node keys are:
+            # resid_x, mlp_x, attn_x, resid_error_x, mlp_error_x, attn_error_x
+            # Deduplicate and store edges
             if "attn_" in loc:
-                # Upstream resid_
+                # resid-to-attn
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"resid_{up_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    old_marginal_grads[f"resid_{up_layer_idx}"],
+                    -acts_dict[f"resid_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
+
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"resid_error_{up_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...s",
+                    old_marginal_grads[f"resid_error_{up_layer_idx}"],
+                    -acts_dict[f"resid_error_{up_layer_idx}"],
+                )[
+                    :, -1
+                ].cpu()
+
             elif "mlp_" in loc:
-                # Same-layer attn_
+                # attn-to-mlp
                 marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    old_marginal_grads[f"attn_{down_layer_idx}"],
+                    -acts_dict[f"attn_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
+
                 marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"attn_error_{down_layer_idx}"].cpu()
-            elif "resid_" in loc:
-                # Upstream resid_; double-counting corrections.
+                ] = t.einsum(
+                    "...sd,...sd->...s",
+                    old_marginal_grads[f"attn_error_{down_layer_idx}"],
+                    -acts_dict[f"attn_error_{down_layer_idx}"],
+                )[
+                    :, -1
+                ].cpu()
+
+                # resid-to-mlp - (resid-attn-mlp)
                 marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = (
-                    marginal_grads[f"resid_{up_layer_idx}"]
-                    - jvp_grads[  # pylint: disable=possibly-used-before-assignment
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    old_marginal_grads[f"resid_{up_layer_idx}"]
+                    - resid_attn_mlp_grads[  # pylint: disable=possibly-used-before-assignment
                         f"resid_{up_layer_idx}"
-                    ]
-                ).cpu()
+                    ],
+                    -acts_dict[f"resid_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
+
                 marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
                     dim_idx
-                ] = (
-                    marginal_grads[f"resid_error_{up_layer_idx}"]
-                    - jvp_grads[f"resid_error_{up_layer_idx}"]
-                ).cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...s",
+                    old_marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - resid_attn_mlp_grads[f"resid_error_{up_layer_idx}"],
+                    -acts_dict[f"resid_error_{up_layer_idx}"],
+                )[
+                    :, -1
+                ].cpu()
 
-                # Same-layer mlp_
+            elif "resid_" in loc:
+                # attn-to-resid - (attn-mlp-resid)
+                marginal_grads_dict[f"attn_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    old_marginal_grads[f"attn_{down_layer_idx}"]
+                    - x_mlp_resid_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"attn_{down_layer_idx}"
+                    ],
+                    -acts_dict[f"attn_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
+
+                marginal_grads_dict[f"attn_error_{down_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = t.einsum(
+                    "...sd,...sd->...s",
+                    old_marginal_grads[f"attn_error_{down_layer_idx}"]
+                    - x_mlp_resid_grads[f"attn_error_{down_layer_idx}"],
+                    -acts_dict[f"attn_error_{down_layer_idx}"],
+                )[
+                    :, -1
+                ].cpu()
+
+                # mlp-to-resid
                 marginal_grads_dict[f"mlp_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"mlp_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    old_marginal_grads[f"mlp_{down_layer_idx}"],
+                    -acts_dict[f"mlp_{down_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
+
                 marginal_grads_dict[f"mlp_error_{down_layer_idx}_to_" + loc][
                     dim_idx
-                ] = marginal_grads[f"mlp_error_{down_layer_idx}"].cpu()
+                ] = t.einsum(
+                    "...sd,...sd->...s",
+                    old_marginal_grads[f"mlp_error_{down_layer_idx}"],
+                    -acts_dict[f"mlp_error_{down_layer_idx}"],
+                )[
+                    :, -1
+                ].cpu()
+
+                # resid-to-resid - (resid-attn-resid) - (resid-mlp-resid)
+                # + (resid-attn-mlp-resid)
+                marginal_grads_dict[f"resid_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = t.einsum(
+                    "...sd,...sd->...sd",
+                    old_marginal_grads[f"resid_{up_layer_idx}"]
+                    - resid_attn_resid_grads[  # pylint: disable=possibly-used-before-assignment
+                        f"resid_{up_layer_idx}"
+                    ]
+                    - x_mlp_resid_grads[f"resid_{up_layer_idx}"]
+                    + full_path_grads[f"resid_{up_layer_idx}"],
+                    -acts_dict[f"resid_{up_layer_idx}"],
+                )[
+                    :, -1, :
+                ].cpu()
+
+                marginal_grads_dict[f"resid_error_{up_layer_idx}_to_" + loc][
+                    dim_idx
+                ] = t.einsum(
+                    "...sd,...sd->...s",
+                    old_marginal_grads[f"resid_error_{up_layer_idx}"]
+                    - resid_attn_resid_grads[f"resid_error_{up_layer_idx}"]
+                    - x_mlp_resid_grads[f"resid_error_{up_layer_idx}"]
+                    + full_path_grads[f"resid_error_{up_layer_idx}"],
+                    -acts_dict[f"resid_error_{up_layer_idx}"],
+                )[
+                    :, -1
+                ].cpu()
+
             else:
                 raise ValueError("Module location not recognized.")
 
 # Here to have the newlines look nice in both the interactive notebooks and the
 # shell.
 print()
+
+# # Act/grad regression test printouts.
+# print("Activations:")
+# for k, v in acts_dict.items():
+#     print(k, v)
+# # Note that grads_list is used here; grads_dict is not accurate anymore by
+# # this point.
+# print("Gradients:")
+# for k, v in old_grads_dict.items():
+#     print(k, v)
+
+# # Marginal-effects regression test printouts.
+# print("Marginal effects:")
+# for k, v in marginal_grads_dict.items():
+#     print(k)
+#     for i, j in v.items():
+#         print(i, j.detach())
+#     print()
 
 # %%
 # Populate graph.
@@ -447,6 +569,8 @@ unexplained_dict: dict = {}
 effect_explained: float = 0.0
 effect_unexplained: float = 0.0
 
+# Noting that 0:12 runs sometimes have exploding early gradients and so
+# numerical instability.
 for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
@@ -465,6 +589,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
         up_values = up_values.squeeze()
         if up_values.dim() == 2:
             up_values = up_values[-1, :]
+        elif up_values.dim() == 0:
+            up_values = up_values.unsqueeze(dim=0)
         assert up_values.dim() == 1
 
         # Sublayer absolute effect explained.
@@ -477,18 +603,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             bottom_values = up_values
             indices: list[int] = [0]
         else:
-            top_values, top_indices = t.topk(
-                up_values, NUM_UP_NODES, largest=True
-            )
-            bottom_values, bottom_indices = t.topk(
-                up_values, NUM_UP_NODES, largest=False
-            )
-            indices: list = list(
-                set(top_indices.tolist() + bottom_indices.tolist())
-            )
+            _, ab_top_indices = t.topk(up_values.abs(), NUM_UP_NODES)
+            indices: list = ab_top_indices.tolist()
 
-        color_max_scalar: float = top_values[0].item()
-        color_min_scalar: float = bottom_values[0].item()
+        color_max_scalar: float = t.max(up_values)
+        color_min_scalar: float = t.min(up_values)
 
         for up_dim, effect in enumerate(up_values):
             if up_dim not in indices:
@@ -629,6 +748,10 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 red, green = 0, 255
             elif effect < 0.0:
                 red, green = 255, 0
+            elif isnan(effect):
+                raise ValueError(
+                    f"Exploding/vanishing gradients?: {edges_str, effect}"
+                )
             else:
                 # Satisfies linter
                 raise ValueError("Should be unreachable.")

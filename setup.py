@@ -9,7 +9,7 @@ setup(
     long_description=open("README.markdown", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="David Udell",
-    version="1.3.1",
+    version="1.3.2",
     license="MIT",
     packages=find_packages(),
     install_requires=[
@@ -25,7 +25,8 @@ setup(
         "pytest",
         "PyYAML",
         "scikit-learn",
-        "torch",
+        "torch>=2.5.1",
+        "torchvision>=0.20.1",
         "tqdm",
         "tracr @ git+https://github.com/google-deepmind/tracr.git",
         "transformer_lens",

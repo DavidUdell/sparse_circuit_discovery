@@ -1,6 +1,8 @@
 """Ablation and caching hooks."""
 
+import re
 from collections import defaultdict
+from copy import deepcopy
 from contextlib import contextmanager
 from textwrap import dedent
 from typing import Generator
@@ -490,15 +492,25 @@ def grads_manager(
     acts_dict: dict = {}
     grads_dict: dict = {}
     handles = []
+    ripcord = []
 
-    def backward_hooks_fac(location: str):
+    def backwards_replace_fac(replace):
+        """Replace a gradient with the gradient of an argument."""
+
+        def backward_replace_hook(grad):  # pylint: disable=unused-argument
+            """Replace a gradient with a closure object's gradient."""
+            return replace.grad
+
+        return backward_replace_hook
+
+    def backwards_cache_fac(location: str):
         """Allow backward hooks to label their dictionary entries."""
 
-        def backward_hook(grad):
+        def backward_cache_hook(grad):
             """Label the gradient tensor with its location."""
             grads_dict[location] = grad
 
-        return backward_hook
+        return backward_cache_hook
 
     def forward_hooks_fac(
         layer_idx: int,
@@ -520,20 +532,6 @@ def grads_manager(
             at the autoencoder tensor and error residual.
             """
 
-            # Project activations through the encoder. Bias usage corresponds
-            # to JBloom's.
-            projected_acts = (
-                t.nn.functional.linear(  # pylint: disable=not-callable
-                    output[0] - dec_biases.to(model.device),
-                    encoder.T.to(model.device),
-                    bias=enc_biases.to(model.device),
-                ).to(model.device)
-            )
-            t.nn.functional.relu(
-                projected_acts,
-                inplace=True,
-            )
-
             # Module detection
             if "attention" in module.__class__.__name__.lower():
                 # "gpt2attention"
@@ -551,16 +549,33 @@ def grads_manager(
             else:
                 raise ValueError("Unexpected module name.")
 
-            # Register backward hooks on the projected activations.
-            handles.append(
-                projected_acts.register_hook(backward_hooks_fac(current_name))
+            # Handle tuple cases
+            if isinstance(output, tuple):
+                hidden = output[0]
+            else:
+                assert isinstance(output, t.Tensor)
+                hidden = output
+
+            # Project activations through the encoder. Bias usage corresponds
+            # to JBloom's.
+            projected_acts = (
+                t.nn.functional.linear(  # pylint: disable=not-callable
+                    hidden - dec_biases.to(model.device),
+                    encoder.T.to(model.device),
+                    bias=enc_biases.to(model.device),
+                ).to(model.device)
             )
-            # Cache activations.
+            projected_acts = t.nn.functional.relu(projected_acts)
+
+            handles.append(
+                projected_acts.register_hook(backwards_cache_fac(current_name))
+            )
+            # Note that the cached projected acts are neither cloned nor
+            # detached yet.
             acts_dict[current_name] = projected_acts
-            acts_dict[error_name] = output[0]
 
             # Decode projected acts.
-            projected_acts = (
+            decoded_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
                     decoder.T.to(model.device),
@@ -569,20 +584,33 @@ def grads_manager(
             )
 
             # Algebra for the error residual.
-            error = projected_acts - output[0]
-            # Then break gradient for the new error tensor.
-            error = error.detach()
-            error.requires_grad = True
+            error = hidden - decoded_acts
 
-            handles.append(error.register_hook(backward_hooks_fac(error_name)))
+            # Note that the cached error acts are neither cloned nor detached
+            # yet.
+            acts_dict[error_name] = error
+            # Stop grad must go here
+            error = error.detach().requires_grad_(True)
 
-            # output[0] = projected_acts - error
+            handles.append(
+                error.register_hook(backwards_cache_fac(error_name))
+            )
+
+            # hidden = decoded_acts + error
+            reconstructed: t.Tensor = decoded_acts + error
+
+            # This block brings this repo's grads into alignment with the Bau
+            # Lab implementation.
+            reconstructed.retain_grad()
+            ripcord.append(
+                hidden.register_hook(backwards_replace_fac(reconstructed))
+            )
+
             if isinstance(output, tuple):
-                return projected_acts - error, output[1]
-            elif isinstance(output, t.Tensor):
-                return projected_acts - error
-            else:
-                raise ValueError("Unexpected output type.")
+                return reconstructed, output[1]
+            if isinstance(output, t.Tensor):
+                return reconstructed
+            raise ValueError("Unexpected output type.")
 
         return forward_hook
 
@@ -622,7 +650,7 @@ def grads_manager(
         )
 
     try:
-        yield (acts_dict, grads_dict)
+        yield (acts_dict, grads_dict, ripcord)
     finally:
         for handle in handles:
             handle.remove()
@@ -682,3 +710,102 @@ def attn_mlp_acts_manager(
     finally:
         for handle in handles:
             handle.remove()
+
+
+def measure_confounds(
+    down_node_location: str,
+    gradients: dict,
+    activations: dict,
+    acts_and_grads,
+) -> tuple | dict | None:
+    """
+    Provide confound effect grads for each down-node.
+
+    This function runs inside a backward-pass context manager which has a
+    global `acts_and_grads`. The edges resid-to-attn, attn-to-mlp, mlp-to-resid
+    have no confounds.
+    """
+    resid_pattern: str = "(resid_error_|resid_)"
+    mlp_pattern: str = "(mlp_error_|mlp_)"
+
+    # We don't want the input gradients to change dynamically if we need to
+    # take several backward pass measurements:
+    gradients = deepcopy(gradients)
+
+    # Deal with two possible cases; we only know the down node is resid
+    if re.match("resid_", down_node_location) is not None:
+        # RESID: attn-to-resid - (attn-to-mlp-to-resid)
+        # sub in mlp
+        mlp_handle: str = re.sub(resid_pattern, "mlp_", down_node_location)
+        # Weight mlp acts by effect on resid.
+        mlp_affecting_resid = t.einsum(
+            "...sd,...sd->...s",
+            gradients[mlp_handle],
+            activations[mlp_handle],
+        ).squeeze()
+        # Differentiate effects w/r/t attn
+        if mlp_affecting_resid.dim() == 0:
+            # Single-token prompt edge case.
+            mlp_affecting_resid.backward(retain_graph=True)
+        else:
+            mlp_affecting_resid[-1].backward(retain_graph=True)
+        _, x_to_mlp_to_resid_grads, _ = acts_and_grads
+        x_to_mlp_to_resid_grads = deepcopy(x_to_mlp_to_resid_grads)
+
+        # RESID:
+        # resid-to-resid - (resid-to-attn-to-resid) - (resid-to-mlp-to-resid)
+        # + (resid-to-attn-to-mlp-to-resid)
+        # (sub in mlp case was already covered), sub in attn
+        attn_handle: str = re.sub(resid_pattern, "attn_", down_node_location)
+        attn_affecting_resid = t.einsum(
+            "...sd,...sd->...s",
+            gradients[attn_handle],
+            activations[attn_handle],
+        ).squeeze()
+        # Differentiate effects w/r/t resid
+        if attn_affecting_resid.dim() == 0:
+            # Single-token prompt edge case.
+            attn_affecting_resid.backward(retain_graph=True)
+        else:
+            attn_affecting_resid[-1].backward(retain_graph=True)
+        _, resid_to_attn_to_resid_grads, _ = acts_and_grads
+        resid_to_attn_to_resid_grads = deepcopy(resid_to_attn_to_resid_grads)
+
+        attn_affecting_mlp_affecting_resid = t.einsum(
+            "...sd,...sd->...s",
+            x_to_mlp_to_resid_grads[attn_handle],
+            activations[attn_handle],
+        ).squeeze()
+        if attn_affecting_mlp_affecting_resid.dim() == 0:
+            attn_affecting_mlp_affecting_resid.backward(retain_graph=True)
+        else:
+            attn_affecting_mlp_affecting_resid[-1].backward(retain_graph=True)
+        # up_resid affecting attn affecting mlp affecting resid
+        _, full_confound_grads, _ = acts_and_grads
+
+        return (
+            x_to_mlp_to_resid_grads,
+            resid_to_attn_to_resid_grads,
+            full_confound_grads,
+        )
+
+    # MLP: resid-to-mlp - (resid-to-attn-to-mlp)
+    if re.match("mlp_", down_node_location) is not None:
+        # sub in attn
+        attn_handle: str = re.sub(mlp_pattern, "attn_", down_node_location)
+        attn_affecting_mlp = t.einsum(
+            "...sd,...sd->...s",
+            gradients[attn_handle],
+            activations[attn_handle],
+        ).squeeze()
+        # Differentiate effects w/r/t resid
+        if attn_affecting_mlp.dim() == 0:
+            # Single-token prompt edge case.
+            attn_affecting_mlp.backward(retain_graph=True)
+        else:
+            attn_affecting_mlp[-1].backward(retain_graph=True)
+        _, resid_to_attn_to_mlp_grads, _ = acts_and_grads
+        return resid_to_attn_to_mlp_grads
+
+    assert re.match("attn_", down_node_location)
+    return None
