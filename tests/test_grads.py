@@ -397,24 +397,24 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
         .detach()
         .squeeze(),
         t.tensor([-0.0407, -0.0124, -0.1017]),
-        rtol=1e-4,
-        atol=1e-4,
+        rtol=1e-6,
+        atol=5e-5,
     )
     assert t.allclose(
         marginal_grads_dict["attn_11_to_resid_11"][12918][:, :3]
         .detach()
         .squeeze(),
         t.tensor([-0.0014, -0.0000, -0.0016]),
-        rtol=1e-4,
-        atol=1e-4,
+        rtol=1e-6,
+        atol=5e-5,
     )
     assert t.allclose(
         marginal_grads_dict["resid_10_to_mlp_11"][44462][:, :3]
         .detach()
         .squeeze(),
         t.tensor([0.0033, 0.0023, 0.0249]),
-        rtol=1e-4,
-        atol=1e-4,
+        rtol=1e-6,
+        atol=5e-5,
     )
 
     assert t.allclose(
@@ -422,7 +422,7 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
         .detach()
         .squeeze(),
         t.tensor([37.8299, 11.5999, 59.0671]),
-        rtol=1e-2,
+        rtol=2.25e-3,
         atol=1e-4,
     )
     assert t.allclose(
@@ -430,7 +430,7 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
         .detach()
         .squeeze(),
         t.tensor([0.0682, 0.0000, -0.0790]),
-        rtol=1e-2,
+        rtol=2.25e-3,
         atol=1e-4,
     )
     assert t.allclose(
@@ -438,6 +438,6 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
         .detach()
         .squeeze(),
         t.tensor([1.5018, -0.0000, 0.8935]),
-        rtol=1e-2,
+        rtol=2.25e-3,
         atol=1e-4,
     )
