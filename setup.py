@@ -21,6 +21,7 @@ setup(
         "matplotlib",
         "nnsight",
         "numpy",
+        "nvidia-ml-py",
         "pygraphviz",
         "pytest",
         "PyYAML",
