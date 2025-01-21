@@ -190,4 +190,4 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.3.2
+Current version is 1.4.0
