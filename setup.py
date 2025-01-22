@@ -20,7 +20,7 @@ setup(
         "lightning",
         "matplotlib",
         "nnsight",
-        "numpy",
+        "numpy>=2.2.2",
         "nvidia-ml-py",
         "pygraphviz",
         "pytest",
