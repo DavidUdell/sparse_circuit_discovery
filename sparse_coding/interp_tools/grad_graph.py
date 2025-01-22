@@ -627,15 +627,15 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             elif "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
-                style: str = "bold"
+                style: str = "dashed"
             elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
-                style: str = "diagonals"
+                style: str = "solid"
             elif "mlp" in up_layer_module:
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
-                style: str = "rounded"
+                style: str = "solid"
             else:
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
@@ -703,15 +703,15 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             elif "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
-                style: str = "bold"
+                style: str = "dashed"
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
-                style: str = "diagonals"
+                style: str = "solid"
             elif "mlp" in down_layer_module:
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
-                style: str = "rounded"
+                style: str = "solid"
             else:
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
