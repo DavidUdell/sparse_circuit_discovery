@@ -622,16 +622,20 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             if "error" in up_layer_module:
                 info: str | None = None
-                shape: str = "point"
+                shape: str = "box"
+                style: str = "dotted"
             elif "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
+                style: str = "bold"
             elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
-                shape: str = "house"
+                shape: str = "box3d"
+                style: str = "diagonals"
             elif "mlp" in up_layer_module:
                 info: str = MLP_TOKENS_FILE
-                shape: str = "invhouse"
+                shape: str = "box3d"
+                style: str = "rounded"
             else:
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
@@ -658,6 +662,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                             neuronpedia_key=NEURONPEDIA_KEY,
                         ),
                         shape=shape,
+                        style=style,
                     )
                 except ValueError:
                     label: str = (
@@ -675,7 +680,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         VIEW,
                     )
                     label += "</table>>"
-                    graph.add_node(up_dim_name, label=label, shape=shape)
+                    graph.add_node(
+                        up_dim_name, label=label, shape=shape, style=style
+                    )
             else:
                 # Error up nodes
                 label: str = (
@@ -685,20 +692,26 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += up_dim_name
                 label += "</b></font></td></tr>"
                 label += "</table>>"
-                graph.add_node(up_dim_name, label=label, shape=shape)
+                graph.add_node(
+                    up_dim_name, label=label, shape=shape, style=style
+                )
 
             if "error" in down_layer_module:
                 info: str | None = None
-                shape: str = "point"
+                shape: str = "box"
+                style: str = "dotted"
             elif "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
+                style: str = "bold"
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
-                shape: str = "house"
+                shape: str = "box3d"
+                style: str = "diagonals"
             elif "mlp" in down_layer_module:
                 info: str = MLP_TOKENS_FILE
-                shape: str = "invhouse"
+                shape: str = "box3d"
+                style: str = "rounded"
             else:
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
@@ -725,6 +738,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                             neuronpedia_key=NEURONPEDIA_KEY,
                         ),
                         shape=shape,
+                        style=style,
                     )
                 except ValueError:
                     label: str = (
@@ -742,7 +756,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         VIEW,
                     )
                     label += "</table>>"
-                    graph.add_node(down_dim_name, label=label, shape=shape)
+                    graph.add_node(
+                        down_dim_name, label=label, shape=shape, style=style
+                    )
             else:
                 # Error down nodes
                 label: str = (
@@ -752,7 +768,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += down_dim_name
                 label += "</b></font></td></tr>"
                 label += "</table>>"
-                graph.add_node(down_dim_name, label=label, shape=shape)
+                graph.add_node(
+                    down_dim_name, label=label, shape=shape, style=style
+                )
 
             # Edge coloration.
             if effect > 0.0:
