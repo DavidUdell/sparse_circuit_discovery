@@ -28,12 +28,24 @@ total: float = 0.0
 for m in stats:
     MiB: float = m / 1024**2
     total += MiB
-print("NVIDIA VRAM:", total)
-vram_adequate: bool = True
-if total < 31000:
-    # 30712 was my benched VRAM draw for the full model slice "0:12".
-    vram_adequate: bool = False
-if not vram_adequate:
+print("NVIDIA VRAM:", round(total), "MiB")
+
+# 30712 was my benched VRAM draw for the full model slice "0:12", with 6538
+# for the slice "10:12" and 8924 for the slice "9:12". So there's an
+# initial intercept here of ~4600 and a layer-wise coefficient of ~2200,
+# approaching from above.
+PER_LAYER: float = 2200.0
+PER_MODEL: float = 4600.0
+
+layers: int = 12
+vram_req: float = (layers * PER_LAYER) + PER_MODEL
+adequate: bool = True
+if total < vram_req:
+    adequate: bool = False
+
+if adequate:
+    print("VRAM available sufficient for specified run.")
+else:
     print("Dividing model slice to economize on VRAM use.")
 
 for basename in [
