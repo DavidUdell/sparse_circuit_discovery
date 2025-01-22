@@ -622,12 +622,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             if "error" in up_layer_module:
                 info: str | None = None
+                shape: str = "point"
             elif "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
+                shape: str = "box3d"
             elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
+                shape: str = "house"
             elif "mlp" in up_layer_module:
                 info: str = MLP_TOKENS_FILE
+                shape: str = "invhouse"
             else:
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
@@ -653,7 +657,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                             view=VIEW,
                             neuronpedia_key=NEURONPEDIA_KEY,
                         ),
-                        shape="box",
+                        shape=shape,
                     )
                 except ValueError:
                     label: str = (
@@ -671,7 +675,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         VIEW,
                     )
                     label += "</table>>"
-                    graph.add_node(up_dim_name, label=label, shape="box")
+                    graph.add_node(up_dim_name, label=label, shape=shape)
             else:
                 # Error up nodes
                 label: str = (
@@ -681,16 +685,20 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += up_dim_name
                 label += "</b></font></td></tr>"
                 label += "</table>>"
-                graph.add_node(up_dim_name, label=label, shape="box")
+                graph.add_node(up_dim_name, label=label, shape=shape)
 
             if "error" in down_layer_module:
                 info: str | None = None
+                shape: str = "point"
             elif "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
+                shape: str = "box3d"
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
+                shape: str = "house"
             elif "mlp" in down_layer_module:
                 info: str = MLP_TOKENS_FILE
+                shape: str = "invhouse"
             else:
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
@@ -716,7 +724,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                             view=VIEW,
                             neuronpedia_key=NEURONPEDIA_KEY,
                         ),
-                        shape="box",
+                        shape=shape,
                     )
                 except ValueError:
                     label: str = (
@@ -734,7 +742,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         VIEW,
                     )
                     label += "</table>>"
-                    graph.add_node(down_dim_name, label=label, shape="box")
+                    graph.add_node(down_dim_name, label=label, shape=shape)
             else:
                 # Error down nodes
                 label: str = (
@@ -744,7 +752,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += down_dim_name
                 label += "</b></font></td></tr>"
                 label += "</table>>"
-                graph.add_node(down_dim_name, label=label, shape="box")
+                graph.add_node(down_dim_name, label=label, shape=shape)
 
             # Edge coloration.
             if effect > 0.0:
