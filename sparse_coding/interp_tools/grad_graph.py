@@ -798,10 +798,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 / max(abs(color_max_scalar), abs(color_min_scalar))
             )
             rgba: str = f"#{red:02X}00{blue:02X}{alpha:02X}"
+            # Prioritize the residual stream during graph layout.
+            weight: int = 1
+            if "resid" in up_subgraph and "resid" in down_subgraph:
+                weight: int = 5
+
             graph.add_edge(
                 up_dim_name,
                 down_dim_name,
                 color=rgba,
+                weight=weight,
             )
 
     # Store sublayer explained effect.
