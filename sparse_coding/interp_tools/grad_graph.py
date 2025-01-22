@@ -572,8 +572,6 @@ unexplained_dict: dict = {}
 effect_explained: float = 0.0
 effect_unexplained: float = 0.0
 
-# Noting that 0:12 runs sometimes have exploding early gradients and so
-# numerical instability.
 for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
@@ -587,7 +585,14 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     up_layer_module: str = "".join(up_layer_split[:-1])
     down_layer_module: str = "".join(down_layer_split[:-1])
 
+    up_layer_subgraph: str = up_layer_split[0] + up_layer_split[-1]
+    down_layer_subgraph: str = down_layer_split[0] + down_layer_split[-1]
+
+    up_subgraph = graph.add_subgraph(name=up_layer_subgraph, rank="same")
+    down_subgraph = graph.add_subgraph(name=down_layer_subgraph, rank="same")
+
     sublayer_explained: float = 0.0
+
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         up_values = up_values.squeeze()
         if up_values.dim() == 2:
@@ -695,6 +700,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 graph.add_node(
                     up_dim_name, label=label, shape=shape, style=style
                 )
+            up_subgraph.add_node(up_dim_name)
 
             if "error" in down_layer_module:
                 info: str | None = None
@@ -771,6 +777,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 graph.add_node(
                     down_dim_name, label=label, shape=shape, style=style
                 )
+            down_subgraph.add_node(down_dim_name)
 
             # Edge coloration.
             if effect > 0.0:
