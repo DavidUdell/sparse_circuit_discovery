@@ -774,9 +774,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             # Edge coloration.
             if effect > 0.0:
-                red, green = 0, 255
+                red, blue = 0, 255
             elif effect < 0.0:
-                red, green = 255, 0
+                red, blue = 255, 0
             elif isnan(effect):
                 raise ValueError(
                     f"Exploding/vanishing gradients?: {edges_str, effect}"
@@ -790,12 +790,11 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 * abs(effect)
                 / max(abs(color_max_scalar), abs(color_min_scalar))
             )
-            rgba: str = f"#{red:02X}{green:02X}00{alpha:02X}"
+            rgba: str = f"#{red:02X}00{blue:02X}{alpha:02X}"
             graph.add_edge(
                 up_dim_name,
                 down_dim_name,
                 color=rgba,
-                arrowsize=1.5,
             )
 
     # Store sublayer explained effect.
