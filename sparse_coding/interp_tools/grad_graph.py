@@ -56,7 +56,10 @@ WANDB_ENTITY = config.get("WANDB_ENTITY")
 WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
-ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
+# Patch over ACTS_LAYERS_SLICE, if env_var is specified.
+ACTS_LAYERS_SLICE = parse_slice(
+    os.environ.get("ACTS_LAYERS_SLICE", config.get("ACTS_LAYERS_SLICE"))
+)
 ENCODER_FILE = config.get("ENCODER_FILE")
 ENC_BIASES_FILE = config.get("ENC_BIASES_FILE")
 DECODER_FILE = config.get("DECODER_FILE")
@@ -569,8 +572,6 @@ unexplained_dict: dict = {}
 effect_explained: float = 0.0
 effect_unexplained: float = 0.0
 
-# Noting that 0:12 runs sometimes have exploding early gradients and so
-# numerical instability.
 for edges_str, down_nodes in marginal_grads_dict.items():
     node_types: tuple[str] = edges_str.split("_to_")
     up_layer_split: tuple = node_types[0].split("_")
@@ -584,7 +585,14 @@ for edges_str, down_nodes in marginal_grads_dict.items():
     up_layer_module: str = "".join(up_layer_split[:-1])
     down_layer_module: str = "".join(down_layer_split[:-1])
 
+    up_layer_subgraph: str = up_layer_split[0] + up_layer_split[-1]
+    down_layer_subgraph: str = down_layer_split[0] + down_layer_split[-1]
+
+    up_subgraph = graph.add_subgraph(name=up_layer_subgraph, rank="same")
+    down_subgraph = graph.add_subgraph(name=down_layer_subgraph, rank="same")
+
     sublayer_explained: float = 0.0
+
     for down_dim, up_values in tqdm(down_nodes.items(), desc=edges_str):
         up_values = up_values.squeeze()
         if up_values.dim() == 2:
@@ -619,12 +627,20 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             if "error" in up_layer_module:
                 info: str | None = None
+                shape: str = "box"
+                style: str = "dotted"
             elif "res" in up_layer_module:
                 info: str = RESID_TOKENS_FILE
+                shape: str = "box3d"
+                style: str = "dashed"
             elif "attn" in up_layer_module:
                 info: str = ATTN_TOKENS_FILE
+                shape: str = "box3d"
+                style: str = "solid"
             elif "mlp" in up_layer_module:
                 info: str = MLP_TOKENS_FILE
+                shape: str = "box3d"
+                style: str = "solid"
             else:
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
@@ -650,7 +666,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                             view=VIEW,
                             neuronpedia_key=NEURONPEDIA_KEY,
                         ),
-                        shape="box",
+                        shape=shape,
+                        style=style,
                     )
                 except ValueError:
                     label: str = (
@@ -668,7 +685,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         VIEW,
                     )
                     label += "</table>>"
-                    graph.add_node(up_dim_name, label=label, shape="box")
+                    graph.add_node(
+                        up_dim_name, label=label, shape=shape, style=style
+                    )
             else:
                 # Error up nodes
                 label: str = (
@@ -678,16 +697,27 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += up_dim_name
                 label += "</b></font></td></tr>"
                 label += "</table>>"
-                graph.add_node(up_dim_name, label=label, shape="box")
+                graph.add_node(
+                    up_dim_name, label=label, shape=shape, style=style
+                )
+            up_subgraph.add_node(up_dim_name)
 
             if "error" in down_layer_module:
                 info: str | None = None
+                shape: str = "box"
+                style: str = "dotted"
             elif "res" in down_layer_module:
                 info: str = RESID_TOKENS_FILE
+                shape: str = "box3d"
+                style: str = "dashed"
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
+                shape: str = "box3d"
+                style: str = "solid"
             elif "mlp" in down_layer_module:
                 info: str = MLP_TOKENS_FILE
+                shape: str = "box3d"
+                style: str = "solid"
             else:
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
@@ -713,7 +743,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                             view=VIEW,
                             neuronpedia_key=NEURONPEDIA_KEY,
                         ),
-                        shape="box",
+                        shape=shape,
+                        style=style,
                     )
                 except ValueError:
                     label: str = (
@@ -731,7 +762,9 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         VIEW,
                     )
                     label += "</table>>"
-                    graph.add_node(down_dim_name, label=label, shape="box")
+                    graph.add_node(
+                        down_dim_name, label=label, shape=shape, style=style
+                    )
             else:
                 # Error down nodes
                 label: str = (
@@ -741,13 +774,16 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 label += down_dim_name
                 label += "</b></font></td></tr>"
                 label += "</table>>"
-                graph.add_node(down_dim_name, label=label, shape="box")
+                graph.add_node(
+                    down_dim_name, label=label, shape=shape, style=style
+                )
+            down_subgraph.add_node(down_dim_name)
 
             # Edge coloration.
             if effect > 0.0:
-                red, green = 0, 255
+                red, blue = 0, 255
             elif effect < 0.0:
-                red, green = 255, 0
+                red, blue = 255, 0
             elif isnan(effect):
                 raise ValueError(
                     f"Exploding/vanishing gradients?: {edges_str, effect}"
@@ -761,12 +797,17 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 * abs(effect)
                 / max(abs(color_max_scalar), abs(color_min_scalar))
             )
-            rgba: str = f"#{red:02X}{green:02X}00{alpha:02X}"
+            rgba: str = f"#{red:02X}00{blue:02X}{alpha:02X}"
+            # Prioritize the residual stream during graph layout.
+            weight: int = 1
+            if "resid" in up_subgraph and "resid" in down_subgraph:
+                weight: int = 5
+
             graph.add_edge(
                 up_dim_name,
                 down_dim_name,
                 color=rgba,
-                arrowsize=1.5,
+                weight=weight,
             )
 
     # Store sublayer explained effect.

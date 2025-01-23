@@ -166,9 +166,9 @@ _Blue and red tokens_ in individual boxes at the bottom are the logits most
 upweighted/downweighted by that dimension. (_Gray_ is the 0.0 effect edge case.)
 
 _Arrows_ between boxes represent downstream ablation effects on other features.
-Red arrows represent downweighting, blue (green in `grad_graph.py`) arrows
-represent upweighting, and arrow transparency represents magnitude. E.g., a
-pale red arrow is a minor downweighting effect.
+Red arrows represent downweighting; blue arrows represent upweighting; arrow
+transparency represents magnitude. E.g., a pale red arrow is a minor
+downweighting effect.
 
 ## Errors
 - I've gimped a lot of repository functionality for now: only `GPT-2 small` and
@@ -190,4 +190,4 @@ pale red arrow is a minor downweighting effect.
   from the bottom of the model and progressively plot up from there.
 
 ## Project Status
-Current version is 1.3.2
+Current version is 1.4.0

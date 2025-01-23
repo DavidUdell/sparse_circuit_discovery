@@ -9,7 +9,7 @@ setup(
     long_description=open("README.markdown", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="David Udell",
-    version="1.3.2",
+    version="1.4.0",
     license="MIT",
     packages=find_packages(),
     install_requires=[
@@ -20,7 +20,8 @@ setup(
         "lightning",
         "matplotlib",
         "nnsight",
-        "numpy",
+        "numpy>=2.2.2",
+        "nvidia-ml-py",
         "pygraphviz",
         "pytest",
         "PyYAML",
