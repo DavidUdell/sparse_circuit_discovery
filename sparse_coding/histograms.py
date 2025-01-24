@@ -4,12 +4,13 @@ Histograms from autoencoder activations, to set distribution-aware thresholds.
 """
 
 
+import itertools
 import warnings
 
 import numpy as np
 import torch as t
-from accelerate import Accelerator
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
+from tqdm.auto import tqdm
 import wandb
 
 from sparse_coding.interp_tools.utils.computations import Encoder
@@ -46,6 +47,8 @@ PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 PROJECTION_DIM = int(HIDDEN_DIM * PROJECTION_FACTOR)
 SEED = config.get("SEED")
 
+PERCENTILE: float = 99.99
+
 # %%
 # Reproducibility
 _ = t.manual_seed(SEED)
@@ -61,7 +64,6 @@ wandb.init(
 
 # %%
 # Loop over all the model layers in the slice.
-accelerator: Accelerator = Accelerator()
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
     model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
@@ -86,58 +88,62 @@ mlp = {
     "biases": MLP_BIASES_FILE,
 }
 
+sublayer_iterator = itertools.product(seq_layer_indices, [resid, attn, mlp])
 percentiles_dict: dict[str, float] = {}
 
-for layer_idx in seq_layer_indices:
-    for sublayer in [resid, attn, mlp]:
-        acts_file: str = sublayer["acts"]
-        encoder_file: str = sublayer["encoder"]
-        biases_file: str = sublayer["biases"]
+for layer_idx, sublayer in tqdm(
+    sublayer_iterator,
+    desc="Sublayer Percentiles",
+    total=len(seq_layer_indices) * 3,
+):
+    acts_file: str = sublayer["acts"]
+    encoder_file: str = sublayer["encoder"]
+    biases_file: str = sublayer["biases"]
 
-        encoder_path: str = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{encoder_file}",
-        )
-        biases_path: str = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
-        )
-        acts_path: str = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
-        )
-        imported_weights: t.Tensor = t.load(encoder_path, weights_only=True).T
-        imported_biases: t.Tensor = t.load(biases_path, weights_only=True)
-        layer_acts_data: t.Tensor = accelerator.prepare(
-            t.load(acts_path, weights_only=True)
-        )
+    encoder_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{encoder_file}",
+    )
+    biases_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
+    )
+    acts_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
+    )
+    imported_weights: t.Tensor = t.load(encoder_path, weights_only=True).T
+    imported_biases: t.Tensor = t.load(biases_path, weights_only=True)
+    # Moved this to CPU to avoid cuda memory crashes.
+    layer_acts_data: t.Tensor = t.load(acts_path, weights_only=True).cpu()
 
-        module_type: str = acts_file.split("_")[0]
-        append: str = f"{module_type}_percentile.csv"
-        percentile_path: str = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{append}",
-        )
+    module_type: str = acts_file.split("_")[0]
+    append: str = f"{module_type}_percentile.csv"
+    percentile_path: str = save_paths(
+        __file__,
+        f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{append}",
+    )
 
-        graph_title: str = f"Layer {layer_idx} {module_type}"
-        # Reassigning model variable to tell the garbage collector we're done
-        # with it now.
-        model: Encoder = accelerator.prepare(
-            Encoder(
-                imported_weights,
-                imported_biases,
-                HIDDEN_DIM,
-                PROJECTION_DIM,
-            )
-        )
+    graph_title: str = f"Layer {layer_idx} {module_type}"
+    # Reassigning model variable to tell the garbage collector we're done with
+    # it now.
+    model: Encoder = Encoder(
+        imported_weights,
+        imported_biases,
+        HIDDEN_DIM,
+        PROJECTION_DIM,
+    ).to("cpu")
 
-        projected_acts: np.ndarray = (
-            model(layer_acts_data)[:, -1, :].squeeze().cpu().detach().numpy()
-        )
-        percentile = np.percentile(projected_acts, 99.99)
-        percentile = round(percentile, 2)
+    projected_acts: np.ndarray = (
+        model(layer_acts_data).squeeze().detach().numpy()
+    )
 
-        percentiles_dict[percentile_path] = percentile
+    # np.percentile() is actually faster than explicit histogram and cdf
+    # computations.
+    percentile = np.percentile(projected_acts, PERCENTILE)
+    percentile = round(percentile, 2)
+
+    percentiles_dict[percentile_path] = percentile
 
 # %%
 # Save percentiles to csv

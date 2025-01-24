@@ -104,11 +104,11 @@ WANDB_ENTITY: "davidudell"
 SEED: 0
 
 # `collect_acts.py`
-NUM_SEQUENCES_EVALED: 50
+NUM_SEQUENCES_EVALED: 1000
 MAX_SEQ_LEN: 50
 
 # `precluster.py`
-NUM_CLUSTERS: 1000
+NUM_CLUSTERS: 10
 KEEPER_CLUSTER_INDEX: 0
 
 # `train_autoencoder.py`
