@@ -45,7 +45,8 @@ def project_activations(
 
     flat_acts: t.Tensor = t.cat(acts_list, dim=0)
     flat_acts: t.Tensor = accelerator.prepare(flat_acts)
-    projected_flat_acts: t.Tensor = projector(flat_acts).detach()
+    projected_flat_acts = t.einsum("pn,...n->...p", projector, flat_acts)
+    # projected_flat_acts: t.Tensor = projector(flat_acts).detach()
 
     # Reconstruct the original question lengths.
     projected_activations: list[t.Tensor] = []

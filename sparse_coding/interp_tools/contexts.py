@@ -217,7 +217,7 @@ for layer_idx in seq_layer_indices:
         model: Encoder = Encoder(
             imported_weights, imported_biases, HIDDEN_DIM, PROJECTION_DIM
         )
-        model = accelerator.prepare(model)
+        model = model.encoder_layer.weight.to("cuda:0")
 
         # Load and parallelize activations.
         LAYER_ACTS_PATH = save_paths(
