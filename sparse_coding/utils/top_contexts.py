@@ -17,8 +17,6 @@ def context_activations(
     at each input token."""
 
     contexts_and_activations = defaultdict(list)
-    top_k_contexts_acts = defaultdict(list)
-    top_k_views = defaultdict(list)
 
     assert len(context_token_ids) == len(
         context_acts
@@ -29,26 +27,7 @@ def context_activations(
             acts = activation[:, dim_idx].tolist()
             contexts_and_activations[dim_idx].append((context, acts))
 
-    for dim_idx, contexts_acts in contexts_and_activations.items():
-        ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
-            contexts_acts,
-            key=lambda x: max(x[-1]),
-            reverse=True,
-        )
-        top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
-
-        for context, acts in top_k_contexts_acts[dim_idx]:
-            # index() should always return a unique index. It will prioritize
-            # the first, in case of collisions.
-            max_position = acts.index(max(acts))
-            # To complete the open end of the slice, we add 1 to that side.
-            view_slice = slice(max_position - view, max_position + view + 1)
-            # Fixes singleton unpadded _contexts_.
-            if isinstance(context, int):
-                context: list = [context]
-            top_k_views[dim_idx].append(
-                (context[view_slice], acts[view_slice])
-            )
+    top_k_views = top_k_contexts(contexts_and_activations, view, top_k)
 
     return top_k_views
 
@@ -85,46 +64,46 @@ def project_activations(
     return projected_activations
 
 
-# def top_k_contexts(
-#     contexts_and_activations: defaultdict[
-#         int, list[tuple[list[str], list[float]]]
-#     ],
-#     view: int,
-#     top_k: int,
-# ) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
-#     """
-#     Select the top-k contexts for each feature.
+def top_k_contexts(
+    contexts_and_activations: defaultdict[
+        int, list[tuple[list[str], list[float]]]
+    ],
+    view: int,
+    top_k: int,
+) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
+    """
+    Select the top-k contexts for each feature.
 
-#     The contexts are sorted by their max activation values, and are trimmed to
-#     a specified distance around each top activating token. Then, we only keep
-#     the top-k of those trimmed contexts.
-#     """
+    The contexts are sorted by their max activation values, and are trimmed to
+    a specified distance around each top activating token. Then, we only keep
+    the top-k of those trimmed contexts.
+    """
 
-#     top_k_contexts_acts = defaultdict(list)
-#     top_k_views = defaultdict(list)
+    top_k_contexts_acts = defaultdict(list)
+    top_k_views = defaultdict(list)
 
-#     for dim_idx, contexts_acts in contexts_and_activations.items():
-#         ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
-#             contexts_acts,
-#             key=lambda x: max(x[-1]),
-#             reverse=True,
-#         )
-#         top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
+    for dim_idx, contexts_acts in contexts_and_activations.items():
+        ordered_contexts_acts: list[tuple[list[str], list[float]]] = sorted(
+            contexts_acts,
+            key=lambda x: max(x[-1]),
+            reverse=True,
+        )
+        top_k_contexts_acts[dim_idx] = ordered_contexts_acts[:top_k]
 
-#         for context, acts in top_k_contexts_acts[dim_idx]:
-#             # index() should always return a unique index. It will prioritize
-#             # the first, in case of collisions.
-#             max_position = acts.index(max(acts))
-#             # To complete the open end of the slice, we add 1 to that side.
-#             view_slice = slice(max_position - view, max_position + view + 1)
-#             # Fixes singleton unpadded _contexts_.
-#             if isinstance(context, int):
-#                 context: list = [context]
-#             top_k_views[dim_idx].append(
-#                 (context[view_slice], acts[view_slice])
-#             )
+        for context, acts in top_k_contexts_acts[dim_idx]:
+            # index() should always return a unique index. It will prioritize
+            # the first, in case of collisions.
+            max_position = acts.index(max(acts))
+            # To complete the open end of the slice, we add 1 to that side.
+            view_slice = slice(max_position - view, max_position + view + 1)
+            # Fixes singleton unpadded _contexts_.
+            if isinstance(context, int):
+                context: list = [context]
+            top_k_views[dim_idx].append(
+                (context[view_slice], acts[view_slice])
+            )
 
-#     return top_k_views
+    return top_k_views
 
 
 def unpad_activations(
