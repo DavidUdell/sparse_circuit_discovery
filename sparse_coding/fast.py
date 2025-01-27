@@ -18,15 +18,20 @@ dirname: list[str] = __file__.split("/")[:-1]
 dirname: str = "/".join(dirname)
 
 # Check NVIDIA GPU VRAM
-pynvml.nvmlInit()
-num_devices = pynvml.nvmlDeviceGetCount()
 stats = []
-for idx in range(num_devices):
-    handle = pynvml.nvmlDeviceGetHandleByIndex(idx)
-    memory = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    vram_total: int = memory.total
-    stats.append(vram_total)
-pynvml.nvmlShutdown()
+
+try:
+    pynvml.nvmlInit()
+except RuntimeError as e:
+    print(e)
+else:
+    num_devices = pynvml.nvmlDeviceGetCount()
+    for idx in range(num_devices):
+        handle = pynvml.nvmlDeviceGetHandleByIndex(idx)
+        memory = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        vram_total: int = memory.total
+        stats.append(vram_total)
+    pynvml.nvmlShutdown()
 
 total: float = 0.0
 for m in stats:
@@ -51,7 +56,8 @@ if total < vram_req:
 
 if adequate:
     print("VRAM available sufficient for specified run.")
-
+elif total == 0.0:
+    print("No NVIDIA VRAM detected.")
 else:
     # Dividing into halves always suffices
     halfway: int = floor((layers_slice.start + layers_slice.stop) / 2)
@@ -65,6 +71,7 @@ else:
     )
     os.environ["ACTS_LAYERS_SLICE"] = f"{halfway}:{layers_slice.stop}"
 
+
 for basename in [
     "collect_acts.py",
     "precluster.py",
@@ -76,7 +83,7 @@ for basename in [
     run(["python3", path], check=True)
 
 # Run second pass when needed
-if not adequate:
+if not adequate and total >= 0.0:
     path = f"{dirname}/interp_tools/grad_graph.py"
     os.environ["ACTS_LAYERS_SLICE"] = f"{layers_slice.start}:{halfway + 1}"
     run(["python3", path], check=True)

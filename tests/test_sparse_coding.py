@@ -100,7 +100,7 @@ def test_project_activations(  # pylint: disable=redefined-outer-name
     mock_encoder, _, accelerator = mock_autoencoder
 
     mock_projections = project_activations(
-        acts_list, mock_encoder, accelerator
+        acts_list, mock_encoder.encoder_layer.weight, accelerator
     )
 
     assert isinstance(mock_projections, list)
