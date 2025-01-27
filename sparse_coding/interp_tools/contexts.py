@@ -213,11 +213,11 @@ for layer_idx in seq_layer_indices:
         imported_weights: t.Tensor = t.load(ENCODER_PATH, weights_only=True).T
         imported_biases: t.Tensor = t.load(BIASES_PATH, weights_only=True)
 
-        # Initialize a concrete encoder for this layer.
+        # Initialize a concrete _encoder_ for this layer.
         model: Encoder = Encoder(
             imported_weights, imported_biases, HIDDEN_DIM, PROJECTION_DIM
         )
-        model = model.encoder_layer.weight.to("cuda:0")
+        model: t.Tensor = model.encoder_layer.weight.to("cuda:0")
 
         # Load and parallelize activations.
         LAYER_ACTS_PATH = save_paths(

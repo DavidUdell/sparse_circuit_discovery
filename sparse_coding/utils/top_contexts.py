@@ -20,7 +20,7 @@ def context_activations(
     ), f"{len(context_token_ids)} != {len(context_acts)}"
 
     for context, activation in zip(context_token_ids, context_acts):
-        for dim_idx in range(encoder.encoder_layer.weight.shape[0]):
+        for dim_idx in range(encoder.shape[0]):
             acts = activation[:, dim_idx].tolist()
             contexts_and_activations[dim_idx].append((context, acts))
 
