@@ -22,9 +22,6 @@ stats = []
 
 try:
     pynvml.nvmlInit()
-except RuntimeError as e:
-    print(e)
-else:
     num_devices = pynvml.nvmlDeviceGetCount()
     for idx in range(num_devices):
         handle = pynvml.nvmlDeviceGetHandleByIndex(idx)
@@ -32,6 +29,9 @@ else:
         vram_total: int = memory.total
         stats.append(vram_total)
     pynvml.nvmlShutdown()
+
+except RuntimeError as e:
+    print(e)
 
 total: float = 0.0
 for m in stats:
