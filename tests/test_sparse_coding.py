@@ -1,6 +1,5 @@
 """Unit tests for the `sparse_coding` module."""
 
-
 from collections import defaultdict
 
 import pytest
@@ -71,12 +70,12 @@ def test_context_activations(  # pylint: disable=redefined-outer-name
     mock_encoder, _, _ = mock_autoencoder
     question_token_ids, feature_activations = mock_data
 
-    mock_effects: defaultdict[
-        int, list[tuple[list[int], list[float]]]
-    ] = context_activations(
-        question_token_ids,
-        feature_activations,
-        mock_encoder,
+    mock_effects: defaultdict[int, list[tuple[list[int], list[float]]]] = (
+        context_activations(
+            question_token_ids,
+            feature_activations,
+            mock_encoder.encoder_layer.weight,
+        )
     )
 
     assert isinstance(mock_effects, defaultdict)
@@ -112,9 +111,9 @@ def test_project_activations(  # pylint: disable=redefined-outer-name
 def test_top_k_contexts():
     """Test `top_k_contexts`."""
 
-    mock_effects: defaultdict[
-        int, list[tuple[list[int], list[float]]]
-    ] = defaultdict(list)
+    mock_effects: defaultdict[int, list[tuple[list[int], list[float]]]] = (
+        defaultdict(list)
+    )
     mock_effects[0].append(([0, 1, 2], [0.1, 0.2, 0.3]))
     mock_effects[0].append(([1, 1, 2], [0.4, 0.5, 0.6]))
     mock_effects[0].append(([2, 2, 2], [0.7, 0.8, 0.9]))
