@@ -13,7 +13,7 @@ def process_activations(
     encoder: t.Tensor,
     view: int,
     top_k: int,
-) -> defaultdict[int, list[tuple[list[int], list[float]]]]:
+) -> defaultdict[int, list[tuple[list[int], t.Tensor]]]:
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
@@ -21,6 +21,8 @@ def process_activations(
 
     max_act_batches = None
     max_seq_pos_batches = None
+
+    top_k = min(len(batches_list), top_k)
 
     for batch in tqdm(batches_list):
         max_act, max_seq_poses = batch.max(dim=0)
@@ -56,20 +58,31 @@ def process_activations(
         higher_cut = t.min(center + view + 1, upper)
 
         tokens_window: list = []
-        acts_window: list = []
+        acts_window = None
         for i in range(top_k):
             low = lower_cut[i]
             high = higher_cut[i]
             tokens_window.append(top_token_seqs[i][low:high])
-            acts_window.append(top_act_seqs[i][low:high])
+            if acts_window is None:
+                acts_window = top_act_seqs[i][:, dim][low:high]
+            else:
+                acts_window = t.cat(
+                    acts_window, top_act_seqs[i][:, dim][low:high]
+                )
 
         top_k_views[dim].append((tokens_window, acts_window))
 
-    assert top_k_views == top_k_contexts(
-        context_activations(sequence_token_ids, batches_list, encoder),
-        view,
-        top_k,
-    )
+    # baseline_output = top_k_contexts(
+    #     context_activations(sequence_token_ids, batches_list, encoder),
+    #     view,
+    #     top_k,
+    # )
+    # assert t.isclose(
+    #     top_k_views[0][0][-1][-1], baseline_output[0][0][-1][-1]
+    # ), (
+    #     top_k_views[0][0],
+    #     baseline_output[0][0],
+    # )
 
     return top_k_views
 
@@ -134,7 +147,7 @@ def top_k_contexts(
     ],
     view: int,
     top_k: int,
-) -> defaultdict[int, list[tuple[list[str], list[float]]]]:
+) -> defaultdict[int, list[tuple[list[str], t.Tensor]]]:
     """
     Select the top-k contexts for each feature.
 

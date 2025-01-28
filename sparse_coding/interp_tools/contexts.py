@@ -147,11 +147,11 @@ def populate_table(
             # Context here has been stringified, so its length is not its token
             # length, for the time being.
             for context, acts in contexts_and_effects[dim_idx]:
-                if sum(acts) == 0.0:
+                if t.is_nonzero(acts.sum()):
                     break
 
                 top_k_contexts.append(context)
-                top_activations.append(acts)
+                top_activations.append(acts.tolist())
 
             if not top_k_contexts:
                 continue
