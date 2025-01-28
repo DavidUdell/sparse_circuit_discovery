@@ -246,7 +246,7 @@ for layer_idx in seq_layer_indices:
         # Calculate per-input-token summed activation, for each feature
         # dimension. Select just the top-k effects.
         truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
-            top_contexts.context_activations(
+            top_contexts.process_activations(
                 unpacked_prompts_ids,
                 feature_acts,
                 model,

@@ -6,7 +6,7 @@ import torch as t
 from accelerate import Accelerator
 
 
-def context_activations(
+def process_activations(
     context_token_ids: list[list[int]],
     context_acts: list[t.Tensor],
     encoder: t.Tensor,
@@ -30,6 +30,28 @@ def context_activations(
     top_k_views = top_k_contexts(contexts_and_activations, view, top_k)
 
     return top_k_views
+
+
+def context_activations(
+    context_token_ids: list[list[int]],
+    context_acts: list[t.Tensor],
+    encoder: t.Tensor,
+) -> defaultdict[int, list[tuple[list[int], list[float]]]]:
+    """Return the autoencoder's summed activations, at each feature dimension,
+    at each input token."""
+
+    contexts_and_activations = defaultdict(list)
+
+    assert len(context_token_ids) == len(
+        context_acts
+    ), f"{len(context_token_ids)} != {len(context_acts)}"
+
+    for context, activation in zip(context_token_ids, context_acts):
+        for dim_idx in range(encoder.shape[0]):
+            acts = activation[:, dim_idx].tolist()
+            contexts_and_activations[dim_idx].append((context, acts))
+
+    return contexts_and_activations
 
 
 def defaultdict_factory():
