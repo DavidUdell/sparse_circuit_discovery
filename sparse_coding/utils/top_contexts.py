@@ -2,13 +2,14 @@
 
 from collections import defaultdict
 
+from tqdm.auto import tqdm
 import torch as t
 from accelerate import Accelerator
 
 
 def process_activations(
-    context_token_ids: list[list[int]],
-    context_acts: list[t.Tensor],
+    sequence_token_ids: list[list[int]],
+    batches_list: list[t.Tensor],
     encoder: t.Tensor,
     view: int,
     top_k: int,
@@ -16,10 +17,59 @@ def process_activations(
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
-    contexts_and_activations = context_activations(
-        context_token_ids, context_acts, encoder
+    top_k_views = defaultdict(list)
+
+    max_act_batches = None
+    max_seq_pos_batches = None
+
+    for batch in tqdm(batches_list):
+        max_act, max_seq_poses = batch.max(dim=0)
+
+        max_act: t.Tensor = max_act.unsqueeze(0)
+        max_seq_poses: t.Tensor = max_seq_poses.unsqueeze(0)
+
+        if max_act_batches is None:
+            max_act_batches = max_act
+            max_seq_pos_batches = max_seq_poses
+
+        else:
+            max_act_batches = t.cat([max_act_batches, max_act])
+            max_seq_pos_batches = t.cat([max_seq_pos_batches, max_seq_poses])
+
+    _, max_seqs = t.topk(max_act_batches, top_k, dim=0)
+
+    # max_seq_pos_batches.shape: num_batches, hidden_dim
+    # max_seqs.shape: top_k, hidden_dim
+
+    for dim, top_seqs in tqdm(enumerate(max_seqs.T)):
+        top_token_seqs = [sequence_token_ids[t] for t in top_seqs]
+        top_act_seqs = [batches_list[t] for t in top_seqs]
+
+        center: t.Tensor = max_seq_pos_batches[:, dim][top_seqs]
+        lower = t.zeros_like(center)
+        upper = t.tensor(
+            [len(top_act_seqs[i]) for i in range(top_k)],
+            device=lower.device,
+        )
+
+        lower_cut = t.max(center - view, lower)
+        higher_cut = t.min(center + view + 1, upper)
+
+        tokens_window: list = []
+        acts_window: list = []
+        for i in range(top_k):
+            low = lower_cut[i]
+            high = higher_cut[i]
+            tokens_window.append(top_token_seqs[i][low:high])
+            acts_window.append(top_act_seqs[i][low:high])
+
+        top_k_views[dim].append((tokens_window, acts_window))
+
+    assert top_k_views == top_k_contexts(
+        context_activations(sequence_token_ids, batches_list, encoder),
+        view,
+        top_k,
     )
-    top_k_views = top_k_contexts(contexts_and_activations, view, top_k)
 
     return top_k_views
 
@@ -114,7 +164,7 @@ def top_k_contexts(
             if isinstance(context, int):
                 context: list = [context]
             top_k_views[dim_idx].append(
-                (context[view_slice], acts[view_slice])
+                (context[view_slice], t.tensor(acts[view_slice]))
             )
 
     return top_k_views
