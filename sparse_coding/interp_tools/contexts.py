@@ -198,72 +198,84 @@ mlp = {
 print("Annotating autoencoder dimensions:")
 for layer_idx in seq_layer_indices:
     for sublayer in [resid, attn, mlp]:
-        acts_file: str = sublayer["acts"]
-        encoder_file: str = sublayer["encoder"]
-        biases_file: str = sublayer["biases"]
-        tokens_file: str = sublayer["tokens"]
+        with t.no_grad():
+            acts_file: str = sublayer["acts"]
+            encoder_file: str = sublayer["encoder"]
+            biases_file: str = sublayer["biases"]
+            tokens_file: str = sublayer["tokens"]
 
-        ENCODER_PATH = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{encoder_file}",
-        )
-        BIASES_PATH = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
-        )
-        imported_weights: t.Tensor = t.load(ENCODER_PATH, weights_only=True).T
-        imported_biases: t.Tensor = t.load(BIASES_PATH, weights_only=True)
-
-        # Initialize a concrete _encoder_ for this layer.
-        model: Encoder = Encoder(
-            imported_weights, imported_biases, HIDDEN_DIM, PROJECTION_DIM
-        )
-        model: t.Tensor = model.encoder_layer.weight.to(accelerator.device)
-
-        # Load and parallelize activations.
-        LAYER_ACTS_PATH = save_paths(
-            __file__,
-            f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
-        )
-        layer_acts_data: t.Tensor = accelerator.prepare(
-            t.load(LAYER_ACTS_PATH, weights_only=True)
-        )
-
-        # Note that activations are stored as a list of question tensors from
-        # this function on out. Functions may internally unpack that into
-        # individual activations, but that's the general protocol between
-        # functions.
-        unpadded_acts: list[t.Tensor] = top_contexts.unpad_activations(
-            layer_acts_data, unpacked_prompts_ids
-        )
-
-        # If you want to _directly_ interpret the model's activations, assign
-        # `feature_acts` directly to `unpadded_acts` and ensure constants are
-        # set to the model's embedding dimensionality.
-        feature_acts: list[t.Tensor] = top_contexts.project_activations(
-            unpadded_acts, model, accelerator
-        )
-
-        # Calculate per-input-token summed activation, for each feature
-        # dimension. Select just the top-k effects.
-        truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
-            top_contexts.process_activations(
-                unpacked_prompts_ids,
-                feature_acts,
-                VIEW,
-                TOP_K,
+            ENCODER_PATH = save_paths(
+                __file__,
+                f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{encoder_file}",
             )
-        )
+            BIASES_PATH = save_paths(
+                __file__,
+                f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{biases_file}",
+            )
+            imported_weights: t.Tensor = t.load(
+                ENCODER_PATH, weights_only=True
+            ).T
+            imported_biases: t.Tensor = t.load(BIASES_PATH, weights_only=True)
 
-        populate_table(
-            truncated_effects,
-            MODEL_DIR,
-            tokens_file,
-            layer_idx,
-        )
+            # Initialize a concrete _encoder_ for this layer.
+            model: Encoder = Encoder(
+                imported_weights, imported_biases, HIDDEN_DIM, PROJECTION_DIM
+            )
+            model: t.Tensor = model.encoder_layer.weight.to(accelerator.device)
 
-        t.cuda.empty_cache()
-        gc.collect()
+            # Load and parallelize activations.
+            LAYER_ACTS_PATH = save_paths(
+                __file__,
+                f"{sanitize_model_name(MODEL_DIR)}/{layer_idx}/{acts_file}",
+            )
+            layer_acts_data: t.Tensor = accelerator.prepare(
+                t.load(LAYER_ACTS_PATH, weights_only=True)
+            )
+
+            # Note that activations are stored as a list of question tensors
+            # from this function on out. Functions may internally unpack that
+            # into individual activations, but that's the general protocol
+            # between functions.
+            unpadded_acts: list[t.Tensor] = top_contexts.unpad_activations(
+                layer_acts_data, unpacked_prompts_ids
+            )
+
+            # If you want to _directly_ interpret the model's activations,
+            # assign `feature_acts` directly to `unpadded_acts` and ensure
+            # constants are set to the model's embedding dimensionality.
+            feature_acts: list[t.Tensor] = top_contexts.project_activations(
+                unpadded_acts, model, accelerator
+            )
+
+            # Calculate per-input-token summed activation, for each feature
+            # dimension. Select just the top-k effects.
+            truncated_effects: defaultdict[int, list[tuple[str, float]]] = (
+                top_contexts.process_activations(
+                    unpacked_prompts_ids,
+                    feature_acts,
+                    VIEW,
+                    TOP_K,
+                )
+            )
+
+            populate_table(
+                truncated_effects,
+                MODEL_DIR,
+                tokens_file,
+                layer_idx,
+            )
+
+            # Every memory trick
+            imported_weights, imported_biases, model = None, None, None
+            layer_acts_data, unpadded_acts, feature_acts, truncated_effects = (
+                None,
+                None,
+                None,
+                None,
+            )
+            accelerator.clear()
+            t.cuda.empty_cache()
+            gc.collect()
 
 # For clean spacing in stdout.
 print()

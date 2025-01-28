@@ -42,7 +42,11 @@ def process_activations(
     # max_seq_pos_batches.shape: num_batches, hidden_dim
     # max_seqs.shape: top_k, hidden_dim
 
-    for dim, top_seqs in tqdm(enumerate(max_seqs.T), desc="Dims Annotated"):
+    for dim, top_seqs in tqdm(
+        enumerate(max_seqs.T),
+        desc="Dims Annotated",
+        total=max_seqs.T.shape[0],
+    ):
         top_token_seqs = [sequence_token_ids[t] for t in top_seqs]
         top_act_seqs = [batches_list[t] for t in top_seqs]
 

@@ -140,8 +140,7 @@ def test_top_k_contexts():
     assert isinstance(mock_top_k_contexts[0][0], tuple)
     assert isinstance(mock_top_k_contexts[0][0][0], list)
     assert isinstance(mock_top_k_contexts[0][0][0][0], int)
-    assert isinstance(mock_top_k_contexts[0][0][1], list)
-    assert isinstance(mock_top_k_contexts[0][0][1][0], float)
+    assert isinstance(mock_top_k_contexts[0][0][1], t.Tensor)
 
     assert len(mock_top_k_contexts) == 2
     assert len(mock_top_k_contexts[0]) == 3
