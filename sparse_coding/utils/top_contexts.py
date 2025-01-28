@@ -10,7 +10,6 @@ from accelerate import Accelerator
 def process_activations(
     sequence_token_ids: list[list[int]],
     batches_list: list[t.Tensor],
-    encoder: t.Tensor,
     view: int,
     top_k: int,
 ) -> defaultdict[int, list[tuple[list[int], t.Tensor]]]:
@@ -24,7 +23,7 @@ def process_activations(
 
     top_k = min(len(batches_list), top_k)
 
-    for batch in tqdm(batches_list):
+    for batch in batches_list:
         max_act, max_seq_poses = batch.max(dim=0)
 
         max_act: t.Tensor = max_act.unsqueeze(0)
@@ -43,7 +42,7 @@ def process_activations(
     # max_seq_pos_batches.shape: num_batches, hidden_dim
     # max_seqs.shape: top_k, hidden_dim
 
-    for dim, top_seqs in tqdm(enumerate(max_seqs.T)):
+    for dim, top_seqs in tqdm(enumerate(max_seqs.T), desc="Dims Annotated"):
         top_token_seqs = [sequence_token_ids[t] for t in top_seqs]
         top_act_seqs = [batches_list[t] for t in top_seqs]
 
@@ -67,7 +66,7 @@ def process_activations(
                 acts_window = top_act_seqs[i][:, dim][low:high]
             else:
                 acts_window = t.cat(
-                    acts_window, top_act_seqs[i][:, dim][low:high]
+                    [acts_window, top_act_seqs[i][:, dim][low:high]]
                 )
 
         top_k_views[dim].append((tokens_window, acts_window))

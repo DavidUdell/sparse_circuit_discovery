@@ -6,6 +6,7 @@ Requires a HF access token to get `Llama-2`'s tokenizer.
 """
 
 
+import gc
 import os
 import warnings
 import csv
@@ -249,7 +250,6 @@ for layer_idx in seq_layer_indices:
             top_contexts.process_activations(
                 unpacked_prompts_ids,
                 feature_acts,
-                model,
                 VIEW,
                 TOP_K,
             )
@@ -261,6 +261,9 @@ for layer_idx in seq_layer_indices:
             tokens_file,
             layer_idx,
         )
+
+        t.cuda.empty_cache()
+        gc.collect()
 
 # For clean spacing in stdout.
 print()
