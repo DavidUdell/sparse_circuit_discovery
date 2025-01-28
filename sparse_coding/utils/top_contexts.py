@@ -16,17 +16,9 @@ def process_activations(
     """Return the autoencoder's summed activations, at each feature dimension,
     at each input token."""
 
-    contexts_and_activations = defaultdict(list)
-
-    assert len(context_token_ids) == len(
-        context_acts
-    ), f"{len(context_token_ids)} != {len(context_acts)}"
-
-    for context, activation in zip(context_token_ids, context_acts):
-        for dim_idx in range(encoder.shape[0]):
-            acts = activation[:, dim_idx].tolist()
-            contexts_and_activations[dim_idx].append((context, acts))
-
+    contexts_and_activations = context_activations(
+        context_token_ids, context_acts, encoder
+    )
     top_k_views = top_k_contexts(contexts_and_activations, view, top_k)
 
     return top_k_views
@@ -54,12 +46,6 @@ def context_activations(
     return contexts_and_activations
 
 
-def defaultdict_factory():
-    """Factory for string defaultdicts."""
-
-    return defaultdict(str)
-
-
 def project_activations(
     acts_list: list[t.Tensor],
     projector,
@@ -84,6 +70,12 @@ def project_activations(
         current_idx += length
 
     return projected_activations
+
+
+def defaultdict_factory():
+    """Factory for string defaultdicts."""
+
+    return defaultdict(str)
 
 
 def top_k_contexts(
