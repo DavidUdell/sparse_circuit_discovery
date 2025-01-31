@@ -601,9 +601,6 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             up_values = up_values.unsqueeze(dim=0)
         assert up_values.dim() == 1
 
-        # Sublayer absolute effect explained.
-        sublayer_explained += abs(up_values).sum().item()
-
         ###  Thresholding up-nodes  ###
         if "error" in up_layer_module:
             up_values = up_values.sum().unsqueeze(0)
@@ -626,18 +623,23 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 continue
 
             if "error" in up_layer_module:
+                effect_unexplained += effect
+                continue
                 info: str | None = None
                 shape: str = "box"
                 style: str = "dotted"
             elif "res" in up_layer_module:
+                effect_explained += effect
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "dashed"
             elif "attn" in up_layer_module:
+                effect_explained += effect
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
             elif "mlp" in up_layer_module:
+                effect_explained += effect
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
@@ -703,6 +705,7 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             up_subgraph.add_node(up_dim_name)
 
             if "error" in down_layer_module:
+                continue
                 info: str | None = None
                 shape: str = "box"
                 style: str = "dotted"
@@ -809,15 +812,6 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 color=rgba,
                 weight=weight,
             )
-
-    # Store sublayer explained effect.
-    if down_layer_str not in explained_dict:
-        explained_dict[down_layer_str] = sublayer_explained
-    else:
-        explained_dict[down_layer_str] += sublayer_explained
-
-    # Log overall explained effect.
-    effect_explained += sublayer_explained
 
 # Here to have the newlines look nice in both the interactive notebooks and the
 # shell.
