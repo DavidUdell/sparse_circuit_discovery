@@ -128,6 +128,9 @@ def hooks_manager(
     activations_dict: defaultdict,
     ablate_during_run: bool = True,
     coefficient: float = 0.0,
+    complement: bool = False,
+    keep_errors: bool = True,
+    patch_activations: t.Tensor | None = None,
 ):
     """
     Context manager for the full-scale ablations and caching.
@@ -135,6 +138,11 @@ def hooks_manager(
     Ablates the specified feature at `layer_idx` and caches the downstream
     effects. `coefficient` can be set for other multiplicative pinnings, apart
     from ablation.
+
+    Args:
+        complement_mask: If True, takes complement of mask before applying
+        keep_errors: If False, removes error terms from reconstruction
+        patch_activations: If provided, patches these activations instead of zeroing
     """
 
     def ablate_hook_fac(
@@ -148,7 +156,7 @@ def hooks_manager(
 
         def ablate_hook(  # pylint: disable=unused-argument, redefined-builtin
             module, input, output
-        ) -> None:
+        ) -> tuple[t.Tensor, t.Tensor]:
             """
             Project activation vectors; ablate them; project them back.
             """
@@ -168,15 +176,30 @@ def hooks_manager(
                 inplace=True,
             )
 
-            # Zero out or otherwise pin the column vectors specified.
+            # Create mask for ablation
             mask = t.ones(projected_acts.shape, dtype=t.bool).to(model.device)
             if coefficient == 0.0:
                 mask[:, :, dim_indices] = False
             else:
                 mask = mask.float()
                 mask[:, :, dim_indices] *= coefficient
-            ablated_acts = projected_acts * mask
 
+            # Take complement if requested
+            if complement:
+                mask = ~mask if mask.dtype == t.bool else 1.0 - mask
+
+            # Apply mask or patch in activations
+            if patch_activations is not None:
+                # Create patched tensor starting with original
+                patched_acts = projected_acts.clone()
+                # Patch where mask is True (complement)
+                patched_acts[mask] = patch_activations[mask]
+                ablated_acts = patched_acts
+            else:
+                # Zero out based on mask
+                ablated_acts = projected_acts * mask
+
+            # Project back through decoder
             projected_acts = (
                 t.nn.functional.linear(  # pylint: disable=not-callable
                     projected_acts,
@@ -195,10 +218,19 @@ def hooks_manager(
             # Perform the ablation. The right term reflects just ablation
             # effects, hopefully canceling out autoencoder mangling. We must
             # also preserve the attention data in `output[1]`.
-            return (
-                output[0] + (ablated_acts - projected_acts),
-                output[1],
-            )
+
+            if keep_errors:
+                return (
+                    output[0] + (ablated_acts - projected_acts),
+                    output[1],
+                )
+            else:
+                # Remove autoencoder errors by using only the difference between
+                # ablated and non-ablated decoded activations
+                return (
+                    ablated_acts,
+                    output[1],
+                )
 
         return ablate_hook
 
