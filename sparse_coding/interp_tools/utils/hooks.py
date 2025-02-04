@@ -301,8 +301,8 @@ def hooks_manager(
 
         return cache_hook
 
-    if ablate_layer_idx == model_layer_range[-1]:
-        raise ValueError("Cannot ablate and cache from the last layer.")
+    # if ablate_layer_idx == model_layer_range[-1]:
+    #     raise ValueError("Cannot ablate and cache from the last layer.")
     cache_layer_idx: int = ablate_layer_idx + 1
     # Just the GPT-2 small layer syntax, for now.
     if ablate_during_run:

@@ -80,7 +80,6 @@ wandb.init(
 # Model setup.
 t.set_grad_enabled(False)
 accelerator: Accelerator = Accelerator()
-print(HF_ACCESS_TOKEN)
 tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     use_fast=True,
