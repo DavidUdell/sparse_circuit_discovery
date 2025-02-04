@@ -83,6 +83,8 @@ TOP_K = config.get("TOP_K")
 VIEW = config.get("VIEW")
 NUM_DOWN_NODES = config.get("NUM_DOWN_NODES")
 NUM_UP_NODES = config.get("NUM_UP_NODES")
+ERROR_NODES = config.get("ERROR_NODES")
+SUBLAYERS = config.get("SUBLAYERS")
 
 # export WANDB_MODE, if set in config
 if WANDB_MODE:
@@ -624,7 +626,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             if "error" in up_layer_module:
                 effect_unexplained += effect
-                continue
+                if not ERROR_NODES:
+                    continue
                 info: str | None = None
                 shape: str = "box"
                 style: str = "dotted"
@@ -634,11 +637,15 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 shape: str = "box3d"
                 style: str = "dashed"
             elif "attn" in up_layer_module:
+                if not SUBLAYERS:
+                    continue
                 effect_explained += effect
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
             elif "mlp" in up_layer_module:
+                if not SUBLAYERS:
+                    continue
                 effect_explained += effect
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
@@ -705,7 +712,8 @@ for edges_str, down_nodes in marginal_grads_dict.items():
             up_subgraph.add_node(up_dim_name)
 
             if "error" in down_layer_module:
-                continue
+                if not ERROR_NODES:
+                    continue
                 info: str | None = None
                 shape: str = "box"
                 style: str = "dotted"
@@ -714,10 +722,14 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 shape: str = "box3d"
                 style: str = "dashed"
             elif "attn" in down_layer_module:
+                if not SUBLAYERS:
+                    continue
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
             elif "mlp" in down_layer_module:
+                if not SUBLAYERS:
+                    continue
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"

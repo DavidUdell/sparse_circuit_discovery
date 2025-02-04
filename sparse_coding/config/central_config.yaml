@@ -43,7 +43,7 @@ VALIDATION_DIMS_PINNED:
 MODEL_DIR: "openai-community/gpt2"
 
 # Prompt
-PROMPT: "Hello, world"
+PROMPT: "Copyright (C"
 
 # Dataset
 # A specified dataset will override the prompt.
@@ -90,6 +90,10 @@ ACCUMULATE_GRAD_BATCHES: 4
 
 # Cognition Graph
 LOGIT_TOKENS: 10
+
+# Grad Graph
+ERROR_NODES: False
+SUBLAYERS: False
 
 ## ------------------------------------------------------------------------- ##
 ## ----------------------------- Dev Constants ----------------------------- ##
