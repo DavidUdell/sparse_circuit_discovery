@@ -36,6 +36,7 @@ PROJECTION_FACTOR = config.get("PROJECTION_FACTOR")
 MODEL_DIR = config.get("MODEL_DIR")
 ACTS_LAYERS_SLICE = parse_slice(config.get("ACTS_LAYERS_SLICE"))
 ACTS_LAYERS_RANGE = range(ACTS_LAYERS_SLICE.start, ACTS_LAYERS_SLICE.stop)
+# RESID_REPO: str = "jbloom/GPT2-Small-SAEs"
 
 RESID_REPO: str = "jbloom/GPT2-Small-OAI-v5-128k-resid-post-SAEs"
 ATTN_REPO: str = "jbloom/GPT2-Small-OAI-v5-128k-attn-out-SAEs"

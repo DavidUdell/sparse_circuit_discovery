@@ -56,7 +56,8 @@ WANDB_ENTITY = config.get("WANDB_ENTITY")
 WANDB_MODE = config.get("WANDB_MODE")
 MODEL_DIR = config.get("MODEL_DIR")
 PROMPT = config.get("PROMPT")
-# Patch over ACTS_LAYERS_SLICE, if env_var is specified.
+# If there is an env var ACTS_LAYERS_SLICE, use that instead of the
+# ACTS_LAYERS_SLICE value in central_config.yaml
 ACTS_LAYERS_SLICE = parse_slice(
     os.environ.get("ACTS_LAYERS_SLICE", config.get("ACTS_LAYERS_SLICE"))
 )
