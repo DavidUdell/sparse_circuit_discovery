@@ -12,6 +12,7 @@ import numpy as np
 import torch as t
 from accelerate import Accelerator
 from datasets import load_dataset
+from tqdm.auto import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 import wandb
 
@@ -80,6 +81,7 @@ tokenizer = AutoTokenizer.from_pretrained(
     token=HF_ACCESS_TOKEN,
 )
 tokenizer.pad_token = tokenizer.eos_token
+t.set_grad_enabled(False)
 
 accelerator: Accelerator = Accelerator()
 model = accelerator.prepare(model)
@@ -129,7 +131,7 @@ if VALIDATION_DIMS_PINNED is not None:
 
 
 # %%
-# Validate the pinned circuit with ablations. Base case first.
+# Validate the pinned circuit with ablations.
 def func_tokenize(seq):
     """Put tokenization into functional form."""
 
@@ -146,40 +148,37 @@ dataloader = t.utils.data.DataLoader(
 )
 
 base_logits: t.Tensor = None
-with t.no_grad():
-    for batch in dataloader:
-        outputs = model(**batch)
-        # TODO: Normalize the logits into probs before summing
-        if base_logits is not None:
-            base_logits += outputs.logits.sum(dim=1).sum(dim=0)
-        else:
-            base_logits = outputs.logits.sum(dim=1).sum(dim=0)
+for batch in tqdm(dataloader, desc="Base Logits"):
+    outputs = model(**batch)
+    # TODO: Normalize the logits into probs before summing
+    if base_logits is not None:
+        base_logits += outputs.logits.sum(dim=1).sum(dim=0)
+    else:
+        base_logits = outputs.logits.sum(dim=1).sum(dim=0)
 
-print("Cleared base logits.")
 
 altered_logits: t.Tensor = None
-with t.no_grad():
-    with ExitStack() as stack:
-        for k, v in VALIDATION_DIMS_PINNED.items():
-            stack.enter_context(
-                hooks_manager(
-                    k,
-                    v,
-                    layer_range,
-                    {k + 1: []},
-                    model,
-                    layer_encoders,
-                    layer_decoders,
-                    defaultdict(list),
-                )
+with ExitStack() as stack:
+    for k, v in VALIDATION_DIMS_PINNED.items():
+        stack.enter_context(
+            hooks_manager(
+                k,
+                v,
+                layer_range,
+                {k + 1: []},
+                model,
+                layer_encoders,
+                layer_decoders,
+                defaultdict(list),
             )
+        )
 
-        for batch in dataloader:
-            outputs = model(**batch)
-            if altered_logits is not None:
-                altered_logits += outputs.logits.sum(dim=1).sum(dim=0)
-            else:
-                altered_logits = outputs.logits.sum(dim=1).sum(dim=0)
+    for batch in tqdm(dataloader, desc="Ablated Logits"):
+        outputs = model(**batch)
+        if altered_logits is not None:
+            altered_logits += outputs.logits.sum(dim=1).sum(dim=0)
+        else:
+            altered_logits = outputs.logits.sum(dim=1).sum(dim=0)
 
 # %%
 # Compute and display logit diffs.
