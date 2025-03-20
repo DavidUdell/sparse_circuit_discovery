@@ -150,11 +150,18 @@ dataloader = t.utils.data.DataLoader(
 base_logits: t.Tensor = None
 for batch in tqdm(dataloader, desc="Base Logits"):
     outputs = model(**batch)
-    # TODO: Normalize the logits into probs before summing
     if base_logits is not None:
-        base_logits += outputs.logits.sum(dim=1).sum(dim=0)
+        base_logits += (
+            t.nn.functional.softmax(outputs.logits, dim=-1)
+            .sum(dim=1)
+            .sum(dim=0)
+        )
     else:
-        base_logits = outputs.logits.sum(dim=1).sum(dim=0)
+        base_logits = (
+            t.nn.functional.softmax(outputs.logits, dim=-1)
+            .sum(dim=1)
+            .sum(dim=0)
+        )
 
 
 altered_logits: t.Tensor = None
@@ -176,23 +183,28 @@ with ExitStack() as stack:
     for batch in tqdm(dataloader, desc="Ablated Logits"):
         outputs = model(**batch)
         if altered_logits is not None:
-            altered_logits += outputs.logits.sum(dim=1).sum(dim=0)
+            altered_logits += (
+                t.nn.functional.softmax(outputs.logits, dim=-1)
+                .sum(dim=1)
+                .sum(dim=0)
+            )
         else:
-            altered_logits = outputs.logits.sum(dim=1).sum(dim=0)
+            altered_logits = (
+                t.nn.functional.softmax(outputs.logits, dim=-1)
+                .sum(dim=1)
+                .sum(dim=0)
+            )
 
 # %%
 # Compute and display logit diffs.
-prob_diff = t.nn.functional.softmax(
-    altered_logits, dim=-1
-) - t.nn.functional.softmax(base_logits, dim=-1)
+prob_diff = altered_logits - base_logits
 
-prob_diff = prob_diff.mean(dim=0)
 positive_tokens = prob_diff.topk(LOGIT_TOKENS).indices
 negative_tokens = prob_diff.topk(LOGIT_TOKENS, largest=False).indices
 token_ids = t.cat((positive_tokens, negative_tokens), dim=0)
 
 print("Base Probabilities:")
-initial_probs = t.nn.functional.softmax(base_logits, dim=-1).detach().squeeze()
+initial_probs = base_logits.detach()
 top_probs = t.topk(initial_probs, LOGIT_TOKENS)
 for i in top_probs.indices.tolist():
     token = tokenizer.decode(i)
@@ -219,9 +231,8 @@ for meta_idx, token_id in enumerate(token_ids):
 print("\n")
 
 print("Altered Probabilities:")
-final_probs = (
-    t.nn.functional.softmax(altered_logits, dim=-1).detach().squeeze()
-)
+final_probs = altered_logits.detach()
+
 top_probs = t.topk(final_probs, LOGIT_TOKENS)
 for i in top_probs.indices.tolist():
     token = tokenizer.decode(i)
