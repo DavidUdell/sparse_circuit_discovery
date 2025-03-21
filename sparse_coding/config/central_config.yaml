@@ -43,6 +43,8 @@ VALIDATION_DIMS_PINNED:
 MODEL_DIR: "openai-community/gpt2"
 
 # Prompt
+# "The biggest name in basketball is Michael"
+# "Copyright (C"
 PROMPT: "Hello, world"
 
 # Dataset

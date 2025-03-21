@@ -11,6 +11,8 @@ from contextlib import ExitStack
 import numpy as np
 import torch as t
 from accelerate import Accelerator
+from datasets import load_dataset
+from tqdm.auto import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 import wandb
 
@@ -49,6 +51,8 @@ VALIDATION_DIMS_PINNED = config.get("VALIDATION_DIMS_PINNED")
 LOGIT_TOKENS = config.get("LOGIT_TOKENS")
 SEED = config.get("SEED")
 
+BATCH_SIZE: int = 24
+
 if WANDB_MODE:
     os.environ["WANDB_MODE"] = WANDB_MODE
 
@@ -76,6 +80,9 @@ tokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     token=HF_ACCESS_TOKEN,
 )
+tokenizer.pad_token = tokenizer.eos_token
+t.set_grad_enabled(False)
+
 accelerator: Accelerator = Accelerator()
 model = accelerator.prepare(model)
 model.eval()
@@ -83,7 +90,11 @@ model.eval()
 layer_range: range = slice_to_range(model, ACTS_LAYERS_SLICE)
 ablate_layer_range: range = layer_range[:-1]
 
-inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+# Load in the dataset
+raw_dataset: list[list[str]] = load_dataset(
+    "Elriggs/openwebtext-100k",
+    split="train",
+)["text"]
 
 # %%
 # Prepare all layer autoencoders and layer dim index lists up front.
@@ -118,11 +129,42 @@ if VALIDATION_DIMS_PINNED is not None:
         for i in v:
             assert i in layer_dim_indices[k]
 
-# %%
-# Validate the pinned circuit with ablations. Base case first.
-outputs = model(**inputs)
-base_logit = outputs.logits[:, -1, :]
 
+# %%
+# Validate the pinned circuit with ablations.
+def func_tokenize(seq):
+    """Put tokenization into functional form."""
+
+    return tokenizer(
+        seq,
+        padding=True,
+        return_tensors="pt",
+        truncation=True,
+    ).to(model.device)
+
+
+dataloader = t.utils.data.DataLoader(
+    raw_dataset, batch_size=BATCH_SIZE, collate_fn=func_tokenize
+)
+
+base_logits: t.Tensor = None
+for batch in tqdm(dataloader, desc="Base Logits"):
+    outputs = model(**batch)
+    if base_logits is not None:
+        base_logits += (
+            t.nn.functional.softmax(outputs.logits, dim=-1)
+            .sum(dim=1)
+            .sum(dim=0)
+        )
+    else:
+        base_logits = (
+            t.nn.functional.softmax(outputs.logits, dim=-1)
+            .sum(dim=1)
+            .sum(dim=0)
+        )
+
+
+altered_logits: t.Tensor = None
 with ExitStack() as stack:
     for k, v in VALIDATION_DIMS_PINNED.items():
         stack.enter_context(
@@ -138,22 +180,31 @@ with ExitStack() as stack:
             )
         )
 
-    outputs = model(**inputs)
-    altered_logit = outputs.logits[:, -1, :]
+    for batch in tqdm(dataloader, desc="Ablated Logits"):
+        outputs = model(**batch)
+        if altered_logits is not None:
+            altered_logits += (
+                t.nn.functional.softmax(outputs.logits, dim=-1)
+                .sum(dim=1)
+                .sum(dim=0)
+            )
+        else:
+            altered_logits = (
+                t.nn.functional.softmax(outputs.logits, dim=-1)
+                .sum(dim=1)
+                .sum(dim=0)
+            )
 
 # %%
 # Compute and display logit diffs.
-prob_diff = t.nn.functional.softmax(
-    altered_logit, dim=-1
-) - t.nn.functional.softmax(base_logit, dim=-1)
+prob_diff = altered_logits - base_logits
 
-prob_diff = prob_diff.mean(dim=0)
 positive_tokens = prob_diff.topk(LOGIT_TOKENS).indices
 negative_tokens = prob_diff.topk(LOGIT_TOKENS, largest=False).indices
 token_ids = t.cat((positive_tokens, negative_tokens), dim=0)
 
 print("Base Probabilities:")
-initial_probs = t.nn.functional.softmax(base_logit, dim=-1).detach().squeeze()
+initial_probs = base_logits.detach()
 top_probs = t.topk(initial_probs, LOGIT_TOKENS)
 for i in top_probs.indices.tolist():
     token = tokenizer.decode(i)
@@ -180,7 +231,8 @@ for meta_idx, token_id in enumerate(token_ids):
 print("\n")
 
 print("Altered Probabilities:")
-final_probs = t.nn.functional.softmax(altered_logit, dim=-1).detach().squeeze()
+final_probs = altered_logits.detach()
+
 top_probs = t.topk(final_probs, LOGIT_TOKENS)
 for i in top_probs.indices.tolist():
     token = tokenizer.decode(i)
