@@ -16,8 +16,8 @@ THRESHOLD_EXP: 5.0
 DIMS_PINNED:
 
 # Topk thresholds for gradient-based method.
-NUM_UP_NODES: 5
-NUM_DOWN_NODES: 5
+NUM_UP_NODES: 8
+NUM_DOWN_NODES: 8
 
 # Here you can freely pin multiple dims per layer.
 VALIDATION_DIMS_PINNED:
@@ -43,9 +43,9 @@ VALIDATION_DIMS_PINNED:
 MODEL_DIR: "openai-community/gpt2"
 
 # Prompt
-# "The biggest name in basketball is Michael"
-# "Copyright (C"
-PROMPT: "Hello, world"
+# "The biggest name in basketball is Michael Jordan"
+# "Copyright (C)"
+PROMPT: "Copyright (C)"
 
 # Dataset
 # A specified dataset will override the prompt.
