@@ -255,7 +255,8 @@ save_dot_path: str = save_paths(
 
 # %%
 # Define cross-entropy loss.
-metric = t.nn.CrossEntropyLoss()
+# metric = t.nn.CrossEntropyLoss()
+metric = t.logsumexp
 
 # %%
 # Model passes.
@@ -292,9 +293,13 @@ with grads_manager(
     output = model(**inputs)
     logits = output.logits[:, -1, :].squeeze()
 
+    # loss = metric(
+    #     logits,
+    #     target,
+    # )
     loss = metric(
         logits,
-        target,
+        dim=-1,
     )
     loss.backward(retain_graph=True)
 
