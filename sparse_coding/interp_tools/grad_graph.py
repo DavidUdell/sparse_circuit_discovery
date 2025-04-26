@@ -37,6 +37,7 @@ from sparse_coding.interp_tools.utils.computations import (
 from sparse_coding.interp_tools.utils.graphs import (
     get_local_logits,
     label_highlighting,
+    logit_diffs_str,
     neuronpedia_api,
     prune_graph,
 )
@@ -656,17 +657,17 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             if info is not None:
                 # Autoencoder up nodes
+                prob_diffs = get_local_logits(
+                    inputs,
+                    model,
+                    logits,
+                    up_layer_idx,
+                    [up_dim],
+                    encoder,
+                    decoder,
+                    up_layer_module,
+                )
                 try:
-                    prob_diffs = get_local_logits(
-                        inputs,
-                        model,
-                        logits,
-                        up_layer_idx,
-                        [up_dim],
-                        encoder,
-                        decoder,
-                        up_layer_module,
-                    )
                     label = label_highlighting(
                         up_layer_idx,
                         up_dim,
@@ -703,6 +704,13 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         up_layer_module,
                         TOP_K,
                         VIEW,
+                    )
+                    label += logit_diffs_str(
+                        up_layer_idx,
+                        up_dim,
+                        prob_diffs,
+                        LOGIT_TOKENS,
+                        tokenizer,
                     )
                     label += "</table>>"
                     graph.add_node(
@@ -750,17 +758,17 @@ for edges_str, down_nodes in marginal_grads_dict.items():
 
             if info is not None:
                 # Autoencoder down nodes
+                prob_diffs = get_local_logits(
+                    inputs,
+                    model,
+                    logits,
+                    down_layer_idx,
+                    [down_dim],
+                    encoder,
+                    decoder,
+                    down_layer_module,
+                )
                 try:
-                    prob_diffs = get_local_logits(
-                        inputs,
-                        model,
-                        logits,
-                        down_layer_idx,
-                        [down_dim],
-                        encoder,
-                        decoder,
-                        down_layer_module,
-                    )
                     label = label_highlighting(
                         down_layer_idx,
                         down_dim,
@@ -797,6 +805,13 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         down_layer_module,
                         TOP_K,
                         VIEW,
+                    )
+                    label += logit_diffs_str(
+                        down_layer_idx,
+                        down_dim,
+                        prob_diffs,
+                        LOGIT_TOKENS,
+                        tokenizer,
                     )
                     label += "</table>>"
                     graph.add_node(
