@@ -17,6 +17,7 @@ from sparse_coding.interp_tools.utils.computations import (
     calc_overall_effects,
     deduplicate_sequences,
 )
+from sparse_coding.interp_tools.utils.hooks import hooks_manager
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
     load_preexisting_graph,
@@ -161,6 +162,7 @@ def label_highlighting(
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
         label += "<tr>"
+        print(label)
         pos_tokens_affected = (
             prob_diffs[layer_idx, neuron_idx]
             .sum(dim=0)
@@ -557,3 +559,50 @@ def neuronpedia_api(
         label += "</tr>"
 
     return label
+
+
+def get_local_logits(
+    prompt,
+    model,
+    base_logits,
+    ablate_layer_idx,
+    ablate_dim_indices,
+    enc_tensors_per_layer,
+    dec_tensors_per_layer,
+    sublayer_module: str,
+) -> dict:
+    """Run yet more ablations to get local logit diffs."""
+
+    activations_dict = None
+    model_layer_range = None
+    cache_dim_indices = None
+
+    with hooks_manager(
+        ablate_layer_idx,
+        ablate_dim_indices,
+        model_layer_range,
+        cache_dim_indices,
+        model,
+        enc_tensors_per_layer,
+        dec_tensors_per_layer,
+        activations_dict,
+        ablate_during_run=True,
+        cache_during_run=False,
+        ablate_layer_module=sublayer_module,
+    ):
+        output = model(**prompt)
+        ablated_logits = output.logits[:, -1, :]
+
+        log_probability_diff = -t.nn.functional.log_softmax(
+            ablated_logits,
+            dim=-1,
+        ) + t.nn.functional.log_softmax(
+            base_logits,
+            dim=-1,
+        )
+        assert len(ablate_dim_indices) == 1
+        log_probability_diff: dict = {
+            (ablate_layer_idx, ablate_dim_indices[0]): log_probability_diff
+        }
+
+    return log_probability_diff
