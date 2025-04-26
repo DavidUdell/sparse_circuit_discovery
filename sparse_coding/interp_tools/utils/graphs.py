@@ -159,10 +159,25 @@ def label_highlighting(
 
         label += "</tr>"
 
+    if neuronpedia:
+        assert (
+            sublayer_type is not None
+            and top_k is not None
+            and view is not None
+        )
+
+        label += neuronpedia_api(
+            layer_idx,
+            neuron_idx,
+            neuronpedia_key,
+            sublayer_type,
+            top_k,
+            view,
+        )
+
     # Add logit diffs.
     if (layer_idx, neuron_idx) in prob_diffs:
         label += "<tr>"
-        print(label)
         pos_tokens_affected = (
             prob_diffs[layer_idx, neuron_idx]
             .sum(dim=0)
@@ -209,24 +224,7 @@ def label_highlighting(
             label += f"{cell_tag}{token}</td>"
         label += "</tr>"
 
-    if neuronpedia:
-        assert (
-            sublayer_type is not None
-            and top_k is not None
-            and view is not None
-        )
-
-        label += neuronpedia_api(
-            layer_idx,
-            neuron_idx,
-            neuronpedia_key,
-            sublayer_type,
-            top_k,
-            view,
-        )
-
     label += "</table>>"
-
     return label
 
 
