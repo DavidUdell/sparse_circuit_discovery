@@ -85,10 +85,9 @@ trace out circuits as you go.
 ### Gradient-Based Algorithm Pipeline
 There is also a gradient-based algorithm, an implementation of [Marks et al.
 (2024).](https://arxiv.org/abs/2403.19647) This algorithm has the advantage of
-plotting contributions to the cross-entropy loss _directly_, rather than
-plotting contributions to intermediate activation magnitudes. Its
-implementation here also extends to GPT-2's sublayers, not just the model's
-residual stream.
+plotting contributions to the loss _directly_, rather than plotting
+contributions to intermediate activation magnitudes. Its implementation here
+also extends to GPT-2's sublayers, not just the model's residual stream.
 
 Key hyperparameters here are:
 1. `ACTS_LAYERS_SLICE` works as above.
@@ -102,6 +101,12 @@ NUM_DOWN_NODES: 5
    each sublayer down node. You'll get this many absolute top-k edges.
 3. `NUM_DOWN_NODES` fixes the number of sublayer nodes that edges will then be
    plotted _from_.
+
+Note also that there's a slight discrepency between how the `PROMPT` is used here
+vs. above. Instead of looking at a final _forward_ pass, we're now looking at a
+final _backward_ pass from the final sequence position. So if you want to see
+how a token was generated, you now _include_ that token as your final token in
+`PROMPT`.
 
 Save these values in `central_config.yaml`, then run interpretability:
 
