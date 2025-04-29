@@ -291,7 +291,7 @@ def hooks_manager(
         ablate_decoder, ablate_dec_bias = dec_tensors_per_layer[
             ablate_layer_idx
         ]
-        if ablate_layer_module == "resid":
+        if "res" in ablate_layer_module and "error" not in ablate_layer_module:
             ablate_hook_handle = model.transformer.h[
                 ablate_layer_idx
             ].register_forward_hook(
@@ -303,7 +303,10 @@ def hooks_manager(
                     ablate_dec_bias,
                 )
             )
-        elif ablate_layer_module == "attn":
+        elif (
+            "attn" in ablate_layer_module
+            and "error" not in ablate_layer_module
+        ):
             ablate_hook_handle = model.transformer.h[
                 ablate_layer_idx
             ].attn.register_forward_hook(
@@ -315,7 +318,9 @@ def hooks_manager(
                     ablate_dec_bias,
                 )
             )
-        elif ablate_layer_module == "mlp":
+        elif (
+            "mlp" in ablate_layer_module and "error" not in ablate_layer_module
+        ):
             ablate_hook_handle = model.transformer.h[
                 ablate_layer_idx
             ].mlp.register_forward_hook(
