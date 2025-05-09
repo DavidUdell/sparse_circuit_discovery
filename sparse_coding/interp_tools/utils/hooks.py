@@ -120,13 +120,18 @@ def rasp_ablate_hook_fac(neuron_index: int):
 def hooks_manager(
     ablate_layer_idx: int,
     ablate_dim_indices: list[int],
-    model_layer_range: range,
+    # Just leaving this arg be for now, even though I've commented out its
+    # logic.
+    model_layer_range: range,  # pylint: disable=unused-argument
     cache_dim_indices: dict[int, list[int]],
     model,
     enc_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     dec_tensors_per_layer: dict[int, tuple[t.Tensor, t.Tensor]],
     activations_dict: defaultdict,
+    # "res" | "attn" | "mlp"
+    ablate_layer_module: str = "res",
     ablate_during_run: bool = True,
+    cache_during_run: bool = True,
     coefficient: float = 0.0,
 ):
     """
@@ -171,10 +176,10 @@ def hooks_manager(
             # Zero out or otherwise pin the column vectors specified.
             mask = t.ones(projected_acts.shape, dtype=t.bool).to(model.device)
             if coefficient == 0.0:
-                mask[:, :, dim_indices] = False
+                mask[..., :, dim_indices] = False
             else:
                 mask = mask.float()
-                mask[:, :, dim_indices] *= coefficient
+                mask[..., :, dim_indices] *= coefficient
             ablated_acts = projected_acts * mask
 
             projected_acts = (
@@ -195,10 +200,15 @@ def hooks_manager(
             # Perform the ablation. The right term reflects just ablation
             # effects, hopefully canceling out autoencoder mangling. We must
             # also preserve the attention data in `output[1]`.
-            return (
-                output[0] + (ablated_acts - projected_acts),
-                output[1],
-            )
+            if isinstance(output, tuple):
+                return (
+                    output[0] + (ablated_acts - projected_acts),
+                    output[1],
+                )
+            elif isinstance(output, t.Tensor):
+                return output + (ablated_acts - projected_acts)
+            else:
+                assert False
 
         return ablate_hook
 
@@ -269,8 +279,9 @@ def hooks_manager(
 
         return cache_hook
 
-    if ablate_layer_idx == model_layer_range[-1]:
-        raise ValueError("Cannot ablate and cache from the last layer.")
+    # if ablate_layer_idx == model_layer_range[-1]:
+    #     raise ValueError("Cannot ablate and cache from the last layer.")
+
     cache_layer_idx: int = ablate_layer_idx + 1
     # Just the GPT-2 small layer syntax, for now.
     if ablate_during_run:
@@ -280,39 +291,73 @@ def hooks_manager(
         ablate_decoder, ablate_dec_bias = dec_tensors_per_layer[
             ablate_layer_idx
         ]
+        if "res" in ablate_layer_module and "error" not in ablate_layer_module:
+            ablate_hook_handle = model.transformer.h[
+                ablate_layer_idx
+            ].register_forward_hook(
+                ablate_hook_fac(
+                    ablate_dim_indices,
+                    ablate_encoder,
+                    ablate_enc_bias,
+                    ablate_decoder,
+                    ablate_dec_bias,
+                )
+            )
+        elif (
+            "attn" in ablate_layer_module
+            and "error" not in ablate_layer_module
+        ):
+            ablate_hook_handle = model.transformer.h[
+                ablate_layer_idx
+            ].attn.register_forward_hook(
+                ablate_hook_fac(
+                    ablate_dim_indices,
+                    ablate_encoder,
+                    ablate_enc_bias,
+                    ablate_decoder,
+                    ablate_dec_bias,
+                )
+            )
+        elif (
+            "mlp" in ablate_layer_module and "error" not in ablate_layer_module
+        ):
+            ablate_hook_handle = model.transformer.h[
+                ablate_layer_idx
+            ].mlp.register_forward_hook(
+                ablate_hook_fac(
+                    ablate_dim_indices,
+                    ablate_encoder,
+                    ablate_enc_bias,
+                    ablate_decoder,
+                    ablate_dec_bias,
+                )
+            )
+        else:
+            print(ablate_layer_module)
+            assert False
 
-        ablate_hook_handle = model.transformer.h[
-            ablate_layer_idx
+    if cache_during_run:
+        cache_encoder, cache_enc_bias = enc_tensors_per_layer[cache_layer_idx]
+        _, cache_dec_bias = dec_tensors_per_layer[cache_layer_idx]
+        cache_hook_handle = model.transformer.h[
+            cache_layer_idx
         ].register_forward_hook(
-            ablate_hook_fac(
+            cache_hook_fac(
                 ablate_dim_indices,
-                ablate_encoder,
-                ablate_enc_bias,
-                ablate_decoder,
-                ablate_dec_bias,
+                cache_dim_indices[cache_layer_idx],
+                ablate_layer_idx,
+                cache_encoder,
+                cache_enc_bias,
+                cache_dec_bias,
+                activations_dict,
             )
         )
-
-    cache_encoder, cache_enc_bias = enc_tensors_per_layer[cache_layer_idx]
-    _, cache_dec_bias = dec_tensors_per_layer[cache_layer_idx]
-    cache_hook_handle = model.transformer.h[
-        cache_layer_idx
-    ].register_forward_hook(
-        cache_hook_fac(
-            ablate_dim_indices,
-            cache_dim_indices[cache_layer_idx],
-            ablate_layer_idx,
-            cache_encoder,
-            cache_enc_bias,
-            cache_dec_bias,
-            activations_dict,
-        )
-    )
 
     try:
         yield
     finally:
-        cache_hook_handle.remove()
+        if cache_during_run:
+            cache_hook_handle.remove()
         if ablate_during_run:
             ablate_hook_handle.remove()
 

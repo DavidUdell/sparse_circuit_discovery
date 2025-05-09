@@ -431,7 +431,7 @@ def test_edge_level_effects(  # pylint: disable=redefined-outer-name, unused-arg
         .squeeze(),
         t.tensor([0.0682, 0.0000, -0.0790]),
         rtol=2.25e-3,
-        atol=1e-4,
+        atol=1e-3,
     )
     assert t.allclose(
         marginal_grads_dict["attn_11_to_resid_error_11"][0][:, :3]

@@ -17,6 +17,7 @@ from sparse_coding.interp_tools.utils.computations import (
     calc_overall_effects,
     deduplicate_sequences,
 )
+from sparse_coding.interp_tools.utils.hooks import hooks_manager
 from sparse_coding.utils.interface import (
     load_layer_feature_labels,
     load_preexisting_graph,
@@ -102,6 +103,58 @@ def color_range_from_scalars(activations: dict) -> tuple[float, float]:
     return min_scalar, max_scalar
 
 
+def logit_diffs_str(
+    layer_idx, neuron_idx, prob_diffs, logit_tokens, tokenizer
+) -> str:
+    "Map prob_diffs onto an HTML table row."
+
+    label = "<tr>"
+
+    pos_tokens_affected = (
+        prob_diffs[layer_idx, neuron_idx]
+        .sum(dim=0)
+        .squeeze()
+        .topk(logit_tokens)
+        .indices
+    )
+    # Negative prob_diffs here to get top tokens negatively affected.
+    neg_tokens_affected = (
+        (-prob_diffs[layer_idx, neuron_idx])
+        .sum(dim=0)
+        .squeeze()
+        .topk(logit_tokens)
+        .indices
+    )
+    for meta_idx, token in enumerate(
+        t.cat((pos_tokens_affected, neg_tokens_affected))
+    ):
+        # Break rows between positive and negative logits.
+        if meta_idx == len(pos_tokens_affected):
+            label += "</tr><tr>"
+        if prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item() > 0.0:
+            shade = "#6060ff"
+            cell_tag = f'<td border="1" bgcolor="{shade}">'
+        elif (
+            prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item() < 0.0
+        ):
+            shade = "#ff6060"
+            cell_tag = f'<td border="1" bgcolor="{shade}">'
+        else:
+            # Grey for no effect, to disabmiguate from any errors.
+            cell_tag = '<td border="1" bgcolor="#cccccc">'
+
+        token = tokenizer.convert_ids_to_tokens(token.item())
+        token = tokenizer.convert_tokens_to_string([token])
+        token = html.escape(token)
+        # Explicitly handle newlines/control characters.
+        token = token.encode("unicode_escape").decode("utf-8")
+
+        label += f"{cell_tag}{token}</td>"
+
+    label += "</tr>"
+    return label
+
+
 def label_highlighting(
     layer_idx,
     neuron_idx,
@@ -158,55 +211,6 @@ def label_highlighting(
 
         label += "</tr>"
 
-    # Add logit diffs.
-    if (layer_idx, neuron_idx) in prob_diffs:
-        label += "<tr>"
-        pos_tokens_affected = (
-            prob_diffs[layer_idx, neuron_idx]
-            .sum(dim=0)
-            .squeeze()
-            .topk(logit_tokens)
-            .indices
-        )
-        # Negative prob_diffs here to get top tokens negatively affected.
-        neg_tokens_affected = (
-            (-prob_diffs[layer_idx, neuron_idx])
-            .sum(dim=0)
-            .squeeze()
-            .topk(logit_tokens)
-            .indices
-        )
-        for meta_idx, token in enumerate(
-            t.cat((pos_tokens_affected, neg_tokens_affected))
-        ):
-            # Break rows between positive and negative logits.
-            if meta_idx == len(pos_tokens_affected):
-                label += "</tr><tr>"
-            if (
-                prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item()
-                > 0.0
-            ):
-                shade = "#6060ff"
-                cell_tag = f'<td border="1" bgcolor="{shade}">'
-            elif (
-                prob_diffs[layer_idx, neuron_idx][:, token].sum(dim=0).item()
-                < 0.0
-            ):
-                shade = "#ff6060"
-                cell_tag = f'<td border="1" bgcolor="{shade}">'
-            else:
-                # Grey for no effect, to disabmiguate from any errors.
-                cell_tag = '<td border="1" bgcolor="#cccccc">'
-
-            token = tokenizer.convert_ids_to_tokens(token.item())
-            token = tokenizer.convert_tokens_to_string([token])
-            token = html.escape(token)
-            # Explicitly handle newlines/control characters.
-            token = token.encode("unicode_escape").decode("utf-8")
-
-            label += f"{cell_tag}{token}</td>"
-        label += "</tr>"
-
     if neuronpedia:
         assert (
             sublayer_type is not None
@@ -223,8 +227,13 @@ def label_highlighting(
             view,
         )
 
-    label += "</table>>"
+    # Add logit diffs.
+    if (layer_idx, neuron_idx) in prob_diffs:
+        label += logit_diffs_str(
+            layer_idx, neuron_idx, prob_diffs, logit_tokens, tokenizer
+        )
 
+    label += "</table>>"
     return label
 
 
@@ -557,3 +566,50 @@ def neuronpedia_api(
         label += "</tr>"
 
     return label
+
+
+def get_local_logits(
+    prompt,
+    model,
+    base_logits,
+    ablate_layer_idx,
+    ablate_dim_indices,
+    enc_tensors_per_layer,
+    dec_tensors_per_layer,
+    sublayer_module: str,
+) -> dict:
+    """Run yet more ablations to get local logit diffs."""
+
+    activations_dict = None
+    model_layer_range = None
+    cache_dim_indices = None
+
+    with hooks_manager(
+        ablate_layer_idx,
+        ablate_dim_indices,
+        model_layer_range,
+        cache_dim_indices,
+        model,
+        enc_tensors_per_layer,
+        dec_tensors_per_layer,
+        activations_dict,
+        ablate_during_run=True,
+        cache_during_run=False,
+        ablate_layer_module=sublayer_module,
+    ):
+        output = model(**prompt)
+        ablated_logits = output.logits[:, -1, :]
+
+        log_probability_diff = -t.nn.functional.log_softmax(
+            ablated_logits,
+            dim=-1,
+        ) + t.nn.functional.log_softmax(
+            base_logits,
+            dim=-1,
+        )
+        assert len(ablate_dim_indices) == 1
+        log_probability_diff: dict = {
+            (ablate_layer_idx, ablate_dim_indices[0]): log_probability_diff
+        }
+
+    return log_probability_diff

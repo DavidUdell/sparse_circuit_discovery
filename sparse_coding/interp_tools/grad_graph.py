@@ -35,7 +35,9 @@ from sparse_coding.interp_tools.utils.computations import (
     ExactlyZeroEffectError,
 )
 from sparse_coding.interp_tools.utils.graphs import (
+    get_local_logits,
     label_highlighting,
+    logit_diffs_str,
     neuronpedia_api,
     prune_graph,
 )
@@ -290,10 +292,11 @@ with grads_manager(
 
     # Forward pass installs all backward hooks.
     output = model(**inputs)
-    logits = output.logits[:, -1, :].squeeze()
+    logits = output.logits[:, -1, :]
+    flat_logits = logits.squeeze()
 
     loss = metric(
-        logits,
+        flat_logits,
         target,
     )
     loss.backward(retain_graph=True)
@@ -632,41 +635,58 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "dashed"
+                encoder = res_enc_and_biases
+                decoder = res_dec_and_biases
             elif "attn" in up_layer_module:
                 effect_explained += effect
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
+                encoder = attn_enc_and_biases
+                decoder = attn_dec_and_biases
             elif "mlp" in up_layer_module:
                 effect_explained += effect
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
+                encoder = mlp_enc_and_biases
+                decoder = mlp_dec_and_biases
             else:
                 raise ValueError("Module location not recognized.")
             up_dim_name: str = f"{node_types[0]}.{up_dim}"
 
             if info is not None:
                 # Autoencoder up nodes
+                prob_diffs = get_local_logits(
+                    inputs,
+                    model,
+                    logits,
+                    up_layer_idx,
+                    [up_dim],
+                    encoder,
+                    decoder,
+                    up_layer_module,
+                )
                 try:
+                    label = label_highlighting(
+                        up_layer_idx,
+                        up_dim,
+                        MODEL_DIR,
+                        info,
+                        LOGIT_TOKENS,
+                        tokenizer,
+                        up_dim_name,
+                        prob_diffs,
+                        __file__,
+                        neuronpedia=True,
+                        sublayer_type=up_layer_module,
+                        top_k=TOP_K,
+                        view=VIEW,
+                        neuronpedia_key=NEURONPEDIA_KEY,
+                    )
                     graph.add_node(
                         up_dim_name,
-                        label=label_highlighting(
-                            up_layer_idx,
-                            up_dim,
-                            MODEL_DIR,
-                            info,
-                            0,
-                            tokenizer,
-                            up_dim_name,
-                            {},
-                            __file__,
-                            neuronpedia=True,
-                            sublayer_type=up_layer_module,
-                            top_k=TOP_K,
-                            view=VIEW,
-                            neuronpedia_key=NEURONPEDIA_KEY,
-                        ),
+                        label=label,
                         shape=shape,
                         style=style,
                     )
@@ -684,6 +704,13 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         up_layer_module,
                         TOP_K,
                         VIEW,
+                    )
+                    label += logit_diffs_str(
+                        up_layer_idx,
+                        up_dim,
+                        prob_diffs,
+                        LOGIT_TOKENS,
+                        tokenizer,
                     )
                     label += "</table>>"
                     graph.add_node(
@@ -711,39 +738,56 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                 info: str = RESID_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "dashed"
+                encoder = res_enc_and_biases
+                decoder = res_dec_and_biases
             elif "attn" in down_layer_module:
                 info: str = ATTN_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
+                encoder = attn_enc_and_biases
+                decoder = attn_dec_and_biases
             elif "mlp" in down_layer_module:
                 info: str = MLP_TOKENS_FILE
                 shape: str = "box3d"
                 style: str = "solid"
+                encoder = mlp_enc_and_biases
+                decoder = mlp_dec_and_biases
             else:
                 raise ValueError("Module location not recognized.")
             down_dim_name: str = f"{node_types[1]}.{down_dim}"
 
             if info is not None:
                 # Autoencoder down nodes
+                prob_diffs = get_local_logits(
+                    inputs,
+                    model,
+                    logits,
+                    down_layer_idx,
+                    [down_dim],
+                    encoder,
+                    decoder,
+                    down_layer_module,
+                )
                 try:
+                    label = label_highlighting(
+                        down_layer_idx,
+                        down_dim,
+                        MODEL_DIR,
+                        info,
+                        LOGIT_TOKENS,
+                        tokenizer,
+                        down_dim_name,
+                        prob_diffs,
+                        __file__,
+                        neuronpedia=True,
+                        sublayer_type=down_layer_module,
+                        top_k=TOP_K,
+                        view=VIEW,
+                        neuronpedia_key=NEURONPEDIA_KEY,
+                    )
                     graph.add_node(
                         down_dim_name,
-                        label=label_highlighting(
-                            down_layer_idx,
-                            down_dim,
-                            MODEL_DIR,
-                            info,
-                            0,
-                            tokenizer,
-                            down_dim_name,
-                            {},
-                            __file__,
-                            neuronpedia=True,
-                            sublayer_type=down_layer_module,
-                            top_k=TOP_K,
-                            view=VIEW,
-                            neuronpedia_key=NEURONPEDIA_KEY,
-                        ),
+                        label=label,
                         shape=shape,
                         style=style,
                     )
@@ -761,6 +805,13 @@ for edges_str, down_nodes in marginal_grads_dict.items():
                         down_layer_module,
                         TOP_K,
                         VIEW,
+                    )
+                    label += logit_diffs_str(
+                        down_layer_idx,
+                        down_dim,
+                        prob_diffs,
+                        LOGIT_TOKENS,
+                        tokenizer,
                     )
                     label += "</table>>"
                     graph.add_node(
